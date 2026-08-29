@@ -15,10 +15,10 @@ import { Lattice } from '@/components/Lattice';
 import { Btn, Field, INPUT } from '@/components/ui';
 import { Num } from '@/components/Num';
 import { cx } from '@/lib/cx';
+import { INTRO, prefersReducedMotion } from '@/lib/motion';
 import { useDB } from '@/lib/store';
 
 type Phase = 'hold' | 'travel' | 'settled';
-const KEY = 'halqah.intro.seen';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -30,22 +30,18 @@ export default function LoginPage() {
   const idRef = useRef<HTMLInputElement>(null);
   const db = useDB();
 
-  /* Decide the intro on the client only — the server has no sessionStorage,
-     so rendering 'settled' first keeps hydration identical on both sides.
-     The timeline does not start until the mark has actually decoded: otherwise a
-     cold load spends the whole hold phase staring at an empty ground. */
+  /* Runs on every visit, including a reload — this is the brand moment.
+     Rendering 'settled' on the server keeps hydration identical on both sides,
+     and the timeline only starts once the mark has actually decoded, so a cold
+     load never spends the hold phase staring at an empty ground. */
   useEffect(() => {
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    let seen = true;
-    try { seen = sessionStorage.getItem(KEY) === '1'; } catch { /* private mode */ }
-    if (seen || reduced) { setReady(true); return; }
-    try { sessionStorage.setItem(KEY, '1'); } catch {}
+    if (prefersReducedMotion()) { setReady(true); return; }
 
     let t1: ReturnType<typeof setTimeout>, t2: ReturnType<typeof setTimeout>;
     const start = () => {
       setPhase('hold');
-      t1 = setTimeout(() => setPhase('travel'), 900);
-      t2 = setTimeout(() => { setPhase('settled'); setReady(true); }, 1500);
+      t1 = setTimeout(() => setPhase('travel'), INTRO.hold);
+      t2 = setTimeout(() => { setPhase('settled'); setReady(true); }, INTRO.hold + INTRO.travel);
     };
     const img = new Image();
     const cap = setTimeout(start, 900);          // never wait on a slow network
@@ -70,15 +66,18 @@ export default function LoginPage() {
       {/* ── intro overlay: the mark alone on an empty ground ───────────────── */}
       {intro && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-page"
-             style={{ transition: 'opacity .55s cubic-bezier(.22,.61,.36,1)', opacity: phase === 'travel' ? 0 : 1 }}>
+             style={{ transition: `opacity ${INTRO.travel}ms cubic-bezier(.22,.61,.36,1)`,
+                      opacity: phase === 'travel' ? 0 : 1 }}>
           <div className="relative">
             <span className="absolute -inset-10 rounded-full border border-brand-300"
-                  style={{ animation: 'ringPulse 1.6s cubic-bezier(.22,.61,.36,1) .25s both' }} />
+                  style={{ animation: `ringPulse ${INTRO.hold}ms cubic-bezier(.22,.61,.36,1) ${INTRO.fadeIn}ms both` }} />
             <div style={{
-              transition: 'transform .6s cubic-bezier(.22,.61,.36,1)',
+              transition: `transform ${INTRO.travel}ms cubic-bezier(.22,.61,.36,1)`,
               transform: phase === 'travel' ? 'translateY(-14vh) scale(.52)' : 'none',
             }}>
-              <div className="mark-in"><LogoFull height={96} /></div>
+              <div className="mark-in" style={{ animationDuration: `${INTRO.fadeIn}ms` }}>
+                <LogoFull height={96} />
+              </div>
             </div>
           </div>
         </div>
@@ -130,7 +129,7 @@ export default function LoginPage() {
         {/* form column */}
         <main className="flex flex-col justify-center px-6 py-12 sm:px-12">
           <div className={cx('mx-auto w-full max-w-[23rem]', !intro && 'rise')}
-               style={{ animationDelay: '.16s' }}>
+               style={{ animationDelay: `${INTRO.formDelay}ms` }}>
             <div className="lg:hidden"><LogoFull height={46} /></div>
 
             <h1 className="mt-8 font-display text-d1 text-ink-900 lg:mt-0">تسجيل الدخول</h1>
