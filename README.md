@@ -1,7 +1,19 @@
 # حلقة — web
 
-Next.js app for the Halqah system. Built against the three specs one directory up:
-`SPEC.md` (what) · `DESIGN.md` (how it looks) · `BUILD_PLAN.md` (in what order).
+Next.js app for the Halqah system, built for **حلقات جامع محمد العبدالكريم — الدمام، حي أُحد**.
+
+Specs live in [`docs/`](docs/): [`SPEC.md`](docs/SPEC.md) (what it does) ·
+[`DESIGN.md`](docs/DESIGN.md) (how it looks) · [`BUILD_PLAN.md`](docs/BUILD_PLAN.md) (in what order).
+
+> **No client data is in this repository.** Student records, the association's workbooks
+> and the approved Arabic requirements PDF are deliberately kept out; `.gitignore` excludes
+> `*.xlsx`. Names, national IDs and phone numbers have been stripped from the docs.
+
+## Deploy
+
+Built for [CranL](https://cranl.com) — a Dockerfile-based PaaS. The `Dockerfile` uses
+Next.js standalone output and runs as a non-root user; point CranL at this repo, set the
+port to `3000`, and choose the **MENA** region.
 
 ## Run
 
