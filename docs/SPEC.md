@@ -2,7 +2,8 @@
 
 > **Audience:** the engineer/agent implementing this system.
 > **Privacy:** every real name, national ID and phone number has been stripped from these
-> documents. The client's workbooks and the approved Arabic PDF stay outside version control.
+> documents. The client's four workbooks stay outside version control — they carry students'
+> names, national IDs and guardians' phone numbers, and this repository is public.
 > **Language:** English by design, so identifiers, schema and prose stay in one language.
 > The **client-facing** document is Arabic: `متطلبات-نظام-حلقة.pdf` (source: `halqah-requirements.html`).
 > **This file must never contradict that PDF.** If it does, the PDF wins and this file is fixed.

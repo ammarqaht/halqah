@@ -2,12 +2,19 @@
 
 Next.js app for the Halqah system, built for **حلقات جامع محمد العبدالكريم — الدمام، حي أُحد**.
 
-Specs live in [`docs/`](docs/): [`SPEC.md`](docs/SPEC.md) (what it does) ·
-[`DESIGN.md`](docs/DESIGN.md) (how it looks) · [`BUILD_PLAN.md`](docs/BUILD_PLAN.md) (in what order).
+Specs live in [`docs/`](docs/):
 
-> **No client data is in this repository.** Student records, the association's workbooks
-> and the approved Arabic requirements PDF are deliberately kept out; `.gitignore` excludes
-> `*.xlsx`. Names, national IDs and phone numbers have been stripped from the docs.
+| File | What it is |
+|---|---|
+| [`متطلبات-نظام-حلقة.pdf`](docs/متطلبات-نظام-حلقة.pdf) | The client-approved requirements, in Arabic. The source of truth for scope. |
+| [`SPEC.md`](docs/SPEC.md) | Technical spec — data model, rules engine, import pipelines |
+| [`DESIGN.md`](docs/DESIGN.md) | Design system, application shell, sign-in |
+| [`BUILD_PLAN.md`](docs/BUILD_PLAN.md) | Phased build order |
+
+> **No student data is in this repository, and none should ever be added.** The association's
+> four workbooks carry students' names, national IDs and guardians' phone numbers; they stay
+> out, and `.gitignore` excludes `*.xlsx` so they cannot slip in. Names and identifiers have
+> been stripped from the documents above. The supervisor uploads his own file at runtime.
 
 ## Deploy
 
