@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Brand faces ─────────────────────────────────────────────────────────── */
+@font-face{font-family:'BrandArabic';src:url('/fonts/sans-Regular.woff2')format('woff2');font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:'BrandArabic';src:url('/fonts/sans-Medium.woff2')format('woff2');font-weight:500;font-style:normal;font-display:swap}
+@font-face{font-family:'BrandArabic';src:url('/fonts/sans-Bold.woff2')format('woff2');font-weight:700;font-style:normal;font-display:swap}
+@font-face{font-family:'BrandDisplay';src:url('/fonts/serif-Regular.woff2')format('woff2');font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:'BrandDisplay';src:url('/fonts/serif-Medium.woff2')format('woff2');font-weight:500;font-style:normal;font-display:swap}
+
+@layer base{
+  html,body,#__next{height:100%}
+  body{background:#F4F5F1;color:#191E1C;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  ::selection{background:#CFE2DF;color:#0A403C}
+  /* DESIGN.md §9.2 — every interactive element carries a visible ring */
+  :where(a,button,input,select,textarea,[tabindex]):focus-visible{
+    outline:2px solid #0E8D83;outline-offset:2px;border-radius:4px}
+}
+
+@layer utilities{
+  /* DESIGN.md §2.2 — figures align in columns */
+  .num{font-variant-numeric:tabular-nums}
+  .thin-scroll{scrollbar-width:thin;scrollbar-color:#D6DCD6 transparent}
+  .thin-scroll::-webkit-scrollbar{width:9px;height:9px}
+  .thin-scroll::-webkit-scrollbar-thumb{background:#D6DCD6;border-radius:9px;border:3px solid transparent;background-clip:content-box}
+  .thin-scroll::-webkit-scrollbar-thumb:hover{background:#B4BDB8;background-clip:content-box}
+}
+
+/* ── Motion ──────────────────────────────────────────────────────────────────
+   transform + opacity only. A layout animation would make every fixed/sticky
+   descendant position against the animated box instead of the viewport.       */
+/* `both` leaves the computed transform as an identity MATRIX, not the keyword
+   `none` — and a matrix still establishes a containing block for fixed
+   descendants. Route/section wrappers therefore use opacity only. */
+@keyframes riseIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes riseFlat{from{opacity:0}to{opacity:1}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes wipeStart{from{opacity:0;transform:translateX(-32px)}to{opacity:1;transform:none}}
+@keyframes markIn{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:none}}
+@keyframes shimmer{100%{transform:translateX(-100%)}}
+@keyframes ringPulse{0%{opacity:.55;transform:scale(.94)}70%{opacity:0;transform:scale(1.35)}100%{opacity:0;transform:scale(1.35)}}
+
+.rise{animation:riseIn .62s cubic-bezier(.22,.61,.36,1) backwards}
+.rise-flat{animation:riseFlat .5s cubic-bezier(.22,.61,.36,1) both}
+.fade{animation:fadeIn .5s ease both}
+.wipe{animation:wipeStart .68s cubic-bezier(.22,.61,.36,1) both}
+.mark-in{animation:markIn .5s cubic-bezier(.22,.61,.36,1) both}
+
+.skel{position:relative;overflow:hidden;background:#E3E7E1;border-radius:6px}
+.skel::after{content:'';position:absolute;inset:0;transform:translateX(100%);
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.65),transparent);
+  animation:shimmer 1.5s infinite}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;
+    transition-duration:.001ms!important;scroll-behavior:auto!important}
+}
