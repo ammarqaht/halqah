@@ -213,8 +213,7 @@ so the supervisor filters and jumps without ever leaving the results:
 | Section | What the panel becomes |
 |---|---|
 | الرئيسية | Jump list — alerts by type, with counts |
-| الطلاب | **Live filter surface** — halaqa, track, stage, status, level range, with result counts per option |
-| الحلقات | Halaqa list; selecting one filters the work area |
+| الطلاب والحلقات | **The halaqat themselves** — add, edit, and filter by them — plus a stage filter, each with result counts. Track and status filters were removed: a halaqa is normally one track, and every student is active, so both were noise |
 | الخطط | Student queue — who is waiting for a plan, who is late |
 | الاختبارات | Booking queue for the day, and exam-type filter |
 | النقاط والمتجر | Batch list / gift categories / order status |
@@ -238,7 +237,9 @@ action** per screen. Then the scrolling content on `page`.
 Structure from Mockup A, palette and type from Mockup C, plus the opening animation the client asked for.
 
 ### 5.1 Layout (after the animation settles)
-Two columns. In RTL the **brand panel is on the right**, the form on the left at a fixed 480px.
+Two columns. **The form is on the right** at a fixed 500px — the RTL reading
+origin, so the eye lands on the fields without crossing the page — and the brand
+panel takes the remaining width on the left.
 
 **Brand panel** (`brand-900`, white text):
 - Islamic lattice motif as a repeating SVG `<pattern>` at ~5% opacity — a geometric tile, not imagery.
@@ -254,24 +255,51 @@ Two columns. In RTL the **brand panel is on the right**, the form on the left at
 - A hairline, then the student entry point.
 - Footer: support line in `micro` `ink-500`.
 
-### 5.2 The opening animation
-A single continuous motion, ~1.6s total. Runs **once per browser session** (`sessionStorage`), so the
-supervisor logging in daily is not taxed 3 seconds every time.
+### 5.2 The opening curtain  ✅ built
+
+A full-bleed **curtain** in the page colour holds the mark dead centre, then the
+whole curtain **lifts out of the top of the viewport**, uncovering the screen
+that was rendered underneath it the entire time. The reveal is genuine: the page
+is uncovered, not faded in.
+
+> An earlier version had the mark travel and shrink into its corner. It read as
+> noise rather than as an entrance and was replaced. Recorded here because the
+> distinction is the whole point — one gesture, in one direction.
 
 | t | What happens |
 |---|---|
-| 0 → 400ms | Full-bleed `page` ground. The **complete logo lockup** fades in at the centre, at `height: 96px`, from `opacity 0 / scale 0.96` |
-| 400 → 900ms | It holds. Nothing else on screen |
-| 900 → 1500ms | The logo **travels to its resting position** in the brand panel and scales to `46px`, on a single `cubic-bezier(0.22, 0.61, 0.36, 1)` |
-| 1100 → 1600ms | Overlapping: the brand panel wipes in from the right edge, the form column fades up 12px, and the lattice cross-fades to 5% |
-| 1600ms | `autofocus` lands on the login field |
+| 0 → 380ms | The complete lockup fades in at the centre of the curtain, `height: 104px`, from `opacity 0 / scale .97` |
+| 380 → 2000ms | It holds. Nothing else on screen. This is the brand moment |
+| 2000 → 2780ms | The curtain translates to `-100%` on `cubic-bezier(0.7, 0, 0.2, 1)` — slow to release, quick to clear |
+| 2780ms | Focus lands on the national-ID field |
+
+**Runs on every visit, reloads included** — the client asked for it explicitly.
+
+> Worth revisiting at handover: the supervisor signs in daily and may reload
+> often, and 2.8s each time becomes a tax. Shortening it for repeat loads is a
+> single number in `lib/motion.ts`.
+
+**Between screens there is no curtain.** A full-bleed reveal on every navigation
+reads as an obstruction when it happens dozens of times an afternoon, so the
+grand entrance belongs to arrival alone. Navigation instead shows a small fixed
+indicator at the top centre — the mark inside a 68px disc with a `brand-700` arc
+turning around it, held a minimum of 520ms so a fast route change cannot make it
+blink. It never covers the work: the screen underneath stays visible and
+readable throughout.
+
+All timings live in **`lib/motion.ts`**; components read from it and never
+hard-code a duration.
 
 Implementation notes:
-- Animate **`transform` and `opacity` only.** A layout animation on the panel would make every
-  `fixed`/`sticky` descendant position against it instead of the viewport.
-- Use one shared element for the logo (FLIP), so the mark never re-renders or flickers mid-flight.
-- **`prefers-reduced-motion: reduce` → skip to the settled state**, no exceptions.
-- The form is present in the DOM and focusable from t=0. The animation must never gate input.
+- Animate **`transform` and `opacity` only.** Verified in a real browser: during
+  the hold the mark measures **0px off centre on both axes**, and the curtain
+  translates cleanly to `-100%`.
+- **The timeline waits for the mark to decode** before starting, capped at
+  900ms. Without this, a cold load spends the whole hold on an empty ground.
+- The mark is `<link rel="preload">`ed in the root layout.
+- **`prefers-reduced-motion: reduce` → skip straight to the settled state.**
+- The form is in the DOM and focusable from t=0. Motion never gates input.
+- The wrapper must not carry `overflow-hidden`, or it clips the lifting curtain.
 
 ---
 
@@ -283,8 +311,7 @@ The mockups' rail is wrong for this product. This is the correct one, derived fr
 | Icon | Label | Route | SPEC ref |
 |---|---|---|---|
 | home | الرئيسية | `/admin` | إد-٢ |
-| users | الطلاب | `/admin/students` | إد-٣-أ |
-| circles | الحلقات | `/admin/halaqat` | إد-٣-ب |
+| users | **الطلاب والحلقات** | `/admin/students` | إد-٣-أ **+** إد-٣-ب |
 | doc | الخطط | `/admin/plans` | إد-٥-أ |
 | check-square | الاختبارات | `/admin/exams` | إد-٥-ب · إد-٥-ج |
 | coins | النقاط والمتجر | `/admin/points` | إد-٤-أ · ب · ج |
@@ -293,6 +320,12 @@ The mockups' rail is wrong for this product. This is the correct one, derived fr
 ### Rail (foot group)
 | gear | الإعدادات | `/admin/settings` |
 | logout | تسجيل الخروج | — |
+
+### Merged
+- **الحلقات** has no rail entry of its own. The client asked for the halaqat to
+  live inside the students screen, and the shape agrees: a halaqa is how the
+  roster is grouped, so it belongs in the panel that groups by it. Seven
+  destinations, not eight. See `SPEC.md` §6.2.
 
 ### Removed from the mockups
 - **التحضير (attendance)** — stays in Ratel. We *display* attendance from the weekly import; we never capture it.

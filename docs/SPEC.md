@@ -529,13 +529,38 @@ Sheet `تفريغ البيانات من قياس`, 12 columns:
 - `سبب عدم الإتمام` e.g. `لم يحضر الطالب` → keep in `note`, set `score = null` (do **not** store the 0 the sheet contains — it is not a real score).
 - Deduplicate on `(student_id, taken_on, type='ASSOCIATION')`.
 
-### 5.3 Roster import → `students`
-Sheet `قاعدة بيانات` in `قاعدة بيانات الحلقات.xlsx` (20 columns, 985 rows / 103 real students).
+### 5.3 Roster import → `students` + `halaqat`  ✅ built
 
-ID handling (see §3.1): `national_id = abs(value)` stored as a **string, exactly as found** — no length validation, no rejection, no padding beyond stripping the sign. Set `national_id_flag` for information only (short / long / duplicate) so the supervisor can see them; it never blocks an import. Drop the trailing `المجموع` row.
+Sheet `قاعدة بيانات` in `قاعدة بيانات الحلقات.xlsx`, or the `تفريغ البيانات من رتل`
+sheet, or the same shape inside `لوحة المعلومات.xlsx` — all funnel through one
+parser. When a workbook offers several, the one that **maps the most columns**
+wins by default, and the supervisor can pick another.
 
-Row counts to expect: **103 name rows → 102 students after dropping `المجموع` → 101 distinct IDs** (one duplicated).
-Also supports **paste-a-block-of-text** input (§إد-٣-أ, method 2): TSV/CSV from a clipboard, same parser downstream.
+ID handling (see §3.1): `national_id = abs(value)` stored as a **string, exactly
+as found** — no length validation, no rejection. `national_id_flag` records
+short / long / duplicate for information only; it never blocks an import. The
+trailing `المجموع` row is dropped.
+
+Halaqat are **discovered from the rows**: name from `الحلقة`, teacher from
+`معلم الحفظ` or derived from the name, time slot from the parenthesis, mosque
+defaulted. They are deduplicated by name.
+
+**Merge semantics — three rules that are easy to get wrong:**
+
+1. **An import updates only the fields its file carries.** A Ratel report has no
+   `المسار` column; without this rule, importing it after the roster silently
+   wipes every student's track. Empty and null values in the incoming row are
+   skipped, never written.
+2. **Halaqa ids are remapped by name.** Each parse mints fresh ids, so an
+   incoming student's `halaqaId` points into its own batch. Halaqat dedupe by
+   name, so those ids must be translated to the surviving halaqa — otherwise
+   every link dangles and each halaqa reports zero students.
+3. **Identity is `dedupeKey`, not the raw id.** The roster carries two rows on
+   one national ID. Both must survive, so the parser suffixes the second
+   (`4775853742#2`); re-importing the same file then matches them one to one
+   instead of multiplying them.
+
+Row counts to expect: **103 name rows → 102 students → 101 distinct IDs.**
 
 ### 5.4 Curriculum seed (one-off, `scripts/seed/curriculum.ts`)
 Sheets `فضي` (3741 rows) and `ذهبي` (2161 rows), 8 columns:
@@ -556,37 +581,115 @@ Observed ranges: Silver levels 45–60, Golden levels 14–30. Feeds the "late o
 Route prefix `/admin`. Guard: `SUPERVISOR` session or 302 to `/login`.
 Screen IDs match the client PDF so feedback maps 1:1.
 
-### 6.1 `إد-٢` Overview — `/admin`
-Four blocks, one page, server-rendered.
+### 6.1 `إد-٢` Overview — `/admin`  ✅ built
 
-1. **Counters** — students (total/active), halaqat + teachers, track split, points granted vs spent this month, exams this month + pass count, count ready for association.
-2. **Alerts** — each links to its target:
-   | Alert | Query |
-   |---|---|
-   | Student with no halaqa | `students where halaqa_id is null and status='ACTIVE'` |
-   | Late on level | latest `student_plans` per student, `issued_at < now() - 35d` |
-   | Ready for association | rule §4.8 |
-   | Passed but points unpaid | `exams where passed and not points_paid and points_awarded > 0` |
-   | Not examined in N days | `max(taken_on)` per student |
-   | Gift low on stock | `gifts where quantity <= low_stock_threshold and status='VISIBLE'` |
-   | Orders awaiting delivery | `orders where status='PENDING'` |
-   | Ratel data stale | `max(ratel_imports.imported_at) < now() - 14d` |
-3. **Halaqa progress table** — per halaqa: students, avg `hifz_pages` / `review_pages` from the latest Ratel import, exams passed, attendance %.
-4. **Shortcuts** — print a plan · record an exam · issue codes · upload Ratel.
+Everything on this screen is derived from what the supervisor has imported.
+Nothing is seeded, and no figure is hard-coded. **Empty database ⇒ empty state**
+with a single call to action: upload a file.
 
-Compute alerts in **one SQL round-trip** (CTEs), and recompute nightly via CranL cron into a small `alerts_cache` table if the page ever slows.
+1. **Counters** — students (total, and how many active) · halaqat · students with
+   no halaqa · records whose national ID needs review.
+2. **Distributions** — three proportional bars: tracks · school stages ·
+   nationality. The nationality split is what the association asks for.
+3. **Halaqa progress** — a row per halaqa: teacher, student count with a
+   proportional bar, the tracks present, average memorisation and review pages
+   per student from the latest import, and attendance. Attendance renders `—`
+   when the imported file carried no attendance column, never `0%`.
+4. **Shortcuts** — upload a file · print a plan · record an exam · issue codes.
 
-### 6.2 `إد-٣-أ` Students — `/admin/students`
-Table: name · national ID · track · halaqa · grade · stage · nationality · guardian phone · current level · plan issued date · balance · status.
-Search by name (partial, normalised) or ID. Filters: halaqa, track, stage, status, level range. Export the current filter to Excel.
+The contextual panel carries the alerts, not the page body (`DESIGN.md` §4).
 
-Add: (1) upload Excel, (2) paste text, (3) manual form. All three funnel into §5.3.
+> **Deferred until the tables behind them exist.** The alert set below is the
+> target; today only the first two can be computed, and the panel shows exactly
+> those. An alert that cannot be computed is *absent*, never shown as zero.
+>
+> | Alert | Query | State |
+> |---|---|---|
+> | Student with no halaqa | `students where halaqa_id is null` | **built** |
+> | National ID needs review | `students where national_id_flag is not null` | **built** |
+> | Late on level | latest `student_plans` per student, `issued_at < now() - 35d` | phase 4 |
+> | Ready for association | rule §4.8 | phase 5 |
+> | Passed but points unpaid | `exams where passed and not points_paid` | phase 5 |
+> | Not examined in N days | `max(taken_on)` per student | phase 5 |
+> | Gift low on stock | `gifts where quantity <= low_stock_threshold` | phase 6 |
+> | Orders awaiting delivery | `orders where status='PENDING'` | phase 6 |
+> | Ratel data stale | `max(ratel_imports.imported_at) < now() - 14d` | phase 8 |
 
-**Student page** `/admin/students/[id]` — the replacement for the client's `البحث باسم الطالب` sheet:
-personal data · level timeline (each level, issue date, days held) · exam history · points ledger · latest Ratel hifz/review/attendance · actions (print plan, print report, add points, record exam, transfer).
+Compute alerts in **one SQL round-trip** (CTEs) once they are backed by tables.
 
-### 6.3 `إد-٣-ب` Halaqat — `/admin/halaqat`
-Cards per halaqa. Create/edit (name, teacher, **time slot**, **mosque**, notes). Assign students via two-list transfer, multi-select. Transfer keeps all history and writes `halaqa_transfers`; if the transfer implies a track change, warn — never change the track silently.
+### 6.2 `إد-٣` Students and halaqat — `/admin/students`  ✅ built
+
+**One screen, not two.** The client asked for the halaqat to live inside the
+students screen rather than beside it, and the shape justifies it: a halaqa is
+how the roster is grouped, so managing it belongs in the surface that groups by
+it. `إد-٣-أ` and `إد-٣-ب` of the approved PDF are therefore a single route, and
+the rail carries seven destinations rather than eight.
+
+**Contextual panel** — the halaqat live here (`DESIGN.md` §4):
+- `+ إضافة حلقة`, and a pencil on each row to edit one.
+- Every halaqa with its student count; selecting one filters the work area.
+- `بلا حلقة` appears only when such students exist.
+- A `المرحلة` group.
+- Track and status filters were **removed** at the client's request: a halaqa is
+  normally one track, and every student is active, so both groups were noise.
+
+**Work area**
+- With no halaqa selected: the full roster.
+- With one selected: the page becomes **that halaqa's file** — a header card with
+  the teacher, the track(s) present as chips beside the name, the time slot,
+  the student count and an edit button; then its students.
+
+**Roster columns** — الطالب · رقم الهوية · المسار · الحلقة · الصف · الجنسية ·
+جوال ولي الأمر. Two rules keep it readable:
+- Inside a halaqa, **المسار and الحلقة are dropped** — they repeat on every row.
+- **الحالة has no column.** A column identical on 102 rows carries nothing; the
+  exception does, so a non-active student wears a chip beside their name.
+- Teacher names render **first + last** in lists (`shortName`), full on hover.
+  Arabic names run four or five parts and truncation made them unreadable.
+
+**Actions** — search by name or ID (fold-normalised) · add a student (halaqa
+preselected when one is open) · edit a student · multi-select and move to
+another halaqa · upload a file.
+
+**Dialogs** are portalled to `<body>`. A `position: fixed` box is positioned
+against its nearest transformed ancestor, and any `transform` animation with
+fill-mode `both` leaves an identity *matrix* behind — which still creates a
+containing block. Portalling makes dialogs immune to the wrapper they are
+invoked from. All dialogs close on any filter change, since filtering swaps the
+query string without unmounting the screen.
+
+**Student page** `/admin/students/[id]` — *not yet built*. The replacement for
+the client's `البحث باسم الطالب` sheet: personal data · level timeline · exam
+history · points ledger · latest Ratel figures · actions.
+
+### 6.3 `إد-٣` Import — `/admin/students/import`  ✅ built
+
+One surface for every workbook. The supervisor drops **one file or several**;
+each is classified from its own headers rather than from a menu he has to pick
+from. See §5 for the parsing contract.
+
+- **Queue** — one row per file: name, detected kind, student count, review
+  count, and a sheet picker when a workbook holds more than one usable sheet.
+  Clicking a row opens its full preview beneath.
+- **Preview per file** — clean rows · rows needing review · rows skipped ·
+  halaqat discovered; the columns we recognised (green) beside the columns the
+  file has that we do not need (grey); the review table with a reason per row;
+  the discovered halaqat; and the first twelve students.
+- **Commit** — one button for the whole queue. Files are committed
+  **roster before Ratel**: the roster establishes identity and `المسار`, the
+  Ratel report layers the weekly snapshot on top.
+
+Verified against the client's real workbooks: 102 students, 7 halaqat, 92 clean
+rows, 10 needing review (7 short IDs, 1 long, 2 duplicated), and the `المجموع`
+totals row skipped.
+
+### 6.3.1 Settings — `/admin/settings`  ✅ built (partial)
+
+Shows what the database holds and states plainly that data currently lives in
+the browser alone. Carries one **testing-phase** tool: *تصفير البيانات*, which
+clears students and halaqat after showing what will be lost. It sits under a
+heading that says it is for the testing phase — a button that erases everything
+has no place in a system that students are using, and it goes before handover.
 
 ### 6.4 `إد-٤-أ` Points — `/admin/points`
 Balances table (sortable by balance, filter by halaqa). Add points to: one student · selected students · a whole halaqa. **Reason is required.** Negative deltas allowed. Ledger view with filters. Talqeen students are excluded from every path here.
@@ -644,6 +747,11 @@ Talqeen students: no points, no store, no plan. Their portal shows profile + exa
 - Passwords: `bcryptjs`, cost 12. Sessions: `jose` JWT, httpOnly + Secure + SameSite=Lax cookie, 7-day sliding expiry, separate `aud` for `admin` vs `student`.
 - Login throttling: exponential backoff per identifier + IP. Generic error text — never reveal which field was wrong.
 - Student accounts are **created in bulk** when the roster is imported (§13.7 — "دفعة واحدة"), with printable credential sheets for the teachers. Admin can reset any password.
+- **Sign-in as built** (`/login`): national ID + password, remember-me, a
+  forgot-password link, and a separate entry point for students. No
+  self-registration. The screen's brand panel reads its counters from the
+  database — real figures or a descriptive line, never invented ones, and never
+  a student's name on a pre-auth screen. Authentication itself is phase 2.
 - Authorisation is enforced **server-side in every route handler**. A student may only ever read their own rows — assert `session.studentId === row.student_id`, never trust a client-supplied id.
 - Uploads: validate MIME + magic bytes, cap at 5 MB, store under a random key. Only images, only for gifts.
 - Secrets via CranL environment variables. Nothing in the repo.

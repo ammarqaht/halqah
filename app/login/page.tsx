@@ -66,45 +66,8 @@ export default function LoginPage() {
                  fadeIn={INTRO.fadeIn} lift={INTRO.lift} height={104} />
       )}
 
-      <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[1fr_500px]">
-
-        {/* brand panel — the only deep field in the product (DESIGN.md §1.3) */}
-        <aside className="relative hidden flex-col justify-between overflow-hidden bg-brand-900 p-12 text-white lg:flex">
-          <Lattice className="pointer-events-none absolute inset-0 h-full w-full text-white" opacity={0.07} />
-          <div className="pointer-events-none absolute -left-32 -top-32 h-[26rem] w-[26rem] rounded-full bg-white/[.035]" />
-          <div className="pointer-events-none absolute -bottom-40 -left-16 h-[30rem] w-[30rem] rounded-full bg-white/[.025]" />
-
-          <div className="relative flex items-center justify-between gap-8">
-            <LogoFull height={62} white />
-            <span className="h-10 w-px bg-white/15" />
-            <LogoJamiyah height={40} white className="opacity-70" />
-          </div>
-
-          <div className="relative my-auto max-w-[27rem] py-10">
-            <p className="text-micro uppercase tracking-[.18em] text-white/55">
-              حلقات جامع محمد العبدالكريم — الدمام، حي أُحد
-            </p>
-            <p className="mt-6 font-display text-t1 leading-[2.05] text-white/95">
-              وَلَقَدْ يَسَّرْنَا الْقُرْآنَ لِلذِّكْرِ فَهَلْ مِن مُّدَّكِرٍ
-            </p>
-            <cite className="mt-3 block text-xs2 not-italic text-white/55">سورة القمر — الآية ١٧</cite>
-          </div>
-
-          {/* Real figures, read from what this installation actually holds —
-              never hard-coded, and never a student's name on a public screen. */}
-          <div className="relative flex items-end gap-10 border-t border-white/12 pt-7">
-            {db.students.length > 0 ? (
-              [[db.halaqat.length, 'حلقات'], [db.students.length, 'طالبًا']].map(([n, l]) => (
-                <div key={String(l)}>
-                  <div className="font-display text-t1 text-white"><Num>{n}</Num></div>
-                  <div className="mt-0.5 text-xs2 text-white/55">{l}</div>
-                </div>
-              ))
-            ) : (
-              <p className="text-xs2 text-white/55">منصة إدارة الحلقات — الطلاب والمستويات والنقاط والاختبارات</p>
-            )}
-          </div>
-        </aside>
+      {/* form first ⇒ in RTL it sits on the RIGHT, where the eye starts reading */}
+      <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[500px_1fr]">
 
         {/* form column */}
         <main className="flex flex-col justify-center px-6 py-12 sm:px-12">
@@ -159,6 +122,44 @@ export default function LoginPage() {
             </p>
           </div>
         </main>
+
+        {/* brand panel — the only deep field in the product (DESIGN.md §1.3) */}
+        <aside className="relative hidden flex-col justify-between overflow-hidden bg-brand-900 p-12 text-white lg:flex">
+          <Lattice className="pointer-events-none absolute inset-0 h-full w-full text-white" opacity={0.07} />
+          <div className="pointer-events-none absolute -left-32 -top-32 h-[26rem] w-[26rem] rounded-full bg-white/[.035]" />
+          <div className="pointer-events-none absolute -bottom-40 -left-16 h-[30rem] w-[30rem] rounded-full bg-white/[.025]" />
+
+          <div className="relative flex items-center justify-between gap-8">
+            <LogoFull height={62} white />
+            <span className="h-10 w-px bg-white/15" />
+            <LogoJamiyah height={40} white className="opacity-70" />
+          </div>
+
+          <div className="relative my-auto max-w-[27rem] py-10">
+            <p className="text-micro uppercase tracking-[.18em] text-white/55">
+              حلقات جامع محمد العبدالكريم — الدمام، حي أُحد
+            </p>
+            <p className="mt-6 font-display text-t1 leading-[2.05] text-white/95">
+              وَلَقَدْ يَسَّرْنَا الْقُرْآنَ لِلذِّكْرِ فَهَلْ مِن مُّدَّكِرٍ
+            </p>
+            <cite className="mt-3 block text-xs2 not-italic text-white/55">سورة القمر — الآية ١٧</cite>
+          </div>
+
+          {/* Real figures, read from what this installation actually holds —
+              never hard-coded, and never a student's name on a public screen. */}
+          <div className="relative flex items-end gap-10 border-t border-white/12 pt-7">
+            {db.students.length > 0 ? (
+              [[db.halaqat.length, 'حلقات'], [db.students.length, 'طالبًا']].map(([n, l]) => (
+                <div key={String(l)}>
+                  <div className="font-display text-t1 text-white"><Num>{n}</Num></div>
+                  <div className="mt-0.5 text-xs2 text-white/55">{l}</div>
+                </div>
+              ))
+            ) : (
+              <p className="text-xs2 text-white/55">منصة إدارة الحلقات — الطلاب والمستويات والنقاط والاختبارات</p>
+            )}
+          </div>
+        </aside>
       </div>
     </div>
   );
