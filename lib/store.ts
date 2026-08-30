@@ -97,6 +97,11 @@ export const store = {
     const students = i >= 0 ? cur.students.map((x) => (x.id === s.id ? s : x)) : [...cur.students, s];
     commit({ ...cur, students });
   },
+  /** A halaqa runs one track, so it can be set once and carried to its members. */
+  setTrackForHalaqa(halaqaId: string, track: Student['track']) {
+    const cur = load();
+    commit({ ...cur, students: cur.students.map((s) => (s.halaqaId === halaqaId ? { ...s, track } : s)) });
+  },
   /** Moving a student carries all their history — nothing resets. SPEC.md §6.3 */
   moveStudents(ids: string[], halaqaId: string | null) {
     const cur = load();

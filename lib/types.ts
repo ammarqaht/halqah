@@ -15,6 +15,9 @@ export type Halaqa = {
   teacher: string;
   mosque: string;
   timeSlot: string;    // العصر · المغرب …
+  /** A halaqa normally runs one track. Set here, it can be applied to every
+      student in it at once instead of one by one. */
+  track?: Track | null;
   notes?: string;
 };
 
@@ -39,3 +42,10 @@ export type Student = {
   hifzPages?: number;
   reviewPages?: number;
 };
+
+/** Nationalities the client's own files already contain. The list grows —
+    whatever the supervisor types once is offered from then on. */
+export const BASE_NATIONALITIES = [
+  'سعودي', 'يمني', 'سوداني', 'مصري', 'سوري', 'أردني', 'فلسطيني',
+  'باكستاني', 'هندي', 'بنغلاديشي', 'نيجيري', 'تشادي', 'أخرى',
+];
