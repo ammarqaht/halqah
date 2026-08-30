@@ -557,8 +557,8 @@ defaulted. They are deduplicated by name.
    every link dangles and each halaqa reports zero students.
 3. **Identity is `dedupeKey`, not the raw id.** The roster carries two rows on
    one national ID. Both must survive, so the parser suffixes the second
-   (`4775853742#2`); re-importing the same file then matches them one to one
-   instead of multiplying them.
+   (`<id>#2`); re-importing the same file then matches them one to one instead
+   of multiplying them.
 
 Row counts to expect: **103 name rows → 102 students → 101 distinct IDs.**
 
