@@ -3,11 +3,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { Modal, Btn, Field, INPUT } from '@/components/ui';
 import { Combobox } from '@/components/Combobox';
 import { store, useDB } from '@/lib/store';
-import { BASE_NATIONALITIES, TRACK_AR, type Student } from '@/lib/types';
+import { ALL_GRADES, BASE_NATIONALITIES, GRADES_BY_STAGE, STAGES, TRACK_AR, type Student } from '@/lib/types';
 import { normalisePhone, normaliseNationalId, shortName } from '@/lib/normalise';
 import { Num } from '@/components/Num';
-
-const STAGES = ['تلقين', 'ابتدائي', 'متوسط', 'ثانوي'];
 
 const blank = (halaqaId: string | null): Student => ({
   id: Math.random().toString(36).slice(2, 10),
@@ -31,11 +29,23 @@ export function StudentDialog({ open, student, defaultHalaqa, onClose }:
     return [...seen].map((n) => ({ value: n, label: n }));
   }, [db.students, f.nationality]);
 
-  const stages = useMemo(() => {
-    const seen = new Set<string>(STAGES);
-    for (const s of db.students) if (s.stage) seen.add(s.stage);
-    return [...seen].map((n) => ({ value: n, label: n }));
-  }, [db.students]);
+  const stages = useMemo(
+    () => STAGES.map((n) => ({ value: n, label: n })),
+    []);
+
+  /* The grades on offer follow the stage — a متوسط student cannot be in
+     «خامس ابتدائي». With no stage chosen yet, offer them all. */
+  const grades = useMemo(() => {
+    const list = GRADES_BY_STAGE[f.stage] ?? ALL_GRADES;
+    return list.map((g) => ({ value: g, label: g }));
+  }, [f.stage]);
+
+  /* Changing the stage drops a grade that no longer belongs to it, rather than
+     leaving «خامس ابتدائي» sitting under «ثانوي». */
+  const setStage = (stage: string) => {
+    const allowed = GRADES_BY_STAGE[stage] ?? [];
+    setF((p) => ({ ...p, stage, grade: allowed.includes(p.grade) ? p.grade : '' }));
+  };
 
   const halaqaOptions = useMemo(() => [
     { value: '', label: '— بلا حلقة —' },
@@ -91,14 +101,13 @@ export function StudentDialog({ open, student, defaultHalaqa, onClose }:
           <Combobox value={f.halaqaId ?? ''} onChange={(v) => setF({ ...f, halaqaId: v || null })}
             options={halaqaOptions} placeholder="اختر الحلقة" searchPlaceholder="ابحث باسم المعلّم…" />
         </Field>
-        <Field label="الصف الدراسي">
-          <input className={INPUT} value={f.grade} onChange={(e) => setF({ ...f, grade: e.target.value })}
-            placeholder="أول متوسط" />
+        <Field label="المرحلة">
+          <Combobox value={f.stage} onChange={setStage} options={stages} placeholder="اختر المرحلة" />
         </Field>
 
-        <Field label="المرحلة">
-          <Combobox value={f.stage} onChange={(v) => setF({ ...f, stage: v })}
-            options={stages} placeholder="اختر المرحلة" />
+        <Field label="الصف الدراسي" hint={f.stage ? undefined : 'اختر المرحلة أولًا لتضيق القائمة'}>
+          <Combobox value={f.grade} onChange={(v) => setF({ ...f, grade: v })}
+            options={grades} placeholder="اختر الصف" />
         </Field>
         <Field label="الجنسية" hint="اكتب جنسية جديدة وستُحفظ في القائمة">
           <Combobox value={f.nationality} onChange={(v) => setF({ ...f, nationality: v })}

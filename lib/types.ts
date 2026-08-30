@@ -49,3 +49,18 @@ export const BASE_NATIONALITIES = [
   'سعودي', 'يمني', 'سوداني', 'مصري', 'سوري', 'أردني', 'فلسطيني',
   'باكستاني', 'هندي', 'بنغلاديشي', 'نيجيري', 'تشادي', 'أخرى',
 ];
+
+/** School stages, and the grades that belong to each. Derived from the client's
+    own roster: the young ones sit under «تلقين» (التمهيدي and the first three
+    primary years), while «ابتدائي» in his file carries the older primary years.
+    We offer all six there, since he asked for أول…سادس. */
+export const STAGES = ['تلقين', 'ابتدائي', 'متوسط', 'ثانوي'] as const;
+
+export const GRADES_BY_STAGE: Record<string, string[]> = {
+  'تلقين':   ['التمهيدي', 'أول ابتدائي', 'ثاني ابتدائي', 'ثالث ابتدائي'],
+  'ابتدائي': ['أول ابتدائي', 'ثاني ابتدائي', 'ثالث ابتدائي', 'رابع ابتدائي', 'خامس ابتدائي', 'سادس ابتدائي'],
+  'متوسط':   ['أول متوسط', 'ثاني متوسط', 'ثالث متوسط'],
+  'ثانوي':   ['أول ثانوي', 'ثاني ثانوي', 'ثالث ثانوي'],
+};
+
+export const ALL_GRADES = [...new Set(Object.values(GRADES_BY_STAGE).flat())];
