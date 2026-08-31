@@ -57,9 +57,19 @@ export function CodeCard({ value, purpose, code, qr, colour }: {
 
       {/* ── the code half, on paper white so any scanner reads it ────────── */}
       <div className="relative flex flex-1 flex-col items-center justify-center gap-1">
-        {/* A physical corner is genuinely meant here, so a physical property is
+        {/* The positioning lives on a wrapper, NOT on `LogoMark`'s className.
+            `LogoMark` already carries `relative`, and passing `absolute` in
+            would put two position utilities of equal specificity on one
+            element — where the winner is decided by Tailwind's stylesheet
+            order, not by the order they were written. Tailwind emits
+            `.absolute` before `.relative`, so `relative` won and the mark sat
+            in normal flow above the QR instead of in its corner.
+
+            A physical corner is genuinely meant here, so a physical property is
             correct — DESIGN.md §9.1 allows exactly this exception. */}
-        <LogoMark height={13} white={false} className="absolute left-2 top-2" />
+        <span className="absolute left-2 top-2">
+          <LogoMark height={13} white={false} />
+        </span>
 
         <div className="h-[52px] w-[52px] [&>svg]:h-full [&>svg]:w-full"
           dangerouslySetInnerHTML={{ __html: qr }} />
