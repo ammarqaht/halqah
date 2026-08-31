@@ -1,0 +1,161 @@
+// Halqah — schema. Mirrors SPEC.md §3. Only the tables behind screens that
+// exist today; exams, points, store and curriculum arrive with their screens.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Track {
+  TALQEEN
+  SILVER
+  GOLDEN
+}
+
+enum StudentStatus {
+  ACTIVE
+  INACTIVE
+  GRADUATED
+}
+
+enum IdFlag {
+  SHORT
+  LONG
+  DUPLICATE
+}
+
+enum AdminRole {
+  SUPERVISOR
+}
+
+model AdminUser {
+  id           String   @id @default(cuid())
+  fullName     String   @map("full_name")
+  username     String   @unique
+  passwordHash String   @map("password_hash")
+  role         AdminRole @default(SUPERVISOR)
+  active       Boolean  @default(true)
+  lastLoginAt  DateTime? @map("last_login_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  audits AuditLog[]
+  @@map("admin_users")
+}
+
+model Halaqa {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  teacher   String
+  mosque    String   @default("جامع محمد العبدالكريم — حي أُحد")
+  timeSlot  String   @default("العصر") @map("time_slot")
+  track     Track?
+  notes     String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  students Student[]
+
+  @@index([mosque, timeSlot])
+  @@map("halaqat")
+}
+
+model Student {
+  id       String @id @default(cuid())
+  fullName String @map("full_name")
+
+  // Stored exactly as found: abs() of the roster value, no length validation.
+  // NOT unique — the client's roster legitimately carries one id on two rows.
+  nationalId     String? @map("national_id")
+  nationalIdFlag IdFlag? @map("national_id_flag")
+
+  // Stable identity across re-imports; the parser suffixes a repeated id.
+  dedupeKey String? @unique @map("dedupe_key")
+
+  track         Track?
+  halaqaId      String?       @map("halaqa_id")
+  grade         String        @default("")
+  stage         String        @default("")
+  nationality   String        @default("")
+  guardianPhone String        @default("") @map("guardian_phone")
+  status        StudentStatus @default(ACTIVE)
+  currentLevel  Int?          @map("current_level")
+
+  // last snapshot from a Ratel import
+  attended    Boolean? 
+  hifzPages   Decimal? @map("hifz_pages")   @db.Decimal(6, 2)
+  reviewPages Decimal? @map("review_pages") @db.Decimal(6, 2)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt      @map("updated_at")
+
+  halaqa    Halaqa?          @relation(fields: [halaqaId], references: [id], onDelete: SetNull)
+  transfers HalaqaTransfer[]
+
+  @@index([halaqaId])
+  @@index([track])
+  @@index([status])
+  @@index([nationalId])
+  @@map("students")
+}
+
+model HalaqaTransfer {
+  id           String   @id @default(cuid())
+  studentId    String   @map("student_id")
+  fromHalaqaId String?  @map("from_halaqa_id")
+  toHalaqaId   String?  @map("to_halaqa_id")
+  reason       String?
+  movedAt      DateTime @default(now()) @map("moved_at")
+  movedBy      String?  @map("moved_by")
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId, movedAt])
+  @@map("halaqa_transfers")
+}
+
+model ImportRun {
+  id         String   @id @default(cuid())
+  fileName   String   @map("file_name")
+  sheetName  String   @map("sheet_name")
+  kind       String
+  rowCount   Int      @map("row_count")
+  created    Int      @default(0)
+  updated    Int      @default(0)
+  flagged    Int      @default(0)
+  skipped    Int      @default(0)
+  importedBy String?  @map("imported_by")
+  importedAt DateTime @default(now()) @map("imported_at")
+
+  @@index([importedAt])
+  @@map("import_runs")
+}
+
+// Every edit the supervisor makes. §13.10: no edit window, and everything logged.
+model AuditLog {
+  id       String   @id @default(cuid())
+  actorId  String?  @map("actor_id")
+  action   String
+  entity   String
+  entityId String?  @map("entity_id")
+  before   Json?
+  after    Json?
+  at       DateTime @default(now())
+
+  actor AdminUser? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([entity, entityId, at])
+  @@map("audit_log")
+}
+
+// Rules live here, never hard-coded in application code. SPEC.md §3.8
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("settings")
+}
