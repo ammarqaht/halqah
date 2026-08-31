@@ -30,19 +30,29 @@ try {
   console.log(`[bootstrap] settings ok (${Object.keys(SETTINGS).length})`);
 
   /* The first supervisor. Created only when no admin exists, so redeploying
-     never resets a password the client has already changed. */
+     never resets a password that has since been changed.
+
+     The defaults below let the system come up with nothing to configure. They
+     are also public, since this repository is: anyone who reads it knows them.
+     That is fine while the database is empty and we are testing, and it stops
+     being fine the moment real student records are in it. Setting
+     ADMIN_PASSWORD in the environment overrides the default without a code
+     change — and the app warns on every page until that happens. */
+  const DEFAULT_USERNAME = 'admin';
+  const DEFAULT_PASSWORD = '12345';
+
   const count = await db.adminUser.count();
   if (count === 0) {
-    const username = process.env.BOOTSTRAP_ADMIN_USERNAME;
-    const password = process.env.BOOTSTRAP_ADMIN_PASSWORD;
-    const fullName = process.env.BOOTSTRAP_ADMIN_NAME || 'المشرف';
-    if (username && password) {
-      await db.adminUser.create({
-        data: { fullName, username, passwordHash: await bcrypt.hash(password, 12) },
-      });
-      console.log(`[bootstrap] created first supervisor: ${username}`);
-    } else {
-      console.warn('[bootstrap] no admin exists and BOOTSTRAP_ADMIN_* is unset — nobody can sign in');
+    const username = process.env.ADMIN_USERNAME || DEFAULT_USERNAME;
+    const password = process.env.ADMIN_PASSWORD || DEFAULT_PASSWORD;
+    const fullName = process.env.ADMIN_NAME || 'عمار سالم القحطاني';
+
+    await db.adminUser.create({
+      data: { fullName, username, passwordHash: await bcrypt.hash(password, 12) },
+    });
+    console.log(`[bootstrap] created first supervisor: ${username}`);
+    if (password === DEFAULT_PASSWORD) {
+      console.warn('[bootstrap] ⚠ using the default password. Set ADMIN_PASSWORD before real data goes in.');
     }
   } else {
     console.log(`[bootstrap] ${count} admin account(s) already present — untouched`);

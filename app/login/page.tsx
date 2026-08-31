@@ -7,8 +7,8 @@
    session. The form is in the DOM and focusable from t=0 — motion never gates
    input. Only transform/opacity animate.
    ───────────────────────────────────────────────────────────────────────── */
-import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, GraduationCap, Loader2 } from 'lucide-react';
 import { LogoFull, LogoJamiyah } from '@/components/Logo';
 import { Curtain } from '@/components/Curtain';
@@ -19,7 +19,7 @@ import { cx } from '@/lib/cx';
 import { INTRO, prefersReducedMotion } from '@/lib/motion';
 import { useDB } from '@/lib/store';
 
-export default function LoginPage() {
+function LoginScreen() {
   const router = useRouter();
   const [markVisible, setMarkVisible] = useState(false);
   const [up, setUp] = useState(false);
@@ -29,6 +29,9 @@ export default function LoginPage() {
   const [pw, setPw] = useState('');
   const idRef = useRef<HTMLInputElement>(null);
   const db = useDB();
+  const [err, setErr] = useState('');
+  const search = useSearchParams();
+  const next = search.get('next') || '/admin';
 
   /* Plays on every visit, reloads included. The page underneath is fully
      rendered the whole time, so the curtain reveals it rather than the page
@@ -53,10 +56,24 @@ export default function LoginPage() {
     return () => { clearTimeout(cap); clearTimeout(tHold); clearTimeout(tDone); };
   }, []);
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErr('');
     setBusy(true);
-    setTimeout(() => router.push('/admin'), 520);
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: id.trim(), password: pw }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setErr(data.error ?? 'تعذّر الدخول. حاول مرة أخرى.'); setBusy(false); return; }
+      router.replace(next);
+      router.refresh();
+    } catch {
+      setErr('تعذّر الاتصال بالخادم.');
+      setBusy(false);
+    }
   };
 
   return (
@@ -80,10 +97,10 @@ export default function LoginPage() {
             </p>
 
             <form onSubmit={submit} className="mt-8 space-y-4">
-              <Field label="رقم الهوية" htmlFor="nid">
-                <input id="nid" ref={idRef} dir="ltr" inputMode="numeric" autoComplete="username"
-                  value={id} onChange={(e) => setId(e.target.value)} placeholder="1XXXXXXXXX"
-                  className={cx(INPUT, 'num text-right')} />
+              <Field label="اسم المستخدم" htmlFor="nid">
+                <input id="nid" ref={idRef} autoComplete="username"
+                  value={id} onChange={(e) => setId(e.target.value)} placeholder="admin"
+                  className={INPUT} />
               </Field>
               <Field label="كلمة المرور" htmlFor="pw">
                 <input id="pw" type="password" autoComplete="current-password"
@@ -101,6 +118,12 @@ export default function LoginPage() {
                   نسيت كلمة المرور؟
                 </button>
               </div>
+
+              {err && (
+                <p role="alert" className="rounded-md border border-risk-200 bg-risk-100 px-3 py-2.5 text-panel text-risk-700">
+                  {err}
+                </p>
+              )}
 
               <Btn type="submit" variant="primary" size="xl" className="w-full" disabled={busy}>
                 {busy ? <><Loader2 size={17} className="animate-spin" />جارٍ الدخول…</> : 'دخول'}
@@ -163,4 +186,8 @@ export default function LoginPage() {
       </div>
     </div>
   );
+}
+
+export default function LoginPage() {
+  return <Suspense><LoginScreen /></Suspense>;
 }

@@ -6,6 +6,9 @@
 FROM node:22-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
+# the schema must be present before `npm ci`: postinstall runs `prisma generate`,
+# which reads it. Copying only the manifests here is what broke the first build.
+COPY prisma ./prisma
 RUN npm ci
 
 # ── build ────────────────────────────────────────────────────────────────────
@@ -14,8 +17,7 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
-# the client is generated from the schema, so it must exist before the build
-RUN npx prisma generate && npm run build
+RUN npm run build
 
 # ── runtime ──────────────────────────────────────────────────────────────────
 FROM node:22-alpine AS runner
