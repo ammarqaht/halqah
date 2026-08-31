@@ -157,14 +157,13 @@ function LoginScreen() {
             <LogoJamiyah height={40} white className="opacity-70" />
           </div>
 
-          <div className="relative my-auto max-w-[27rem] py-10">
-            <p className="text-micro uppercase tracking-[.18em] text-white/55">
-              حلقات جامع محمد العبدالكريم — الدمام، حي أُحد
-            </p>
-            <p className="mt-6 font-display text-t1 leading-[2.05] text-white/95">
+          {/* The ayah carries this panel on its own — the mosque is already
+              named by the lockup above it, so repeating it only crowds. */}
+          <div className="relative my-auto max-w-[34rem] py-10">
+            <p className="font-display text-d2 leading-[1.95] text-white lg:text-d1 lg:leading-[1.85]">
               وَلَقَدْ يَسَّرْنَا الْقُرْآنَ لِلذِّكْرِ فَهَلْ مِن مُّدَّكِرٍ
             </p>
-            <cite className="mt-3 block text-xs2 not-italic text-white/55">سورة القمر — الآية ١٧</cite>
+            <cite className="mt-5 block text-sm2 not-italic text-white/55">سورة القمر — الآية ١٧</cite>
           </div>
 
           {/* Real figures, read from what this installation actually holds —
