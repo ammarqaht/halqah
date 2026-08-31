@@ -797,9 +797,29 @@ Editing before print (§إد-٥-أ, "تعديل الخطة وإضافة السو
 
 Bulk print for multiple students into one document.
 
-### 6.8 `إد-٥-ب` Record exam — `/admin/exams/new`
+### 6.8 `إد-٥-ب` Record exam — `/admin/exams/new`  ✅ built (Qiyas import pending)
 Form per §3.4. Student search auto-fills track/halaqa/teacher. `ajza` suggested from level via §4.2. `passed` suggested from score via §4.5. Points suggested from §4.6 — awarding writes the `point_transactions` row **in the same transaction** as the exam.
-Qiyas import lives at `/admin/exams/import`.
+Qiyas import lives at `/admin/exams/import` — **not yet built.** The column
+shape is documented in §5.2 and could be written blind, but it cannot be
+verified without a real Qiyas export, which is client data and stays outside
+this repository. Ask for one sample file before building it.
+
+- **The log is the deliverable, not just the form.** `/admin/exams` replaces
+  «ملف الاختبارات»: every record with its type, level, juz, score, result and
+  points, filtered by type and halaqa from the panel.
+- **The suggestion chain** — halaqa and track from the student, juz from the
+  level (§4.2), score from the counters (§4.4), pass from the score (§4.5),
+  points from §8's table — and every link stays editable, because §11 says
+  «النظام يقترح، وأنت تقرّر».
+- **Points reconcile against the ledger, not against a flag.** `saveExam` reads
+  what the ledger has already paid for that exam and writes only the
+  difference, so re-saving pays nothing, un-ticking «صُرفت» writes an opposite
+  row rather than deleting the first, and «صرفها كلّها» is safe to tap twice.
+  Covered by `lib/store.test.ts`.
+- **«اجتاز ولم تُصرف نقاطه»** (SPEC §6.1, held for this phase) is live on the
+  screen with a one-tap «صرفها كلّها».
+- A passed diamond offers the next level for printing — «اجتاز ٢٦، المفروض
+  أطبع له ٢٥», his own sentence.
 
 ### 6.9 `إد-٥-ج` On-site exam — `/admin/exams/onsite`
 Booking list, then the exam screen: a table with **one row per question** — surah field (suggest surahs inside the student's level, free text allowed) + three tap-counters (errors / warnings / tajweed errors) + note.
@@ -862,6 +882,7 @@ Each has a **working default** so implementation is never blocked. Revisit with 
 | e | ~~IDs corrupt~~ **Resolved:** the minus is an Excel artefact; `abs()` gives the true ID, cross-verified against Qiyas. Client: import everything as-is | **Student login = national ID** via `student_credentials.login_id`. Short/long IDs are accepted verbatim. The one duplicated ID gets a system-issued code for the second record until the supervisor merges or corrects |
 | f | Silver curriculum levels 39→1 are missing from the client's file | **Client accepts the gap.** Seed what exists; when a silver student reaches level 39, fail with an explicit Arabic message naming the missing level — never a blank sheet. Request the missing pages then |
 | g | Are the `thmanyah` fonts licensed for web embedding? | Self-host and subset; confirm the licence before public launch |
+| h | **The PDF contradicts itself on tajweed scoring.** §9 says «تُسجَّل بدرجة من ١٠»; §11 puts the pass at «٨٠ من ١٠٠ … وهذا الحدّ واحد لكل أنواع الاختبارات — الجمعية والوسامان **والتجويد**». | **Entered out of 10** (his file), **judged at the same proportion** — 8/10 is the same bar as 80/100. Nothing is silently rescaled and no figure he types changes meaning. `scoreMax()` / `passMarkFor()` in `lib/exams.ts`; one edit if he wants it out of 100 instead |
 
 ---
 

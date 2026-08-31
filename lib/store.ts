@@ -5,8 +5,16 @@
 import { useSyncExternalStore } from 'react';
 import type {
   Student, Halaqa, PointTxn, PointCodeBatch, PointCode, TxnKind, Gift, Order,
+  Exam, TajweedTopic,
 } from './types';
-import { earnsPoints, generateCodes, codeState, purchaseBlock, type PurchaseBlock } from './points';
+import { SEED_TAJWEED_TOPIC } from './types';
+import {
+  earnsPoints, generateCodes, codeState, purchaseBlock, EXAM_TYPE_AR,
+  type PurchaseBlock, type ExamType,
+} from './points';
+
+/** The Arabic name of an exam type, tolerant of a value the enum does not know. */
+const EXAM_LABEL = (t: string) => EXAM_TYPE_AR[t as ExamType] ?? t;
 
 export type DB = {
   students: Student[];
@@ -17,12 +25,16 @@ export type DB = {
   codes: PointCode[];
   gifts: Gift[];
   orders: Order[];
+  exams: Exam[];
+  /** Admin-managed; seeded with the one topic the client records today. */
+  tajweedTopics: TajweedTopic[];
   importedAt: string | null;
   sourceFile: string | null;
 };
 
 const EMPTY: DB = {
-  students: [], halaqat: [], txns: [], batches: [], codes: [], gifts: [], orders: [],
+  students: [], halaqat: [], txns: [], batches: [], codes: [], gifts: [], orders: [], exams: [],
+  tajweedTopics: [{ id: 'tt1', name: SEED_TAJWEED_TOPIC, active: true }],
   importedAt: null, sourceFile: null,
 };
 const KEY = 'halqah.db.v1';
@@ -409,6 +421,73 @@ export const store = {
         ? { ...x, status: 'CANCELLED', cancelledReason: reason.trim() || 'دون سبب مذكور' } : x)),
       txns: [...cur.txns, refund],
     });
+  },
+
+
+  /* ── Exams — SPEC.md §3.4, approved PDF §9 (إد-٥-ب) ─────────────────────────
+     «شاشة إدخال واحدة تُغني عن ملف الاختبارات، وتُحدّث كل الشاشات فور الحفظ».
+
+     The one thing this must get right is the join to the ledger: «وعند التعليم
+     على صُرفت تُضاف لرصيد الطالب مباشرة — لا سجلّ منفصل ولا نسيان». So the exam
+     row and its points movement are written in ONE commit, never two, and the
+     movement carries `refType: 'exam'` so the ledger can always point back at
+     the exam that caused it. */
+
+  /**
+   * Record a new exam, or edit one already recorded (§4.12 — the supervisor may
+   * edit indefinitely, there is no window after which a record locks).
+   *
+   * Points follow the tick, in both directions: ticking «صُرفت» writes the
+   * award, and un-ticking it — or changing the amount — writes a correcting
+   * movement rather than editing the first one away. The ledger stays
+   * append-only, so a student's balance always reconciles against its own rows.
+   */
+  saveExam(exam: Exam): Exam {
+    const cur = load();
+    const prev = cur.exams.find((e) => e.id === exam.id) ?? null;
+    const exams = prev
+      ? cur.exams.map((e) => (e.id === exam.id ? exam : e))
+      : [...cur.exams, exam];
+
+    /* What the ledger has already paid out for THIS exam, from the ledger
+       itself rather than from a flag — the ledger is the truth. */
+    const paidSoFar = cur.txns
+      .filter((t) => t.refType === 'exam' && t.refId === exam.id)
+      .reduce((sum, t) => sum + t.delta, 0);
+
+    const student = cur.students.find((s) => s.id === exam.studentId);
+    const shouldHave = exam.pointsPaid && student && earnsPoints(student)
+      ? exam.pointsAwarded : 0;
+    const delta = shouldHave - paidSoFar;
+
+    const txns = [...cur.txns];
+    if (delta !== 0) {
+      txns.push({
+        id: uid(),
+        studentId: exam.studentId,
+        delta,
+        kind: delta > 0 ? 'EXAM' : 'CORRECTION',
+        reason: delta > 0
+          ? `اجتياز — ${exam.type === 'TAJWEED' && exam.tajweedTopic ? exam.tajweedTopic : EXAM_LABEL(exam.type)}`
+          : `تعديل نقاط اختبار — ${EXAM_LABEL(exam.type)}`,
+        refType: 'exam',
+        refId: exam.id,
+        createdBy: 'المشرف',
+        createdAt: new Date().toISOString(),
+      });
+    }
+    commit({ ...cur, exams, txns });
+    return exam;
+  },
+
+  /** Topics the supervisor adds himself, «دون أن نعدّل النظام». */
+  upsertTajweedTopic(topic: TajweedTopic) {
+    const cur = load();
+    const i = cur.tajweedTopics.findIndex((t) => t.id === topic.id);
+    const tajweedTopics = i >= 0
+      ? cur.tajweedTopics.map((t) => (t.id === topic.id ? topic : t))
+      : [...cur.tajweedTopics, topic];
+    commit({ ...cur, tajweedTopics });
   },
 
   reset() { commit(EMPTY); },

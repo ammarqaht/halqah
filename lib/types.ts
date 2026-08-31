@@ -166,3 +166,47 @@ export type Order = {
   deliveredAt: string | null;
   cancelledReason: string | null;
 };
+
+/* ── Exams — SPEC.md §3.4, requirements PDF §9 (إد-٥-ب · إد-٥-ج) ──────────────
+   «شاشة إدخال واحدة تُغني عن ملف الاختبارات، وتُحدّث كل الشاشات فور الحفظ». */
+
+export type ExamSource = 'MANUAL' | 'QIYAS_IMPORT' | 'ONSITE';
+
+export const EXAM_SOURCE_AR: Record<ExamSource, string> = {
+  MANUAL: 'إدخال يدوي', QIYAS_IMPORT: 'استيراد من قياس', ONSITE: 'اختبار على الشاشة',
+};
+
+/** The reasons the client's own sheet records for a manual grant of points. */
+export type Exam = {
+  id: string;
+  studentId: string;
+  /** Denormalised at the time of the exam — a student may move halaqa later,
+      and the record of who examined him must not move with him. */
+  halaqaId: string | null;
+  track: Track | null;
+  type: string;                    // ExamType from lib/points.ts
+  takenOn: string;                 // ISO date
+  /** The student's level at the moment of the exam, so we know later which
+      levels he has actually been examined on. */
+  level: number | null;
+  ajza: number | null;
+  errors: number | null;
+  warnings: number | null;
+  tajweedErrors: number | null;
+  score: number | null;            // out of 100
+  passed: boolean | null;
+  pointsAwarded: number;
+  /** «نقاط تحفيز» — the tick in the client's sheet. Points reach the ledger
+      only when this is true, and the ledger row is written with the exam. */
+  pointsPaid: boolean;
+  note: string;
+  examiner: string;
+  tajweedTopic: string | null;
+  source: ExamSource;
+  createdAt: string;
+};
+
+/** §9: «تُضيفون أنواعًا أخرى بأنفسكم من الإعدادات … دون أن نعدّل النظام». */
+export type TajweedTopic = { id: string; name: string; active: boolean };
+
+export const SEED_TAJWEED_TOPIC = 'النون الساكنة والتنوين';

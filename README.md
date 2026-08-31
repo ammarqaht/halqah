@@ -40,8 +40,9 @@ npm test         # rules engine — lib/points.ts against the approved figures
 | `/admin/points` | **built** — balances, grant to one/many/halaqa, ledger, honour roll | SPEC.md §6.4 (إد-٤-أ) |
 | `/admin/points/codes` | **built** — issue a batch, track use, revoke | SPEC.md §6.5 (إد-٤-ب) |
 | `/admin/store` | **built** — gifts, atomic purchase, orders, deliver and cancel | SPEC.md §6.6 (إد-٤-ج) |
+| `/admin/exams` · `/admin/exams/new` | **built** — the exam log, and recording that feeds the points ledger | SPEC.md §6.8 (إد-٥-ب) |
 | `/print/codes/[batchId]` · `/print/honour` · `/print/pick-list` | **built** — A4 card sheets with QR, the honour roll, and the delivery list | DESIGN.md §8 |
-| `/admin/*` (plans · exams · follow-up) | placeholder screens, correct chrome and titles | BUILD_PLAN phases 4–5, 8 |
+| `/admin/*` (plans · follow-up) | placeholder screens, correct chrome and titles | BUILD_PLAN phases 4, 8 |
 | `/student` | placeholder | BUILD_PLAN phase 7 |
 
 The shell (rail + contextual panel + top bar) and the route veil are live on every

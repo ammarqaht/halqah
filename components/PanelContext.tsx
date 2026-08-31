@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { PanelShell, PanelGroup, PanelItem } from '@/components/Panel';
 import { StudentsPanel } from '@/components/StudentsPanel';
 import { PointsPanel } from '@/components/PointsPanel';
+import { ExamsPanel } from '@/components/ExamsPanel';
 import { useDB } from '@/lib/store';
 import { derive } from '@/lib/derive';
 import { isLowStock } from '@/lib/points';
@@ -19,6 +20,7 @@ export function PanelContext({ onClose }: { onClose: () => void }) {
   const lowStockGifts = db.gifts.filter(isLowStock).length;
 
   if (path.startsWith('/admin/students')) return <StudentsPanel onClose={onClose} />;
+  if (path.startsWith('/admin/exams')) return <ExamsPanel onClose={onClose} />;
   if (path.startsWith('/admin/points') || path.startsWith('/admin/store')) {
     return <PointsPanel onClose={onClose} />;
   }
