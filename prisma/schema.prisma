@@ -2,7 +2,10 @@
 // exist today; exams, points, store and curriculum arrive with their screens.
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // The runtime image is alpine (musl). Naming the target explicitly stops the
+  // client from looking for a glibc engine that is not there.
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
