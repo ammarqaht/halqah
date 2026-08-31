@@ -9,7 +9,7 @@
    ───────────────────────────────────────────────────────────────────────── */
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, GraduationCap, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { LogoFull, LogoJamiyah } from '@/components/Logo';
 import { Curtain } from '@/components/Curtain';
 import { Lattice } from '@/components/Lattice';
@@ -27,6 +27,7 @@ function LoginScreen() {
   const [busy, setBusy] = useState(false);
   const [id, setId] = useState('');
   const [pw, setPw] = useState('');
+  const [showPw, setShowPw] = useState(false);
   const idRef = useRef<HTMLInputElement>(null);
   const db = useDB();
   const [err, setErr] = useState('');
@@ -103,9 +104,17 @@ function LoginScreen() {
                   className={INPUT} />
               </Field>
               <Field label="كلمة المرور" htmlFor="pw">
-                <input id="pw" type="password" autoComplete="current-password"
-                  value={pw} onChange={(e) => setPw(e.target.value)} placeholder="••••••••"
-                  className={INPUT} />
+                <div className="relative">
+                  <input id="pw" type={showPw ? 'text' : 'password'} autoComplete="current-password"
+                    value={pw} onChange={(e) => setPw(e.target.value)} placeholder="••••••••"
+                    className={cx(INPUT, 'pe-11')} />
+                  <button type="button" onClick={() => setShowPw((v) => !v)}
+                    aria-label={showPw ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
+                    aria-pressed={showPw}
+                    className="absolute inset-y-0 end-0 flex w-11 items-center justify-center rounded-e-md text-ink-400 transition-colors hover:text-ink-700">
+                    {showPw ? <EyeOff size={17} strokeWidth={1.9} /> : <Eye size={17} strokeWidth={1.9} />}
+                  </button>
+                </div>
               </Field>
 
               <div className="flex items-center justify-between pt-0.5">
@@ -129,16 +138,6 @@ function LoginScreen() {
                 {busy ? <><Loader2 size={17} className="animate-spin" />جارٍ الدخول…</> : 'دخول'}
               </Btn>
             </form>
-
-            <div className="my-7 flex items-center gap-3 text-xs2 text-ink-400">
-              <span className="h-px flex-1 bg-ink-200" />أو<span className="h-px flex-1 bg-ink-200" />
-            </div>
-
-            <Btn size="lg" className="w-full justify-between"
-                 onClick={() => router.push('/student')}>
-              <span className="flex items-center gap-2"><GraduationCap size={17} strokeWidth={1.9} />دخول الطلاب</span>
-              <ArrowLeft size={16} strokeWidth={1.9} className="text-ink-400" />
-            </Btn>
 
             <p className="mt-10 text-micro leading-relaxed text-ink-500">
               للاستفسار عن الحساب: مكتب الإشراف — حلقات جامع محمد العبدالكريم.
