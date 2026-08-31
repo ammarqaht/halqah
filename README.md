@@ -27,6 +27,7 @@ port to `3000`, and choose the **MENA** region.
 ```bash
 npm install
 npm run dev      # http://localhost:3000
+npm test         # rules engine — lib/points.ts against the approved figures
 ```
 
 ## What exists today
@@ -35,7 +36,12 @@ npm run dev      # http://localhost:3000
 |---|---|---|
 | `/login` | **built** — two-column sign-in + opening animation | DESIGN.md §5 |
 | `/admin` | **built** — overview: counters, distributions, halaqa progress, lists, shortcuts | SPEC.md §6.1 (إد-٢) |
-| `/admin/*` | placeholder screens, correct chrome and titles | BUILD_PLAN phases 3–8 |
+| `/admin/students` | **built** — roster, halaqat in the panel, import preview and commit | SPEC.md §6.2–6.3 (إد-٣) |
+| `/admin/points` | **built** — balances, grant to one/many/halaqa, ledger, honour roll | SPEC.md §6.4 (إد-٤-أ) |
+| `/admin/points/codes` | **built** — issue a batch, track use, revoke | SPEC.md §6.5 (إد-٤-ب) |
+| `/admin/store` | **built** — gifts, atomic purchase, orders, deliver and cancel | SPEC.md §6.6 (إد-٤-ج) |
+| `/print/codes/[batchId]` · `/print/honour` · `/print/pick-list` | **built** — A4 card sheets with QR, the honour roll, and the delivery list | DESIGN.md §8 |
+| `/admin/*` (plans · exams · follow-up) | placeholder screens, correct chrome and titles | BUILD_PLAN phases 4–5, 8 |
 | `/student` | placeholder | BUILD_PLAN phase 7 |
 
 The shell (rail + contextual panel + top bar) and the route veil are live on every

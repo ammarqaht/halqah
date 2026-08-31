@@ -103,16 +103,21 @@ This is the load-bearing phase. Everything later reads from it.
 
 ## Phase 6 — Points, codes, store (2 days)  → *the client's #1 reason for the project*
 
-- [ ] `point_transactions` ledger + balance aggregate + tests
-- [ ] `/admin/points`: balances, add to one/many/halaqa, required reason, ledger. **Talqeen blocked at the mutation layer**
-- [ ] `point_code_batches`, `point_codes`; generator (Crockford base32, DB-enforced uniqueness)
-- [ ] `/print/codes/[batchId]` — QR cards, colour by value
-- [ ] Batch tracking + revoke
-- [ ] Atomic redemption (SPEC §3.5) + **a concurrency test that fires the same code twice**
-- [ ] `gifts` + S3 image upload; `/admin/store`
-- [ ] `orders`: atomic purchase, deliver, cancel-with-refund, printable pick-list
+- [x] `point_transactions` ledger + balance aggregate — `lib/points.ts`, append-only, corrections as opposite rows
+- [x] `/admin/points`: balances, add to one/many/halaqa, required reason, ledger. **Talqeen blocked at the mutation layer** (`store.grantPoints`, which reports who it skipped)
+- [x] `point_code_batches`, `point_codes`; generator (Crockford base32 minus `I O U 1 0`, rejection-sampled, uniqueness checked against every existing code)
+- [x] `/print/codes/[batchId]` — QR cards, colour by value, spent cards omitted
+- [x] Batch tracking + revoke
+- [x] لوحة الشرف at `/print/honour` — top ten, greyscale-safe
+- [x] Unit tests for `lib/points.ts` — `npm test` (vitest). 43 assertions, each quoting a figure from the approved PDF rather than from the implementation, so the suite fails if the code drifts from what the client agreed to
+- [ ] Atomic redemption (SPEC §3.5) + **a concurrency test that fires the same code twice** — `store.redeemCode` has the right *shape* and single-commit semantics, but the real guarantee is the conditional `UPDATE`, and that arrives with Prisma in phase 1
+- [x] `gifts` + image upload; `/admin/store` — S3 deferred with the rest of the infrastructure, so images are downscaled to 512px JPEG data URLs and the quota failure is surfaced instead of swallowed (`lib/image.ts`)
+- [x] `orders`: atomic purchase, deliver, cancel-with-refund, printable pick-list at `/print/pick-list`
+- [x] Overview alerts «هدية قاربت على النفاد» and «طلبات بانتظار التسليم», which SPEC §6.1 held for this phase, plus the rail badge — all read from the orders themselves
 
 **Checkpoint:** print a sheet of cards, scan one on a phone, watch the balance move.
+*Half-met: cards print and balances move. Scanning waits on the student portal
+(phase 7), which is where the camera lives.*
 
 ---
 

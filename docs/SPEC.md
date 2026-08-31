@@ -611,8 +611,8 @@ The contextual panel carries the alerts, not the page body (`DESIGN.md` §4).
 > | Ready for association | rule §4.8 | phase 5 |
 > | Passed but points unpaid | `exams where passed and not points_paid` | phase 5 |
 > | Not examined in N days | `max(taken_on)` per student | phase 5 |
-> | Gift low on stock | `gifts where quantity <= low_stock_threshold` | phase 6 |
-> | Orders awaiting delivery | `orders where status='PENDING'` | phase 6 |
+> | Gift low on stock | `gifts where 0 < quantity <= low_stock_threshold` | **built** |
+> | Orders awaiting delivery | `orders where status='PENDING'` | **built** |
 > | Ratel data stale | `max(ratel_imports.imported_at) < now() - 14d` | phase 8 |
 
 Compute alerts in **one SQL round-trip** (CTEs) once they are backed by tables.
@@ -691,16 +691,104 @@ clears students and halaqat after showing what will be lost. It sits under a
 heading that says it is for the testing phase — a button that erases everything
 has no place in a system that students are using, and it goes before handover.
 
-### 6.4 `إد-٤-أ` Points — `/admin/points`
-Balances table (sortable by balance, filter by halaqa). Add points to: one student · selected students · a whole halaqa. **Reason is required.** Negative deltas allowed. Ledger view with filters. Talqeen students are excluded from every path here.
+### 6.4 `إد-٤-أ` Points — `/admin/points`  ✅ built
 
-### 6.5 `إد-٤-ب` Codes — `/admin/points/codes`
-Issue a batch: value · quantity · purpose · optional expiry. Generate unique codes (§3.5). Print view at `/print/codes/[batchId]` — cards with logo, value, human-readable code, and a QR, sized for scissors, colour-coded by value.
-Batch table shows used/remaining. Revoke a batch → all unredeemed codes die instantly.
+Balances table (sortable by balance, filter by halaqa). Add points to: one
+student · selected students · a whole halaqa. **Reason is required.** Negative
+deltas allowed. Ledger view with filters. Talqeen students are excluded from
+every path here.
 
-### 6.6 `إد-٤-ج` Store — `/admin/store`
-Gift CRUD with image upload to S3, points cost, quantity, low-stock threshold, visibility, category.
-Orders table with a "delivered" action, and a printable pick-list grouped by halaqa. Cancelling refunds points and restores stock.
+**One screen, three views of one ledger** — the balances he scans, the movements
+he audits, and the ten names he prints. They are views rather than routes
+because they are the same data asked three questions; splitting them would make
+the supervisor navigate to compare a figure with the rows that produced it.
+
+- **Balances** — الطالب · الحلقة · الرصيد · مُنح · استُبدل · آخر حركة, sortable
+  on name, balance and recency. Four KPIs above it recompute against the current
+  filter, so «نقاط متداولة» means *this halaqa's* when a halaqa is open.
+- **Grant** (`GrantDialog`) — the three targets the client described, and only
+  those: one student he searched for, the several he ticked, a whole halaqa.
+  Add and deduct are the same form with the sign flipped, never a quieter
+  second path. Reason is a required field, and «أخرى» demands free text before
+  the button enables.
+- **Ledger** — every movement with who, how much, what kind, why, and by whom.
+  Correcting writes an **opposite row** citing the original (`kind='CORRECTION'`)
+  and the original stays: «لا تُحذف حركة أبدًا».
+- **Honour roll** — top ten with a balance above zero, printed at `/print/honour`.
+
+**Talqeen is enforced at the mutation, not the screen.** `store.grantPoints`
+filters them out and *reports* who it skipped, so the dialog can say so instead
+of silently doing less than it was asked. A screen-only guard would be one
+future caller away from being wrong.
+
+### 6.5 `إد-٤-ب` Codes — `/admin/points/codes`  ✅ built
+
+Issue a batch: value · quantity · purpose · optional expiry. Generate unique
+codes (§3.5). Print view at `/print/codes/[batchId]` — cards with logo, value,
+human-readable code, and a QR, sized for scissors, colour-coded by value.
+Batch table shows used/remaining. Revoke a batch → all unredeemed codes die
+instantly.
+
+- Selecting a batch turns the page into **that batch's file** — the same move
+  the roster makes for a halaqa (§6.2) — with its cards, their state, and who
+  redeemed each one and when.
+- The code alphabet drops `I O U 1 0` from Crockford base32 (`lib/points.ts`),
+  and generation uses **rejection sampling**: `byte % 30` would make the first
+  sixteen symbols ~6% likelier, and that bias would be printed onto every card.
+- **The card is landscape** (`components/CodeCard.tsx`), to the client's brief:
+  value on the right with its purpose beneath, QR and code on the left. **Four
+  treatments are on offer** behind `?style=` while he chooses — كعب التذكرة ·
+  الهادئة · الوسام · المقتصدة — each stating its own cards-per-sheet, because
+  density is a real trade at forty cards a week. **Delete the three he does not
+  pick;** carrying four card designs forever is not a feature.
+- **Spent cards are not reprinted.** A second copy of a redeemed card is a card
+  a child will try and be refused, so the print sheet carries only live ones.
+- «نقاط لم تُصرف بعد» counts only cards in **ACTIVE** batches: a revoked batch
+  still has paper in the world, but none of it is worth a point.
+- Revoking never touches points already redeemed from that batch — the student
+  did nothing wrong.
+
+### 6.6 `إد-٤-ج` Store — `/admin/store`  ✅ built
+
+Gift CRUD with image upload, points cost, quantity, low-stock threshold,
+visibility, category. Orders table with a "delivered" action, and a printable
+pick-list grouped by halaqa. Cancelling refunds points and restores stock.
+
+- **Two views, because they are two jobs**: the catalogue he maintains once a
+  term, and the order queue he works after every circle. Gifts render as cards,
+  not rows — the catalogue is short, pictorial, and recognised by photograph
+  before name.
+- **Availability is stated, never hidden.** Out of stock reads «نفدت»; a gift
+  the student cannot yet afford stays on display with the gap quantified,
+  because §8 makes it motivation: «لا يُخفى، ليكون حافزًا».
+- **Low stock is not zero.** `isLowStock` is false at a quantity of zero — that
+  is a louder, different alert, and folding it in would bury the gift that
+  actually ran out.
+- **Purchase is `store.purchase`, one commit**: balance checked, stock taken,
+  order written, ledger row written. `purchaseBlock` in `lib/points.ts` answers
+  the one question, and the same answer drives the button's disabled state, the
+  message shown, and the write — three places that must never disagree.
+- **Cancel is compensating, not undo**: stock back, a `REFUND` row forward, the
+  order marked `CANCELLED` with its reason and never deleted. Only a `PENDING`
+  order may be cancelled — once the gift is in the student's hands, refunding
+  the points would hand him both.
+- **Orders snapshot `giftNameSnapshot` and `pointsSpent`**, so deleting or
+  repricing a gift cannot rewrite what a student paid last month. Deleting a
+  gift that still has undelivered orders is blocked.
+
+> **Two deviations from the approved PDF, both flagged for the client:**
+>
+> 1. **`صرف هدية لطالب`** — an admin-side purchase. The PDF has the student
+>    buying in his own portal (طا-٤, phase 7). This exists so the supervisor can
+>    hand a gift across the desk before that portal ships, and so the orders
+>    table is testable at all. It is *not* a second implementation: it calls the
+>    same `store.purchase`. Drop it in one line if the client would rather the
+>    portal be the only door.
+> 2. **Images are data URLs, not S3.** §2 puts them in CranL object storage,
+>    which does not exist yet. `lib/image.ts` downscales every upload to 512 px
+>    JPEG first — without that, two phone photos would exceed the browser's ~5 MB
+>    quota and the whole database would silently stop persisting. The quota
+>    failure is now surfaced (`store.persistError`) rather than swallowed.
 
 ### 6.7 `إد-٥-أ` Plans — `/admin/plans`
 Search student → track/halaqa/**next level** resolve automatically (the supervisor does **not** pick the level; §إد-٥-أ) → preview → **print, which saves `issued_at` in the same action**.
