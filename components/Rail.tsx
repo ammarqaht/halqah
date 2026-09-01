@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { LogoMark } from '@/components/Logo';
 import { NAV, NAV_FOOT, SIGN_OUT, type NavItem } from '@/components/nav';
 import { Num } from '@/components/Num';
+import { useDB } from '@/lib/store';
 import { cx } from '@/lib/cx';
 
 function RailBtn({ item, active, onNavigate }: { item: NavItem; active: boolean; onNavigate?: () => void }) {
@@ -36,7 +37,20 @@ function RailBtn({ item, active, onNavigate }: { item: NavItem; active: boolean;
 
 export function Rail({ onNavigate }: { onNavigate?: (href: string) => void }) {
   const path = usePathname();
-  const isActive = (href: string) => href === '/admin' ? path === '/admin' : path.startsWith(href);
+  const db = useDB();
+
+  const isActive = (item: NavItem) =>
+    item.href === '/admin'
+      ? path === '/admin'
+      : path.startsWith(item.href) || !!item.also?.some((p) => path.startsWith(p));
+
+  /* The one count worth interrupting the supervisor for: gifts a student has
+     bought and is waiting to be handed. Read from the orders themselves —
+     never a number typed into the navigation map. */
+  const pendingOrders = db.orders.filter((o) => o.status === 'PENDING').length;
+  const badgeFor = (item: NavItem) =>
+    item.id === 'points' && pendingOrders > 0 ? pendingOrders : undefined;
+
   return (
     <nav aria-label="التنقل الرئيسي"
       className="relative z-50 flex w-14 shrink-0 flex-col items-center bg-brand-900 py-3.5 shadow-rail md:w-18">
@@ -46,13 +60,14 @@ export function Rail({ onNavigate }: { onNavigate?: (href: string) => void }) {
       </Link>
       <div className="flex flex-1 flex-col items-center gap-1.5">
         {NAV.map((it) => (
-          <RailBtn key={it.id} item={it} active={isActive(it.href)} onNavigate={() => onNavigate?.(it.href)} />
+          <RailBtn key={it.id} item={{ ...it, badge: badgeFor(it) }} active={isActive(it)}
+            onNavigate={() => onNavigate?.(it.href)} />
         ))}
       </div>
       <div className="my-3 h-px w-7 bg-white/15" />
       <div className="flex flex-col items-center gap-1.5">
         {NAV_FOOT.map((it) => (
-          <RailBtn key={it.id} item={it} active={isActive(it.href)} onNavigate={() => onNavigate?.(it.href)} />
+          <RailBtn key={it.id} item={it} active={isActive(it)} onNavigate={() => onNavigate?.(it.href)} />
         ))}
         <RailBtn item={SIGN_OUT} active={false} />
       </div>

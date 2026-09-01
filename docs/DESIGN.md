@@ -216,12 +216,21 @@ so the supervisor filters and jumps without ever leaving the results:
 | الطلاب والحلقات | **The halaqat themselves** — add, edit, and filter by them — plus a stage filter, each with result counts. Track and status filters were removed: a halaqa is normally one track, and every student is active, so both were noise |
 | الخطط | Student queue — who is waiting for a plan, who is late |
 | الاختبارات | Booking queue for the day, and exam-type filter |
-| النقاط والمتجر | Batch list / gift categories / order status |
+| النقاط والمتجر | **Built.** Screen switcher, then: the halaqa filter over the balances, the batch list over the cards, and order status + gift categories over the store |
 | المتابعة | Saved lists — ready for association, late on level, not examined |
 | التقارير | Report kind, scope, period |
 | الإعدادات | Settings tabs |
 
 - Collapses with the TopBar toggle when the table needs full width. State persists per section.
+- **Mounted client-side only** (`app/admin/layout.tsx`). Its content comes entirely
+  from the browser store, so the server has nothing truthful to render — but the
+  reason is stronger than that. The per-section surfaces read `useSearchParams`,
+  which makes Next mark the panel's Suspense boundary *postponed* during
+  prerender. Routes whose page also opts out of static rendering resume it on the
+  client; `/admin` stays fully static, so nothing ever resumed it and the panel
+  sat on its skeleton forever after a hard load — the alerts surface with no
+  alerts on it. Mounting after hydration creates the boundary in the browser,
+  where it resolves at once.
 - At ≤768px it becomes an overlay with a `brand-900/20` scrim.
 - Panel type scale is `panel` 13px throughout. Groups are labelled with `2xs` uppercase-tracked
   `ink-500` eyebrows.
@@ -314,7 +323,7 @@ The mockups' rail is wrong for this product. This is the correct one, derived fr
 | users | **الطلاب والحلقات** | `/admin/students` | إد-٣-أ **+** إد-٣-ب |
 | doc | الخطط | `/admin/plans` | إد-٥-أ |
 | check-square | الاختبارات | `/admin/exams` | إد-٥-ب · إد-٥-ج |
-| coins | النقاط والمتجر | `/admin/points` | إد-٤-أ · ب · ج |
+| coins | النقاط والمتجر | `/admin/points` · `/admin/points/codes` · `/admin/store` | إد-٤-أ · ب · ج |
 | chart | المتابعة والتقارير | `/admin/follow-up` | إد-٥-د · هـ |
 
 ### Rail (foot group)

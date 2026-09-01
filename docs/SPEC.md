@@ -611,8 +611,8 @@ The contextual panel carries the alerts, not the page body (`DESIGN.md` §4).
 > | Ready for association | rule §4.8 | phase 5 |
 > | Passed but points unpaid | `exams where passed and not points_paid` | phase 5 |
 > | Not examined in N days | `max(taken_on)` per student | phase 5 |
-> | Gift low on stock | `gifts where quantity <= low_stock_threshold` | phase 6 |
-> | Orders awaiting delivery | `orders where status='PENDING'` | phase 6 |
+> | Gift low on stock | `gifts where 0 < quantity <= low_stock_threshold` | **built** |
+> | Orders awaiting delivery | `orders where status='PENDING'` | **built** |
 > | Ratel data stale | `max(ratel_imports.imported_at) < now() - 14d` | phase 8 |
 
 Compute alerts in **one SQL round-trip** (CTEs) once they are backed by tables.
@@ -691,16 +691,104 @@ clears students and halaqat after showing what will be lost. It sits under a
 heading that says it is for the testing phase — a button that erases everything
 has no place in a system that students are using, and it goes before handover.
 
-### 6.4 `إد-٤-أ` Points — `/admin/points`
-Balances table (sortable by balance, filter by halaqa). Add points to: one student · selected students · a whole halaqa. **Reason is required.** Negative deltas allowed. Ledger view with filters. Talqeen students are excluded from every path here.
+### 6.4 `إد-٤-أ` Points — `/admin/points`  ✅ built
 
-### 6.5 `إد-٤-ب` Codes — `/admin/points/codes`
-Issue a batch: value · quantity · purpose · optional expiry. Generate unique codes (§3.5). Print view at `/print/codes/[batchId]` — cards with logo, value, human-readable code, and a QR, sized for scissors, colour-coded by value.
-Batch table shows used/remaining. Revoke a batch → all unredeemed codes die instantly.
+Balances table (sortable by balance, filter by halaqa). Add points to: one
+student · selected students · a whole halaqa. **Reason is required.** Negative
+deltas allowed. Ledger view with filters. Talqeen students are excluded from
+every path here.
 
-### 6.6 `إد-٤-ج` Store — `/admin/store`
-Gift CRUD with image upload to S3, points cost, quantity, low-stock threshold, visibility, category.
-Orders table with a "delivered" action, and a printable pick-list grouped by halaqa. Cancelling refunds points and restores stock.
+**One screen, three views of one ledger** — the balances he scans, the movements
+he audits, and the ten names he prints. They are views rather than routes
+because they are the same data asked three questions; splitting them would make
+the supervisor navigate to compare a figure with the rows that produced it.
+
+- **Balances** — الطالب · الحلقة · الرصيد · مُنح · استُبدل · آخر حركة, sortable
+  on name, balance and recency. Four KPIs above it recompute against the current
+  filter, so «نقاط متداولة» means *this halaqa's* when a halaqa is open.
+- **Grant** (`GrantDialog`) — the three targets the client described, and only
+  those: one student he searched for, the several he ticked, a whole halaqa.
+  Add and deduct are the same form with the sign flipped, never a quieter
+  second path. Reason is a required field, and «أخرى» demands free text before
+  the button enables.
+- **Ledger** — every movement with who, how much, what kind, why, and by whom.
+  Correcting writes an **opposite row** citing the original (`kind='CORRECTION'`)
+  and the original stays: «لا تُحذف حركة أبدًا».
+- **Honour roll** — top ten with a balance above zero, printed at `/print/honour`.
+
+**Talqeen is enforced at the mutation, not the screen.** `store.grantPoints`
+filters them out and *reports* who it skipped, so the dialog can say so instead
+of silently doing less than it was asked. A screen-only guard would be one
+future caller away from being wrong.
+
+### 6.5 `إد-٤-ب` Codes — `/admin/points/codes`  ✅ built
+
+Issue a batch: value · quantity · purpose · optional expiry. Generate unique
+codes (§3.5). Print view at `/print/codes/[batchId]` — cards with logo, value,
+human-readable code, and a QR, sized for scissors, colour-coded by value.
+Batch table shows used/remaining. Revoke a batch → all unredeemed codes die
+instantly.
+
+- Selecting a batch turns the page into **that batch's file** — the same move
+  the roster makes for a halaqa (§6.2) — with its cards, their state, and who
+  redeemed each one and when.
+- The code alphabet drops `I O U 1 0` from Crockford base32 (`lib/points.ts`),
+  and generation uses **rejection sampling**: `byte % 30` would make the first
+  sixteen symbols ~6% likelier, and that bias would be printed onto every card.
+- **The card is landscape** (`components/CodeCard.tsx`), to the client's brief:
+  value on the right with its purpose beneath, QR and code on the left. **Four
+  treatments are on offer** behind `?style=` while he chooses — كعب التذكرة ·
+  الهادئة · الوسام · المقتصدة — each stating its own cards-per-sheet, because
+  density is a real trade at forty cards a week. **Delete the three he does not
+  pick;** carrying four card designs forever is not a feature.
+- **Spent cards are not reprinted.** A second copy of a redeemed card is a card
+  a child will try and be refused, so the print sheet carries only live ones.
+- «نقاط لم تُصرف بعد» counts only cards in **ACTIVE** batches: a revoked batch
+  still has paper in the world, but none of it is worth a point.
+- Revoking never touches points already redeemed from that batch — the student
+  did nothing wrong.
+
+### 6.6 `إد-٤-ج` Store — `/admin/store`  ✅ built
+
+Gift CRUD with image upload, points cost, quantity, low-stock threshold,
+visibility, category. Orders table with a "delivered" action, and a printable
+pick-list grouped by halaqa. Cancelling refunds points and restores stock.
+
+- **Two views, because they are two jobs**: the catalogue he maintains once a
+  term, and the order queue he works after every circle. Gifts render as cards,
+  not rows — the catalogue is short, pictorial, and recognised by photograph
+  before name.
+- **Availability is stated, never hidden.** Out of stock reads «نفدت»; a gift
+  the student cannot yet afford stays on display with the gap quantified,
+  because §8 makes it motivation: «لا يُخفى، ليكون حافزًا».
+- **Low stock is not zero.** `isLowStock` is false at a quantity of zero — that
+  is a louder, different alert, and folding it in would bury the gift that
+  actually ran out.
+- **Purchase is `store.purchase`, one commit**: balance checked, stock taken,
+  order written, ledger row written. `purchaseBlock` in `lib/points.ts` answers
+  the one question, and the same answer drives the button's disabled state, the
+  message shown, and the write — three places that must never disagree.
+- **Cancel is compensating, not undo**: stock back, a `REFUND` row forward, the
+  order marked `CANCELLED` with its reason and never deleted. Only a `PENDING`
+  order may be cancelled — once the gift is in the student's hands, refunding
+  the points would hand him both.
+- **Orders snapshot `giftNameSnapshot` and `pointsSpent`**, so deleting or
+  repricing a gift cannot rewrite what a student paid last month. Deleting a
+  gift that still has undelivered orders is blocked.
+
+> **Two deviations from the approved PDF, both flagged for the client:**
+>
+> 1. **`صرف هدية لطالب`** — an admin-side purchase. The PDF has the student
+>    buying in his own portal (طا-٤, phase 7). This exists so the supervisor can
+>    hand a gift across the desk before that portal ships, and so the orders
+>    table is testable at all. It is *not* a second implementation: it calls the
+>    same `store.purchase`. Drop it in one line if the client would rather the
+>    portal be the only door.
+> 2. **Images are data URLs, not S3.** §2 puts them in CranL object storage,
+>    which does not exist yet. `lib/image.ts` downscales every upload to 512 px
+>    JPEG first — without that, two phone photos would exceed the browser's ~5 MB
+>    quota and the whole database would silently stop persisting. The quota
+>    failure is now surfaced (`store.persistError`) rather than swallowed.
 
 ### 6.7 `إد-٥-أ` Plans — `/admin/plans`
 Search student → track/halaqa/**next level** resolve automatically (the supervisor does **not** pick the level; §إد-٥-أ) → preview → **print, which saves `issued_at` in the same action**.
@@ -709,9 +797,38 @@ Editing before print (§إد-٥-أ, "تعديل الخطة وإضافة السو
 
 Bulk print for multiple students into one document.
 
-### 6.8 `إد-٥-ب` Record exam — `/admin/exams/new`
+### 6.8 `إد-٥-ب` Record exam — `/admin/exams/new`  ✅ built (Qiyas import pending)
 Form per §3.4. Student search auto-fills track/halaqa/teacher. `ajza` suggested from level via §4.2. `passed` suggested from score via §4.5. Points suggested from §4.6 — awarding writes the `point_transactions` row **in the same transaction** as the exam.
-Qiyas import lives at `/admin/exams/import`.
+Qiyas import lives at `/admin/exams/import` — **not yet built.** The column
+shape is documented in §5.2 and could be written blind, but it cannot be
+verified without a real Qiyas export, which is client data and stays outside
+this repository. Ask for one sample file before building it.
+
+- **The log is the deliverable, not just the form.** `/admin/exams` replaces
+  «ملف الاختبارات»: every record with its type, level, juz, score, result and
+  points, filtered by type and halaqa from the panel.
+- **The suggestion chain** — halaqa and track from the student, juz from the
+  level (§4.2), score from the counters (§4.4), pass from the score (§4.5),
+  points from §8's table — and every link stays editable, because §11 says
+  «النظام يقترح، وأنت تقرّر».
+- **Points reconcile against the ledger, not against a flag.** `saveExam` reads
+  what the ledger has already paid for that exam and writes only the
+  difference, so re-saving pays nothing, un-ticking «صُرفت» writes an opposite
+  row rather than deleting the first, and «صرفها كلّها» is safe to tap twice.
+  Covered by `lib/store.test.ts`.
+- **«اجتاز ولم تُصرف نقاطه»** (SPEC §6.1, held for this phase) is live on the
+  screen with a one-tap «صرفها كلّها».
+- **Level and juz are required**, bounded 1–60 and clamped as they are typed;
+  the score is clamped to its own scale. They come from the database when a
+  student is chosen, and a record without them cannot say which level was
+  examined — which is what §4.8 later reads.
+- **Talqeen students are not offered in the search at all**, rather than offered
+  and then refused. The count left out is stated under the field.
+- The score and the note carry **hover panels** (`components/Tooltip.tsx`)
+  instead of three more columns: the error breakdown behind the score, the full
+  text behind a truncated note. Keyboard-reachable, not hover-only.
+- A passed diamond offers the next level for printing — «اجتاز ٢٦، المفروض
+  أطبع له ٢٥», his own sentence.
 
 ### 6.9 `إد-٥-ج` On-site exam — `/admin/exams/onsite`
 Booking list, then the exam screen: a table with **one row per question** — surah field (suggest surahs inside the student's level, free text allowed) + three tap-counters (errors / warnings / tajweed errors) + note.
@@ -774,6 +891,7 @@ Each has a **working default** so implementation is never blocked. Revisit with 
 | e | ~~IDs corrupt~~ **Resolved:** the minus is an Excel artefact; `abs()` gives the true ID, cross-verified against Qiyas. Client: import everything as-is | **Student login = national ID** via `student_credentials.login_id`. Short/long IDs are accepted verbatim. The one duplicated ID gets a system-issued code for the second record until the supervisor merges or corrects |
 | f | Silver curriculum levels 39→1 are missing from the client's file | **Client accepts the gap.** Seed what exists; when a silver student reaches level 39, fail with an explicit Arabic message naming the missing level — never a blank sheet. Request the missing pages then |
 | g | Are the `thmanyah` fonts licensed for web embedding? | Self-host and subset; confirm the licence before public launch |
+| h | **The PDF contradicts itself on tajweed scoring.** §9 says «تُسجَّل بدرجة من ١٠»; §11 puts the pass at «٨٠ من ١٠٠ … وهذا الحدّ واحد لكل أنواع الاختبارات — الجمعية والوسامان **والتجويد**». | **Entered out of 10** (his file), **judged at the same proportion** — 8/10 is the same bar as 80/100. Nothing is silently rescaled and no figure he types changes meaning. `scoreMax()` / `passMarkFor()` in `lib/exams.ts`; one edit if he wants it out of 100 instead |
 
 ---
 

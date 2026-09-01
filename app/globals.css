@@ -56,3 +56,26 @@
   *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;
     transition-duration:.001ms!important;scroll-behavior:auto!important}
 }
+
+/* ── Print surfaces — DESIGN.md §8 ────────────────────────────────────────────
+   Print is a first-class output here, not an afterthought: the supervisor
+   prints plans daily and card sheets weekly. A4 is laid out at 794 × 1123 px so
+   what he sees on screen is the sheet that comes out of the tray.             */
+.sheet-a4{width:794px;min-height:1123px;margin:0 auto;background:#fff;
+  padding:14mm 12mm;box-shadow:0 12px 32px -12px rgba(25,30,28,.28)}
+
+@page{size:A4;margin:12mm}
+
+@media print{
+  html,body{background:#fff!important}
+  .no-print{display:none!important}
+  .sheet-a4{width:auto;min-height:0;margin:0;padding:0;box-shadow:none}
+  /* A card must never be cut in half by a page break, and a long table keeps
+     its header on every sheet. */
+  .keep{break-inside:avoid;page-break-inside:avoid}
+  thead{display:table-header-group}
+  tr{break-inside:avoid;page-break-inside:avoid}
+  /* Browsers drop background fills by default; the card colours ARE the sorting
+     mechanism the client asked for, so they have to survive the printer. */
+  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+}
