@@ -23,6 +23,9 @@ function HonourSheet() {
   const bal = useMemo(() => balances(db.txns), [db.txns]);
   const top = useMemo(() => db.students
     .filter(earnsPoints)
+    /* Active only — the follow-up's «المتفوقون» list is «وهم أنفسهم لوحة
+       الشرف», and a student who left must not hang on the wall. */
+    .filter((s) => s.status === 'ACTIVE')
     .filter((s) => (halaqaId ? s.halaqaId === halaqaId : true))
     .map((s) => ({ s, b: bal.get(s.id) ?? EMPTY_BALANCE }))
     .filter((r) => r.b.balance > 0)

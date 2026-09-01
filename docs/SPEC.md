@@ -446,11 +446,14 @@ This is already baked into the `settings` values above; the rule exists so the *
 ### 4.8 Ready for the association exam
 ```ts
 readyForAssociation(student) =
-      completedWholeJuz(student)                     // level maps to a whole juz
-  &&  passedDiamondBadgeForThatJuz(student)
-  &&  !alreadyExaminedByAssociationOn(that juz)
+  ∃ juz J:  passedDiamondBadgeOn(J)                  // the diamond IS the completion proof
+        &&  !alreadyExaminedByAssociationOn(J)       // report the furthest such J
 ```
-Both conditions together — §13.6.
+Both conditions together — §13.6 — evaluated over the student's **whole exam
+history**, not only the current level's juz: §9(d) advances him on the diamond
+alone, so he keeps his place in the ready list for every juz he completed until
+the association actually examines him on it. (The earlier current-juz-only
+form silently dropped a student the moment his next level's sheet was issued.)
 
 ### 4.9 Late on level
 ```ts
@@ -790,6 +793,13 @@ pick-list grouped by halaqa. Cancelling refunds points and restores stock.
 >    quota and the whole database would silently stop persisting. The quota
 >    failure is now surfaced (`store.persistError`) rather than swallowed.
 
+> **Print layout (client decision, 1 Sep 2026):** the sheet's original
+> three-lines-per-day table printed on three pages. It now prints **one row per
+> day** — مراجعة كبرى ثم درجتها، مراجعة صغرى ثم درجتها، الدرس ثم درجته، ثم
+> الملاحظات — so the whole level fits one A4 page, keeping the per-مقرّر score
+> boxes («من ١٠ لكل مقرّر») and no signature lines. The plan *editor* keeps the
+> per-kind structure; only the printed shape merged.
+
 ### 6.7 `إد-٥-أ` Plans — `/admin/plans`
 Search student → track/halaqa/**next level** resolve automatically (the supervisor does **not** pick the level; §إد-٥-أ) → preview → **print, which saves `issued_at` in the same action**.
 
@@ -834,12 +844,52 @@ this repository. Ask for one sample file before building it.
 Booking list, then the exam screen: a table with **one row per question** — surah field (suggest surahs inside the student's level, free text allowed) + three tap-counters (errors / warnings / tajweed errors) + note.
 **Question count is not fixed:** starts at `settings.default_exam_questions`, and add/remove a question with one tap; renumber and recompute live. Score computed by §4.4, editable. One "approve" writes everything.
 
-### 6.10 `إد-٥-د` Follow-up — `/admin/follow-up`
+### 6.10 `إد-٥-د` Follow-up — `/admin/follow-up`  ✅ built
 By halaqa (replaces the client's `البحث بالحلقة` sheet): name · grade · attendance · today's hifz · level · issue date · days held · last association exam (date/ajza/result) · last internal exam (date/type/level/score/note). Students with no plan render "لا توجد خطة", not blanks.
 Ready-made lists: ready for association · late on level · not examined recently · top performers.
 
-### 6.11 `إد-٥-هـ` Reports — `/admin/reports`
+- **Two views, one screen.** «بالحلقة» is the table above; «بالطالب» replaces the
+  client's `البحث باسم الطالب` sheet — search a name, get the whole card: plan,
+  §4.8 readiness (with the *reason* when not ready), exam history, the Ratel
+  snapshot, the balance. A table row click opens that student's card.
+- The four lists live in the contextual panel and **filter the same table**
+  rather than being four pages; each adds only the column it needs (the ready
+  juz, the rank and balance). The top-performers list is capped at ten and
+  links to `/print/honour` — it is the same ranking.
+- Aggregation is one pass per table in `lib/followup.ts` (`followUpRows`) —
+  the in-memory shape of the follow-up SQL view Prisma will get, honouring the
+  one-query-per-list budget in §2.
+- §4.9 (`isLate`) and the not-examined rule (`examOverdue`) are in
+  `lib/exams.ts` with the other rules, unit-tested. **`UNEXAMINED_AFTER_DAYS`
+  is a working default (35)** — §6.1 says «N days» and the client never fixed
+  N; one edit when he does.
+- With these computable, the §6.1 overview alerts «Late on level», «Ready for
+  association» and «Not examined in N days» are **live** and deep-link to the
+  matching list.
+- Talqeen students appear in the by-halaqa sheet (they are roster members) with
+  «التلقين بلا خطة», and are never flagged late or unexamined — §4.11.
+
+### 6.11 `إد-٥-هـ` Reports — `/admin/reports`  ✅ built
 Every report is a `/print/*` route with a print stylesheet. Phase-1 set: plan sheet · full student report · teacher's halaqa report (association-examined students shaded — replaces manual green highlighting) · association statistics (counts, nationality, stage) · ready-for-exam list · code cards · gift pick-list · halaqa points list.
+
+- **The hub** at `/admin/reports` chooses the scope — which student, which
+  halaqa, which period — and opens the sheet; the two reports with their own
+  workflows (plan sheet, code cards) link to their screens. The panel gains a
+  screens group (المتابعة · التقارير) shared with follow-up.
+- Routes: `/print/student/[id]` · `/print/halaqa/[id]` · `/print/association`
+  · `/print/ready` (`?halaqa=` narrows) · `/print/points/[halaqaId]`, on the
+  shared `PrintHead`/`PrintFoot`/`PrintSec` components. Reports addressed to
+  the association carry its reserved blue (DESIGN §1.3).
+- **Client decisions, 1 Sep 2026:** halaqa-report columns as mocked (# · name
+  · grade · track · level · last exam · جمعية ✓ · points); the ready list
+  prints the **full national ID**; association statistics come **cumulative
+  and per-period** — `?from=&to=` bounds the exam tally, while roster figures
+  are always current (no historical roster exists to slice).
+- The halaqa report's shading is `ok-100` **plus** a ✓ column — DESIGN §1.4,
+  the mark must survive a greyscale photocopier.
+- Talqeen: counted in every association statistic (§4.11), absent from the
+  points list (not a zero row), and his student report omits the plan and
+  points sections.
 
 ---
 

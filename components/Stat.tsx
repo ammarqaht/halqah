@@ -1,14 +1,26 @@
 'use client';
+import { SquareArrowOutUpLeft } from 'lucide-react';
 import { Num } from '@/components/Num';
 import { cx } from '@/lib/cx';
 import type { LucideIcon } from 'lucide-react';
 
-export function KPI({ label, value, unit, sub, icon: Ico, accent, delay = 0 }:
-  { label: string; value: React.ReactNode; unit?: string; sub?: string;
-    icon?: LucideIcon; accent?: boolean; delay?: number }) {
+/**
+ * A stat card. Given `onClick` it becomes a real button that opens the figure's
+ * own list, and says so with one fixed glyph — the arrow-out-of-a-box at the
+ * card's bottom-left, the same on every card so the affordance reads as a
+ * system, not a decoration (client decision, 1 Sep 2026).
+ */
+export function KPI({ label, value, unit, sub, icon: Ico, accent, delay = 0, onClick }:
+  { label: string; value: React.ReactNode; unit?: string; sub?: React.ReactNode;
+    icon?: LucideIcon; accent?: boolean; delay?: number; onClick?: () => void }) {
+  const Tag = onClick ? 'button' : 'div';
   return (
-    <div className={cx('rise group relative overflow-hidden rounded-xl border p-5 transition-shadow duration-200 hover:shadow-soft',
-      accent ? 'border-brand-200 bg-brand-50' : 'border-ink-150 bg-paper')}
+    <Tag onClick={onClick} type={onClick ? 'button' : undefined}
+      className={cx('rise group relative overflow-hidden rounded-xl border p-5 text-start transition-shadow duration-200 hover:shadow-soft',
+        accent ? 'border-brand-200 bg-brand-50' : 'border-ink-150 bg-paper',
+        onClick && cx('cursor-pointer transition-[box-shadow,transform,border-color]',
+          'hover:-translate-y-0.5 hover:border-brand-200',
+          'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700'))}
       style={{ animationDelay: `${delay}ms` }}>
       <div className="flex items-start justify-between gap-3">
         <span className="text-xs2 font-medium text-ink-600">{label}</span>
@@ -25,8 +37,12 @@ export function KPI({ label, value, unit, sub, icon: Ico, accent, delay = 0 }:
         </span>
         {unit && <span className="text-xs2 text-ink-500">{unit}</span>}
       </div>
-      {sub && <p className="mt-2 text-micro text-ink-500">{sub}</p>}
-    </div>
+      {sub && <p className={cx('mt-2 text-micro text-ink-500', onClick && 'pe-0 pb-1')}>{sub}</p>}
+      {onClick && (
+        <SquareArrowOutUpLeft size={13} strokeWidth={1.9} aria-hidden
+          className="absolute bottom-2.5 end-3 text-ink-300 transition-colors group-hover:text-brand-800" />
+      )}
+    </Tag>
   );
 }
 

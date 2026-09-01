@@ -18,17 +18,12 @@ import { Tooltip } from '@/components/Tooltip';
 import { Num, pointWord, plural } from '@/components/Num';
 import { usePanel } from '@/components/PanelState';
 import { store, useDB } from '@/lib/store';
-import { EXAM_TYPE_AR, type ExamType } from '@/lib/points';
+import { EXAM_TYPE_AR, EXAM_TYPE_TONE, type ExamType } from '@/lib/points';
 import { scoreMax, SCORE_DEDUCTIONS } from '@/lib/exams';
 import type { Exam } from '@/lib/types';
 import { foldArabic, shortName } from '@/lib/normalise';
 import { formatDate } from '@/lib/dates';
 import { cx } from '@/lib/cx';
-
-const TYPE_TONE: Record<string, 'warn' | 'brand' | 'assoc' | 'info' | 'ink'> = {
-  BADGE_GOLDEN: 'warn', BADGE_DIAMOND: 'brand', ASSOCIATION: 'assoc',
-  MOCK: 'ink', TAJWEED: 'info',
-};
 
 /** A tajweed exam carries no counters in the client's sheet, so there is
     nothing to break down — and an empty tooltip is worse than none. */
@@ -202,7 +197,7 @@ function ExamsScreen() {
                       <td className="px-3 py-3 text-ink-900">{nameOf(e.studentId)}</td>
                       <td className="px-3 py-3 text-panel text-ink-600">{halaqaOf(e.halaqaId)}</td>
                       <td className="px-3 py-3">
-                        <Chip tone={TYPE_TONE[e.type] ?? 'ink'}>
+                        <Chip tone={EXAM_TYPE_TONE[e.type as ExamType] ?? 'ink'}>
                           {EXAM_TYPE_AR[e.type as ExamType] ?? e.type}
                         </Chip>
                         {e.tajweedTopic && (

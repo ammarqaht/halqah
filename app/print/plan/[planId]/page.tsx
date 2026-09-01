@@ -1,14 +1,16 @@
 'use client';
-/* ورقة خطة الحفظ — SPEC.md §6.7, approved PDF §9 (إد-٥-أ):
-   «تُطبع بالشكل نفسه الذي تطبعه اليوم».
+/* ورقة خطة الحفظ — SPEC.md §6.7, approved PDF §9 (إد-٥-أ).
 
    Header: level · track · daily amount · student · teacher · date · both logos.
-   Table:  24 working days, three lines each — م.ك · م.ص · درس — each with
-           «من سورة / من آية» and «إلى سورة / إلى آية», a mark-out-of-10 box and
-           a notes box.
+   Table:  **one row per working day** — مراجعة كبرى ثم درجتها، مراجعة صغرى ثم
+           درجتها، الدرس ثم درجته، ثم الملاحظات. The client's file kept three
+           lines per day and ran to three printed pages; he approved this merged
+           layout on 1 Sep 2026 so the sheet prints on ONE page, with the
+           «الدرجة من ١٠ لكل مقرّر» rule kept — each of the three has its own
+           score box, beside it.
    Days 12 and 24 carry the two badges **with a date box and no recitation
    range**, exactly as the client's own file does.
-   Footer: the printed tajweed reference (§5.4).
+   Footer: the printed tajweed reference (§5.4). No signature lines.
 
    Printing is also what records the issue date — the screen calls
    `store.markPrinted` when it opens this route, because §9 is explicit that
@@ -19,12 +21,34 @@ import { LogoMark, LogoJamiyah } from '@/components/Logo';
 import { Num, toArabicDigits } from '@/components/Num';
 import { Btn } from '@/components/ui';
 import { store, useDB } from '@/lib/store';
-import { resolvePlan, TAJWEED_FOOTER } from '@/lib/curriculum';
+import { resolvePlan, TAJWEED_FOOTER, type PlanRow } from '@/lib/curriculum';
 import { PLAN_KIND_AR, TRACK_AR } from '@/lib/types';
 import { shortName } from '@/lib/normalise';
 import { formatDate } from '@/lib/dates';
 
 const BADGE_AR = { BADGE_GOLDEN: 'الوسام الذهبي', BADGE_DIAMOND: 'الوسام الماسي' } as const;
+
+/**
+ * «الملك ١–١٥» عند سورة واحدة، و«الجن ١٤ ← المزمل ١٩» عند سورتين.
+ *
+ * The editor saves whatever the supervisor typed — no completeness check — so
+ * a HALF-filled range must print as visibly incomplete, never as ambiguous: a
+ * missing side gets a «—» in its slot («الملك —–١٩», «— ← المزمل ١٩») instead
+ * of collapsing into text a teacher could misread as a complete range.
+ */
+function rangeText(r: PlanRow | undefined): string {
+  if (!r || (!r.fromSurah && !r.toSurah)) return '';
+  const ay = (v: string) => (!v || v === 'آخر' ? v : toArabicDigits(v));
+  const fa = ay(r.fromAyah), ta = ay(r.toAyah);
+  if (!r.fromSurah) return `— ← ${r.toSurah}${ta ? ` ${ta}` : ''}`;
+  if (r.fromSurah === r.toSurah || !r.toSurah) {
+    const span = !fa && !ta ? '' : `${fa || '—'}–${ta || '—'}`;
+    /* Both ayahs empty ⇒ the whole surah; an end ayah alone must not read as
+       a start ayah, so the missing side stays visible. */
+    return span ? `${r.fromSurah} ${span}` : r.fromSurah;
+  }
+  return `${r.fromSurah} ${fa || '—'} ← ${r.toSurah} ${ta || '—'}`;
+}
 
 export default function PlanSheet({ params }: { params: Promise<{ planId: string }> }) {
   const { planId } = use(params);
@@ -112,55 +136,65 @@ export default function PlanSheet({ params }: { params: Promise<{ planId: string
           </tbody>
         </table>
 
-        {/* ── الجدول ───────────────────────────────────────────────────── */}
-        <table className="w-full border-collapse text-[11px]">
+        {/* ── الجدول — صفّ واحد لكل يوم، والدرجة بجنب كل مقرّر ─────────── */}
+        <table className="w-full border-collapse text-[10.5px]">
           <thead>
             <tr className="bg-page/60 text-[10px] text-ink-700">
-              <th className={`${cell} w-9`}>اليوم</th>
-              <th className={`${cell} w-12`}>المقرر</th>
-              <th className={cell}>من سورة</th>
-              <th className={`${cell} w-12`}>آية</th>
-              <th className={cell}>إلى سورة</th>
-              <th className={`${cell} w-12`}>آية</th>
-              <th className={`${cell} w-12`}>الدرجة</th>
-              <th className={`${cell} w-28`}>ملاحظات</th>
+              <th className={`${cell} w-8`}>اليوم</th>
+              <th className={cell}>مراجعة كبرى</th>
+              <th className={`${cell} w-10`}>الدرجة</th>
+              <th className={cell}>مراجعة صغرى</th>
+              <th className={`${cell} w-10`}>الدرجة</th>
+              <th className={cell}>الدرس</th>
+              <th className={`${cell} w-10`}>الدرجة</th>
+              <th className={`${cell} w-24`}>ملاحظات</th>
             </tr>
           </thead>
           <tbody>
-            {days.map((d) => (
-              d.examBadge ? (
+            {days.map((d) => {
+              if (d.examBadge) {
                 /* «يظهران في الورقة بصفّهما وخانة تاريخ … لا بمقرّر حفظ» */
-                <tr key={d.dayNo} className="keep bg-brand-50">
-                  <td className={`${cell} font-medium`}><Num>{toArabicDigits(d.dayNo)}</Num></td>
-                  <td className={`${cell} font-medium text-brand-800`} colSpan={5}>
-                    {BADGE_AR[d.examBadge]}
-                  </td>
-                  <td className={`${cell} text-[9px] text-ink-500`}>التاريخ</td>
-                  <td className={cell} />
-                </tr>
-              ) : (
-                d.rows.map((r, i) => (
-                  <tr key={`${d.dayNo}-${r.kind}`} className="keep">
-                    {i === 0 && (
-                      <td className={`${cell} font-medium`} rowSpan={d.rows.length}>
-                        <Num>{toArabicDigits(d.dayNo)}</Num>
-                      </td>
-                    )}
-                    <td className={`${cell} text-ink-700`}>{PLAN_KIND_AR[r.kind]}</td>
-                    <td className={cell}>{r.fromSurah}</td>
-                    <td className={cell}>
-                      {r.fromAyah === 'آخر' ? 'آخر' : <Num>{toArabicDigits(r.fromAyah)}</Num>}
+                return (
+                  <tr key={d.dayNo} className="keep h-[26px] bg-brand-50">
+                    <td className={`${cell} font-medium`}><Num>{toArabicDigits(d.dayNo)}</Num></td>
+                    <td className={`${cell} font-medium text-brand-800`} colSpan={5}>
+                      {BADGE_AR[d.examBadge]}
                     </td>
-                    <td className={cell}>{r.toSurah}</td>
-                    <td className={cell}>
-                      {r.toAyah === 'آخر' ? 'آخر' : <Num>{toArabicDigits(r.toAyah)}</Num>}
-                    </td>
+                    <td className={`${cell} text-[9px] text-ink-500`}>التاريخ</td>
                     <td className={cell} />
-                    <td className={`${cell} text-start text-[10px]`}>{r.note}</td>
                   </tr>
-                ))
-              )
-            ))}
+                );
+              }
+              const byKind = (k: PlanRow['kind']) => d.rows.find((r) => r.kind === k);
+              const mk = byKind('MURAJAA_KUBRA'), ms = byKind('MURAJAA_SUGHRA'), dars = byKind('DARS');
+              /* One note keeps its own words; several must each name their
+                 مقرّر, or a tajweed instruction lands on the wrong recitation. */
+              const noted = d.rows.filter((r) => r.note);
+              const notes = noted.length > 1
+                ? noted.map((r) => `${PLAN_KIND_AR[r.kind]}: ${r.note}`).join(' · ')
+                : (noted[0]?.note ?? '');
+              return (
+                <tr key={d.dayNo} className="keep h-[26px]">
+                  <td className={`${cell} font-medium`}><Num>{toArabicDigits(d.dayNo)}</Num></td>
+                  <td className={`${cell} text-start`}>{rangeText(mk)}</td>
+                  <td className={cell} />
+                  <td className={`${cell} text-start`}>{rangeText(ms)}</td>
+                  <td className={cell} />
+                  <td className={`${cell} text-start font-medium`}>{rangeText(dars)}</td>
+                  <td className={cell} />
+                  <td className={`${cell} text-start text-[9.5px]`}>
+                    {/* Clamped: an unbounded note would grow the row and spill
+                        the sheet onto a second page — the merge's whole point. */}
+                    <span title={notes} style={{
+                      display: '-webkit-box', WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                    }}>
+                      {notes}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
 
@@ -179,7 +213,7 @@ export default function PlanSheet({ params }: { params: Promise<{ planId: string
         </section>
 
         <p className="keep mt-3 text-center text-[9px] text-ink-500">
-          الدرجة من <Num>{toArabicDigits(10)}</Num> لكل سطر ·
+          الدرجة من <Num>{toArabicDigits(10)}</Num> لكل مقرّر ·
           يوما <Num>{toArabicDigits(plan.examDays.BADGE_GOLDEN)}</Num> و
           <Num>{toArabicDigits(plan.examDays.BADGE_DIAMOND)}</Num> للاختبار
         </p>
