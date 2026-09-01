@@ -37,6 +37,25 @@ import { cx } from '@/lib/cx';
 
 const TYPES: ExamType[] = ['BADGE_GOLDEN', 'BADGE_DIAMOND', 'ASSOCIATION', 'MOCK', 'TAJWEED'];
 
+/* Silver runs 60→1 and Golden 30→1, so 60 is the widest a level can be and 1
+   the narrowest. The track's own ceiling is tighter than this and is warned
+   about separately — a warning rather than a block, because the supervisor may
+   be recording history from a file whose numbers we cannot second-guess. */
+const LEVEL_MIN = 1;
+const LEVEL_MAX = 60;
+const TRACK_MAX_LEVEL: Record<string, number> = { SILVER: 60, GOLDEN: 30 };
+
+/** Keep a typed figure inside its bounds as it is typed, not after the fact. */
+function clampDigits(raw: string, max: number, opts: { decimal?: boolean } = {}) {
+  const cleaned = opts.decimal
+    ? raw.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1')
+    : raw.replace(/[^\d]/g, '');
+  if (cleaned === '' || cleaned === '.') return cleaned;
+  const n = Number(cleaned);
+  if (!Number.isFinite(n)) return '';
+  return n > max ? String(max) : cleaned;
+}
+
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 
 type Saved = { exam: Exam; studentName: string; nextLevel: number | null };
@@ -118,19 +137,42 @@ export default function RecordExam() {
     setScoreOverride(null); setPassOverride(null); setPointsOverride(null);
   }, [type]);
 
-  const studentOptions = useMemo(() => db.students.map((s) => ({
+  /* Talqeen students are not offered at all. They have no level and no
+     curriculum (§13.1), so a levelled exam on one of them is not a mistake to
+     warn about after the fact — it is a choice that should never be on the
+     list. The count of who was left out is stated below the field instead. */
+  const eligible = useMemo(() => db.students.filter(earnsPoints), [db.students]);
+  const talqeenCount = db.students.length - eligible.length;
+
+  const studentOptions = useMemo(() => eligible.map((s) => ({
     value: s.id,
     label: s.fullName,
     hint: [s.halaqaId ? shortName(db.halaqat.find((h) => h.id === s.halaqaId)?.teacher ?? '') : 'بلا حلقة',
-           s.currentLevel !== null ? `المستوى ${s.currentLevel}` : null].filter(Boolean).join(' · '),
-  })).sort((a, b) => a.label.localeCompare(b.label, 'ar')), [db.students, db.halaqat]);
+           s.currentLevel !== null ? `المستوى ${s.currentLevel}` : 'بلا مستوى'].filter(Boolean).join(' · '),
+  })).sort((a, b) => a.label.localeCompare(b.label, 'ar')), [eligible, db.halaqat]);
 
   const topicOptions = db.tajweedTopics.filter((t) => t.active)
     .map((t) => ({ value: t.name, label: t.name }));
 
+  /* Level and juz come straight from the database when a student is chosen, and
+     the record is worthless without them: the level is what tells us later which
+     levels he has been examined on, and the juz count is what §4.8 gates
+     association readiness on. So they are required, not merely suggested. */
+  const levelValid = levelNum !== null && levelNum >= LEVEL_MIN && levelNum <= LEVEL_MAX;
+  const ajzaValid = ajza !== '' && Number(ajza) > 0;
+  const scoreValid = score !== null && score >= 0 && score <= scoreMax(type);
+
   const valid = !!student && !blocked && takenOn !== ''
     && (type !== 'TAJWEED' || topic.trim() !== '')
-    && score !== null;
+    && levelValid && ajzaValid && scoreValid;
+
+  /** What is still missing, named — a disabled button with no reason is a wall. */
+  const missing = !student ? 'اختر الطالب'
+    : !levelValid ? `المستوى مطلوب، بين ${LEVEL_MIN} و${LEVEL_MAX}`
+    : !ajzaValid ? 'عدد الأجزاء مطلوب'
+    : type === 'TAJWEED' && topic.trim() === '' ? 'اختر موضوع التجويد'
+    : !scoreValid ? `الدرجة مطلوبة، ولا تتجاوز ${scoreMax(type)}`
+    : null;
 
   const reset = () => {
     setStudentId(''); setType('BADGE_GOLDEN'); setTakenOn(isoDate(new Date()));
@@ -230,6 +272,19 @@ export default function RecordExam() {
                   </div>
                 )}
 
+                {/* A passed GOLDEN badge does not advance anyone, so it gets no
+                    print offer — §13.8: «الذهبي عند نصف المستوى، والماسي عند
+                    المستوى كاملًا **ثم ينتقل الطالب إلى الجزء التالي**». Saying
+                    so is better than saying nothing: without a line here the
+                    supervisor is left wondering why the offer did not appear. */}
+                {saved.exam.type === 'BADGE_GOLDEN' && saved.exam.passed && (
+                  <p className="mt-3 rounded-lg bg-info-100 px-3.5 py-2.5 text-panel text-info-700">
+                    الوسام الذهبي عند نصف المستوى، فلا ينتقل به الطالب —
+                    يبقى على المستوى <Num className="font-medium">{saved.exam.level}</Num> حتى
+                    يجتاز الوسام الماسي في اليوم الرابع والعشرين، وعندها تُطبع له ورقة المستوى التالي.
+                  </p>
+                )}
+
                 {saved.exam.type === 'ASSOCIATION' && (
                   <p className="mt-3 text-panel text-ink-600">
                     اختبار جمعية — سيظهر الطالب مظلَّلًا في تقرير معلّمه.
@@ -260,7 +315,10 @@ export default function RecordExam() {
             meta="اختر الطالب، فتظهر حلقته ومساره ومستواه من نفسها" />
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="اسم الطالب" hint="ابحث بالاسم">
+            <Field label="اسم الطالب"
+              hint={talqeenCount > 0
+                ? `${talqeenCount} من طلاب التلقين خارج هذه القائمة — لا مستوى لهم ولا منهج`
+                : 'ابحث بالاسم'}>
               <Combobox value={studentId} onChange={setStudentId} options={studentOptions}
                 placeholder="اختر الطالب" searchPlaceholder="ابحث بالاسم…"
                 emptyText="لا طالب بهذا الاسم" />
@@ -337,18 +395,38 @@ export default function RecordExam() {
                   : 'الدرجة تُحسب من العدّادات، وتبقى قابلة للتعديل'} />
 
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="المستوى" hint="مستوى الطالب وقت الاختبار">
-                  <input className={INPUT} inputMode="numeric" value={level}
-                    onChange={(e) => setLevel(e.target.value.replace(/[^\d]/g, ''))} />
+                <Field label="المستوى · مطلوب"
+                  hint={`من قاعدة البيانات — بين ${LEVEL_MIN} و${LEVEL_MAX}`}>
+                  <input className={cx(INPUT, !levelValid && level !== '' && 'border-risk-500')}
+                    inputMode="numeric" value={level}
+                    onChange={(e) => setLevel(clampDigits(e.target.value, LEVEL_MAX))} />
                 </Field>
-                <Field label="عدد الأجزاء"
+                <Field label="عدد الأجزاء · مطلوب"
                   hint={isMidJuz(student.track, levelNum)
-                    ? 'هذا المستوى في منتصف جزء، فلا يقابله عدد صحيح'
+                    ? 'هذا المستوى في منتصف جزء، فاكتب العدد بنفسك'
                     : 'يُقترح من المستوى، وقابل للتعديل'}>
-                  <input className={INPUT} inputMode="numeric" value={ajza}
-                    onChange={(e) => setAjza(e.target.value.replace(/[^\d]/g, ''))} />
+                  <input className={cx(INPUT, !ajzaValid && ajza !== '' && 'border-risk-500')}
+                    inputMode="numeric" value={ajza}
+                    onChange={(e) => setAjza(clampDigits(e.target.value, 30))} />
                 </Field>
               </div>
+
+              {/* The track's own ceiling is tighter than 60. A warning, not a
+                  block: he may be entering history from a file we cannot judge. */}
+              {levelValid && student.track && levelNum !== null
+                && levelNum > (TRACK_MAX_LEVEL[student.track] ?? LEVEL_MAX) && (
+                <p className="mt-3 rounded-lg bg-warn-100 px-3.5 py-2.5 text-panel text-warn-700">
+                  المسار {student.track === 'GOLDEN' ? 'الذهبي' : 'الفضي'} ينتهي عند المستوى{' '}
+                  <Num className="font-medium">{TRACK_MAX_LEVEL[student.track]}</Num>، فراجع الرقم قبل الحفظ.
+                </p>
+              )}
+
+              {isMidJuz(student.track, levelNum) && (
+                <p className="mt-3 rounded-lg bg-info-100 px-3.5 py-2.5 text-panel text-info-700">
+                  المستوى <Num className="font-medium">{levelNum}</Num> في المسار الفضي يقع في منتصف جزء،
+                  فلا يقابله عدد أجزاء صحيح — اكتب العدد الذي اختُبر عليه.
+                </p>
+              )}
 
               {type !== 'TAJWEED' && (
                 <div className="mt-4 grid gap-4 sm:grid-cols-3">
@@ -372,7 +450,10 @@ export default function RecordExam() {
                     : undefined}>
                   <input className={INPUT} inputMode="decimal"
                     value={scoreOverride ?? (computedScore !== null ? String(computedScore) : '')}
-                    onChange={(e) => { setScoreOverride(e.target.value.replace(/[^\d.]/g, '')); setPassOverride(null); }}
+                    onChange={(e) => {
+                      setScoreOverride(clampDigits(e.target.value, scoreMax(type), { decimal: true }));
+                      setPassOverride(null);
+                    }}
                     placeholder={type === 'TAJWEED' ? '٨' : '١٠٠'} />
                 </Field>
 
@@ -448,7 +529,7 @@ export default function RecordExam() {
                 {valid
                   ? <>جاهز للحفظ{points > 0 && pointsPaid && <> — ومعه <Coins size={13} className="inline" />{' '}
                       <Num className="font-medium text-brand-800">{points}</Num> {pointWord(points)}</>}</>
-                  : 'أكمل الطالب والدرجة قبل الحفظ'}
+                  : missing}
               </p>
               <Btn variant="primary" size="lg" icon={Check} onClick={save} disabled={!valid}>
                 حفظ الاختبار

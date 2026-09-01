@@ -818,6 +818,15 @@ this repository. Ask for one sample file before building it.
   Covered by `lib/store.test.ts`.
 - **«اجتاز ولم تُصرف نقاطه»** (SPEC §6.1, held for this phase) is live on the
   screen with a one-tap «صرفها كلّها».
+- **Level and juz are required**, bounded 1–60 and clamped as they are typed;
+  the score is clamped to its own scale. They come from the database when a
+  student is chosen, and a record without them cannot say which level was
+  examined — which is what §4.8 later reads.
+- **Talqeen students are not offered in the search at all**, rather than offered
+  and then refused. The count left out is stated under the field.
+- The score and the note carry **hover panels** (`components/Tooltip.tsx`)
+  instead of three more columns: the error breakdown behind the score, the full
+  text behind a truncated note. Keyboard-reachable, not hover-only.
 - A passed diamond offers the next level for printing — «اجتاز ٢٦، المفروض
   أطبع له ٢٥», his own sentence.
 

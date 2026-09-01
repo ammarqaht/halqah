@@ -14,11 +14,13 @@ import { TopBar } from '@/components/TopBar';
 import { Sheet } from '@/components/Sheet';
 import { Btn, Empty, Chip, INPUT } from '@/components/ui';
 import { KPI } from '@/components/Stat';
+import { Tooltip } from '@/components/Tooltip';
 import { Num, pointWord, plural } from '@/components/Num';
 import { usePanel } from '@/components/PanelState';
 import { store, useDB } from '@/lib/store';
 import { EXAM_TYPE_AR, type ExamType } from '@/lib/points';
-import { scoreMax } from '@/lib/exams';
+import { scoreMax, SCORE_DEDUCTIONS } from '@/lib/exams';
+import type { Exam } from '@/lib/types';
 import { foldArabic, shortName } from '@/lib/normalise';
 import { formatDate } from '@/lib/dates';
 import { cx } from '@/lib/cx';
@@ -27,6 +29,50 @@ const TYPE_TONE: Record<string, 'warn' | 'brand' | 'assoc' | 'info' | 'ink'> = {
   BADGE_GOLDEN: 'warn', BADGE_DIAMOND: 'brand', ASSOCIATION: 'assoc',
   MOCK: 'ink', TAJWEED: 'info',
 };
+
+/** A tajweed exam carries no counters in the client's sheet, so there is
+    nothing to break down — and an empty tooltip is worse than none. */
+const hasCounters = (e: Exam) =>
+  e.errors !== null || e.warnings !== null || e.tajweedErrors !== null;
+
+/** How the score was arrived at: each counter, and what it cost. */
+function Breakdown({ exam }: { exam: Exam }) {
+  const rows: [string, number, number][] = [
+    ['أخطاء', exam.errors ?? 0, SCORE_DEDUCTIONS.error],
+    ['تنبيهات', exam.warnings ?? 0, SCORE_DEDUCTIONS.warning],
+    ['أخطاء تجويدية', exam.tajweedErrors ?? 0, SCORE_DEDUCTIONS.tajweedError],
+  ];
+  const lost = rows.reduce((n, [, count, each]) => n + count * each, 0);
+  return (
+    <div className="min-w-[11rem]">
+      <p className="mb-1.5 text-micro uppercase tracking-[.1em] text-ink-500">تفصيل الدرجة</p>
+      <table className="w-full text-panel">
+        <tbody>
+          {rows.map(([label, count, each]) => (
+            <tr key={label} className={count === 0 ? 'text-ink-400' : 'text-ink-800'}>
+              <td className="py-0.5 pe-3">{label}</td>
+              <td className="py-0.5 pe-3 text-end"><Num className="font-medium">{count}</Num></td>
+              {/* The operator goes INSIDE the isolate. Left outside it, RTL
+                  reorders «−٦» into «٦−» — DESIGN.md §2.2, the same reason a
+                  time range needs isolating as one run. */}
+              <td className="py-0.5 text-end text-micro text-ink-500">
+                {count > 0 ? <Num>{`− ${count * each}`}</Num> : '—'}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {/* The whole equation is ONE isolated run. Three separate <Num>s with bare
+          operators between them let RTL reorder the sum into «٩٠ = ١٠ − ١٠٠»,
+          which reads as nonsense. */}
+      <p className="mt-1.5 border-t border-ink-150 pt-1.5 text-panel text-ink-700">
+        <Num className="font-medium text-ink-900">
+          {`${scoreMax(exam.type)} − ${lost} = ${exam.score ?? 0}`}
+        </Num>
+      </p>
+    </div>
+  );
+}
 
 function ExamsScreen() {
   const { panelOpen, setPanelOpen } = usePanel();
@@ -166,9 +212,21 @@ function ExamsScreen() {
                       </td>
                       <td className="px-3 py-3"><Num className="text-panel text-ink-700">{e.level ?? '—'}</Num></td>
                       <td className="px-3 py-3"><Num className="text-panel text-ink-700">{e.ajza ?? '—'}</Num></td>
+                      {/* The breakdown that produced the score, on hover rather
+                          than in three more columns. §3 of DESIGN: a column that
+                          is mostly empty costs every row; the exception does not. */}
                       <td className="px-3 py-3">
-                        <span className="font-medium text-ink-900"><Num>{e.score ?? '—'}</Num></span>
-                        <span className="text-micro text-ink-500"> / <Num>{scoreMax(e.type)}</Num></span>
+                        {hasCounters(e) ? (
+                          <Tooltip content={<Breakdown exam={e} />}>
+                            <span className="font-medium text-ink-900"><Num>{e.score ?? '—'}</Num></span>
+                            <span className="text-micro text-ink-500"> / <Num>{scoreMax(e.type)}</Num></span>
+                          </Tooltip>
+                        ) : (
+                          <>
+                            <span className="font-medium text-ink-900"><Num>{e.score ?? '—'}</Num></span>
+                            <span className="text-micro text-ink-500"> / <Num>{scoreMax(e.type)}</Num></span>
+                          </>
+                        )}
                       </td>
                       <td className="px-3 py-3">
                         {e.passed === null ? <span className="text-ink-400">—</span>
@@ -185,8 +243,12 @@ function ExamsScreen() {
                               </button>
                         ) : <span className="text-ink-400">—</span>}
                       </td>
-                      <td className="max-w-[12rem] truncate px-3 py-3 text-panel text-ink-600" title={e.note}>
-                        {e.note || '—'}
+                      <td className="max-w-[12rem] px-3 py-3 text-panel text-ink-600">
+                        {e.note
+                          ? <Tooltip content={<span className="leading-relaxed">{e.note}</span>}>
+                              <span className="block max-w-[11rem] truncate">{e.note}</span>
+                            </Tooltip>
+                          : '—'}
                       </td>
                     </tr>
                   ))}
