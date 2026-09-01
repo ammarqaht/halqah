@@ -17,6 +17,9 @@ import { Num } from '@/components/Num';
 import { usePanel } from '@/components/PanelState';
 import { scanWorkbook, KIND_AR, KIND_TARGET, type SheetScan, type FileKind } from '@/lib/importers/detect';
 import { parseRoster, ISSUE_AR, type ParseResult } from '@/lib/importers/roster';
+import { buildPlan, COLUMN_DESTINATION, DEST_LABEL, type ImportPlan, type DestGroup } from '@/lib/importers/plan';
+import { useDB } from '@/lib/store';
+import { shortName } from '@/lib/normalise';
 import { store } from '@/lib/store';
 import { TRACK_AR } from '@/lib/types';
 import { cx } from '@/lib/cx';
@@ -56,6 +59,7 @@ export default function ImportPage() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [done, setDone] = useState<{ students: number; halaqat: number; files: number } | null>(null);
   const [error, setError] = useState('');
+  const db = useDB();
 
   const buildJob = (name: string, wb: XLSX.WorkBook): Job => {
     const scans = scanWorkbook(wb);
@@ -273,10 +277,10 @@ export default function ImportPage() {
           <div className="rise sticky bottom-0 -mx-6 mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-ink-150 bg-page/90 px-6 py-4 backdrop-blur-md">
             <p className="text-panel text-ink-600">
               من <Num className="font-medium text-ink-900">{ready.length}</Num> {ready.length === 1 ? 'ملف' : 'ملفات'}:
-              {' '}<Num className="font-medium text-ink-900">{totals.students}</Num> طالبًا
+              {' '}<Num className="font-medium text-ink-900">{totals.students}</Num> صفًا
               و<Num className="font-medium text-ink-900">{totals.halaqat}</Num> حلقات
               {totals.review > 0 && <> · <Num className="font-medium text-warn-700">{totals.review}</Num> تحتاج مراجعتك</>}
-              . الاستيراد يضيف ويحدّث فقط — لا يحذف شيئًا.
+              . الاستيراد يضيف ويحدّث فقط — <strong>لا يحذف أحدًا ولا يمسح حقلًا لا يحمله الملف</strong>.
             </p>
             <Btn variant="primary" size="lg" onClick={commit}>اعتماد الاستيراد</Btn>
           </div>
@@ -289,17 +293,32 @@ export default function ImportPage() {
 /* ── per-file preview ──────────────────────────────────────────────────── */
 function FilePreview({ job }: { job: Job }) {
   const r = job.result!;
+  const db = useDB();
   const review = r.rows.filter((x) => x.issues.length);
-  const clean = r.rows.length - review.length;
+
+  const label = (id: string | null) => {
+    if (!id) return '— بلا حلقة —';
+    const inFile = r.halaqat.find((h) => h.id === id);
+    if (inFile) return shortName(inFile.teacher);
+    const known = db.halaqat.find((h) => h.id === id);
+    return known ? shortName(known.teacher) : '—';
+  };
+
+  const plan: ImportPlan = useMemo(
+    () => buildPlan(r.rows, r.halaqat, db.students, db.halaqat, label),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [r, db.students, db.halaqat]);
+
+  const changed = plan.rows.filter((p) => p.kind === 'UPDATE');
 
   return (
     <div className="fade mt-4 space-y-4">
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {[
-          { l: 'صفوف سليمة', v: clean },
+          { l: 'طلاب جدد', v: plan.creates },
+          { l: 'ستُحدَّث بياناتهم', v: plan.updates },
+          { l: 'بلا تغيير', v: plan.unchanged },
           { l: 'تحتاج مراجعتك', v: review.length },
-          { l: 'صفوف متجاوَزة', v: r.skipped.length },
-          { l: 'حلقات اكتُشفت', v: r.halaqat.length },
         ].map((k) => (
           <div key={k.l} className="rounded-xl border border-ink-150 bg-paper p-4">
             <p className="text-xs2 text-ink-600">{k.l}</p>
@@ -307,6 +326,56 @@ function FilePreview({ job }: { job: Job }) {
           </div>
         ))}
       </div>
+
+      {/* what a second upload actually changes — field by field */}
+      {changed.length > 0 && (
+        <Sheet className="border-brand-200">
+          <SheetHead title="ما سيتغيّر"
+            meta="هذه هي الحقول التي يحملها الملف وتختلف عمّا في القاعدة — وما عداها يبقى كما هو" />
+          <ul className="divide-y divide-ink-150">
+            {changed.slice(0, 25).map((p) => (
+              <li key={p.row.rowNumber} className="py-3">
+                <p className="text-body font-medium text-ink-900">{p.row.student.fullName}</p>
+                <ul className="mt-1.5 flex flex-wrap gap-x-5 gap-y-1">
+                  {p.changes.map((c) => (
+                    <li key={c.field} className="text-panel text-ink-600">
+                      <span className="text-ink-500">{c.label}:</span>{' '}
+                      <span className="text-risk-700 line-through decoration-risk-300">{c.from}</span>
+                      <span className="mx-1 text-ink-400">←</span>
+                      <span className="font-medium text-ok-700">{c.to}</span>
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ul>
+          {changed.length > 25 && (
+            <p className="mt-3 text-micro text-ink-500">
+              وبقيّة <Num>{changed.length - 25}</Num> طالبًا بالتغييرات نفسها في الحقول المذكورة.
+            </p>
+          )}
+        </Sheet>
+      )}
+
+      {/* present in the database, absent from this file — never deleted */}
+      {plan.missing.length > 0 && (
+        <div className="flex items-start gap-3 rounded-xl border border-warn-200 bg-warn-100/50 p-4">
+          <AlertTriangle size={17} className="mt-0.5 shrink-0 text-warn-700" />
+          <div>
+            <p className="text-body font-medium text-ink-900">
+              <Num>{plan.missing.length}</Num> طالبًا في القاعدة وليسوا في هذا الملف
+            </p>
+            <p className="mt-1 text-panel text-ink-600">
+              لن يُحذف أحد منهم. الاستيراد يضيف ويحدّث فقط — فإن كان أحدهم انقطع فعلًا،
+              علّمه «منقطعًا» بنفسك من صفحة الطلاب.
+            </p>
+            <p className="mt-2 text-panel text-ink-500">
+              {plan.missing.slice(0, 5).map((s) => s.fullName).join('، ')}
+              {plan.missing.length > 5 && ` وغيرهم`}
+            </p>
+          </div>
+        </div>
+      )}
 
       {r.skipped.length > 0 && (
         <div className="flex items-start gap-3 rounded-xl border border-ink-200 bg-paper p-4">
@@ -319,17 +388,31 @@ function FilePreview({ job }: { job: Job }) {
       )}
 
       <Sheet>
-        <SheetHead title="الأعمدة التي تعرّفنا عليها"
-          meta="مطابقة بأسماء العناوين لا بمواضعها — فلا يضرّ اختلاف الترتيب أو وجود أعمدة زائدة" />
-        <div className="flex flex-wrap gap-1.5">
-          {Object.keys(r.columnMap).map((k) => <Chip key={k} tone="ok">{COL_AR[k] ?? k}</Chip>)}
-          {/* the roster repeats some headers («الحفظ بالاجزاء» twice), so index the key */}
-          {r.unmappedHeaders.filter((h) => h && !/^\w{3} \w{3} \d/.test(h)).slice(0, 8)
-            .map((h, i) => <Chip key={`${h}-${i}`} tone="ink">{h}</Chip>)}
+        <SheetHead title="أين تذهب كل معلومة"
+          meta="ملف واحد قد يخدم أكثر من غرض — هذا تفصيل ما يذهب إلى أين" />
+        <div className="space-y-3">
+          {(['STUDENT', 'HALAQA', 'SNAPSHOT'] as DestGroup[]).map((g) => {
+            const cols = Object.keys(r.columnMap).filter((k) => COLUMN_DESTINATION[k]?.group === g);
+            if (!cols.length) return null;
+            return (
+              <div key={g} className="flex flex-wrap items-baseline gap-2">
+                <span className="w-40 shrink-0 text-panel font-medium text-ink-800">{DEST_LABEL[g]}</span>
+                <span className="flex flex-wrap gap-1.5">
+                  {cols.map((k) => <Chip key={k} tone="ok">{COLUMN_DESTINATION[k].label}</Chip>)}
+                </span>
+              </div>
+            );
+          })}
+          {r.unmappedHeaders.filter((h) => h && !/^\w{3} \w{3} \d/.test(h)).length > 0 && (
+            <div className="flex flex-wrap items-baseline gap-2 border-t border-ink-150 pt-3">
+              <span className="w-40 shrink-0 text-panel font-medium text-ink-500">لا يحتاجها النظام</span>
+              <span className="flex flex-wrap gap-1.5">
+                {r.unmappedHeaders.filter((h) => h && !/^\w{3} \w{3} \d/.test(h)).slice(0, 10)
+                  .map((h, i) => <Chip key={`${h}-${i}`} tone="ink">{h}</Chip>)}
+              </span>
+            </div>
+          )}
         </div>
-        <p className="mt-3 text-micro text-ink-500">
-          الأخضر مُستورد · الرمادي موجود في ملفك ولا يحتاجه النظام حاليًا.
-        </p>
       </Sheet>
 
       {review.length > 0 && (
@@ -364,16 +447,26 @@ function FilePreview({ job }: { job: Job }) {
       )}
 
       <Sheet>
-        <SheetHead title="الحلقات المكتشفة" meta="اسم الحلقة والمعلّم والوقت مستخرجة من الملف" />
+        <SheetHead title="الحلقات"
+          meta={plan.newHalaqat.length
+            ? `${plan.newHalaqat.length} حلقة جديدة · ${plan.knownHalaqat.length} موجودة مسبقًا`
+            : 'كلها موجودة مسبقًا — لن تُنشأ حلقة جديدة'} />
         <div className="grid gap-2 sm:grid-cols-2">
-          {r.halaqat.map((h) => (
-            <div key={h.id} className="rounded-lg border border-ink-150 bg-page/50 p-3">
-              <p className="text-body font-medium text-ink-900">{h.teacher}</p>
-              <p className="mt-0.5 text-micro text-ink-500">
-                {h.timeSlot} · <Num>{r.rows.filter((x) => x.halaqaName === h.name).length}</Num> طالبًا
-              </p>
-            </div>
-          ))}
+          {r.halaqat.map((h) => {
+            const isNew = plan.newHalaqat.some((n) => n.name === h.name);
+            return (
+              <div key={h.id} className={cx('rounded-lg border p-3',
+                isNew ? 'border-brand-200 bg-brand-50' : 'border-ink-150 bg-page/50')}>
+                <p className="flex items-center gap-2 text-body font-medium text-ink-900">
+                  {shortName(h.teacher)}
+                  {isNew && <Chip tone="brand">جديدة</Chip>}
+                </p>
+                <p className="mt-0.5 text-micro text-ink-500">
+                  {h.timeSlot} · <Num>{r.rows.filter((x) => x.halaqaName === h.name).length}</Num> طالبًا
+                </p>
+              </div>
+            );
+          })}
         </div>
       </Sheet>
 

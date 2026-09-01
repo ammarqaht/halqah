@@ -7,9 +7,9 @@
    session. The form is in the DOM and focusable from t=0 — motion never gates
    input. Only transform/opacity animate.
    ───────────────────────────────────────────────────────────────────────── */
-import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { ArrowLeft, GraduationCap, Loader2 } from 'lucide-react';
+import { Suspense, useEffect, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { LogoFull, LogoJamiyah } from '@/components/Logo';
 import { Curtain } from '@/components/Curtain';
 import { Lattice } from '@/components/Lattice';
@@ -19,7 +19,7 @@ import { cx } from '@/lib/cx';
 import { INTRO, prefersReducedMotion } from '@/lib/motion';
 import { useDB } from '@/lib/store';
 
-export default function LoginPage() {
+function LoginScreen() {
   const router = useRouter();
   const [markVisible, setMarkVisible] = useState(false);
   const [up, setUp] = useState(false);
@@ -27,8 +27,12 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false);
   const [id, setId] = useState('');
   const [pw, setPw] = useState('');
+  const [showPw, setShowPw] = useState(false);
   const idRef = useRef<HTMLInputElement>(null);
   const db = useDB();
+  const [err, setErr] = useState('');
+  const search = useSearchParams();
+  const next = search.get('next') || '/admin';
 
   /* Plays on every visit, reloads included. The page underneath is fully
      rendered the whole time, so the curtain reveals it rather than the page
@@ -53,10 +57,24 @@ export default function LoginPage() {
     return () => { clearTimeout(cap); clearTimeout(tHold); clearTimeout(tDone); };
   }, []);
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErr('');
     setBusy(true);
-    setTimeout(() => router.push('/admin'), 520);
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: id.trim(), password: pw }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setErr(data.error ?? 'تعذّر الدخول. حاول مرة أخرى.'); setBusy(false); return; }
+      router.replace(next);
+      router.refresh();
+    } catch {
+      setErr('تعذّر الاتصال بالخادم.');
+      setBusy(false);
+    }
   };
 
   return (
@@ -80,15 +98,23 @@ export default function LoginPage() {
             </p>
 
             <form onSubmit={submit} className="mt-8 space-y-4">
-              <Field label="رقم الهوية" htmlFor="nid">
-                <input id="nid" ref={idRef} dir="ltr" inputMode="numeric" autoComplete="username"
-                  value={id} onChange={(e) => setId(e.target.value)} placeholder="1XXXXXXXXX"
-                  className={cx(INPUT, 'num text-right')} />
+              <Field label="اسم المستخدم" htmlFor="nid">
+                <input id="nid" ref={idRef} autoComplete="username"
+                  value={id} onChange={(e) => setId(e.target.value)} placeholder="admin"
+                  className={INPUT} />
               </Field>
               <Field label="كلمة المرور" htmlFor="pw">
-                <input id="pw" type="password" autoComplete="current-password"
-                  value={pw} onChange={(e) => setPw(e.target.value)} placeholder="••••••••"
-                  className={INPUT} />
+                <div className="relative">
+                  <input id="pw" type={showPw ? 'text' : 'password'} autoComplete="current-password"
+                    value={pw} onChange={(e) => setPw(e.target.value)} placeholder="••••••••"
+                    className={cx(INPUT, 'pe-11')} />
+                  <button type="button" onClick={() => setShowPw((v) => !v)}
+                    aria-label={showPw ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
+                    aria-pressed={showPw}
+                    className="absolute inset-y-0 end-0 flex w-11 items-center justify-center rounded-e-md text-ink-400 transition-colors hover:text-ink-700">
+                    {showPw ? <EyeOff size={17} strokeWidth={1.9} /> : <Eye size={17} strokeWidth={1.9} />}
+                  </button>
+                </div>
               </Field>
 
               <div className="flex items-center justify-between pt-0.5">
@@ -102,20 +128,16 @@ export default function LoginPage() {
                 </button>
               </div>
 
+              {err && (
+                <p role="alert" className="rounded-md border border-risk-200 bg-risk-100 px-3 py-2.5 text-panel text-risk-700">
+                  {err}
+                </p>
+              )}
+
               <Btn type="submit" variant="primary" size="xl" className="w-full" disabled={busy}>
                 {busy ? <><Loader2 size={17} className="animate-spin" />جارٍ الدخول…</> : 'دخول'}
               </Btn>
             </form>
-
-            <div className="my-7 flex items-center gap-3 text-xs2 text-ink-400">
-              <span className="h-px flex-1 bg-ink-200" />أو<span className="h-px flex-1 bg-ink-200" />
-            </div>
-
-            <Btn size="lg" className="w-full justify-between"
-                 onClick={() => router.push('/student')}>
-              <span className="flex items-center gap-2"><GraduationCap size={17} strokeWidth={1.9} />دخول الطلاب</span>
-              <ArrowLeft size={16} strokeWidth={1.9} className="text-ink-400" />
-            </Btn>
 
             <p className="mt-10 text-micro leading-relaxed text-ink-500">
               للاستفسار عن الحساب: مكتب الإشراف — حلقات جامع محمد العبدالكريم.
@@ -135,14 +157,13 @@ export default function LoginPage() {
             <LogoJamiyah height={40} white className="opacity-70" />
           </div>
 
-          <div className="relative my-auto max-w-[27rem] py-10">
-            <p className="text-micro uppercase tracking-[.18em] text-white/55">
-              حلقات جامع محمد العبدالكريم — الدمام، حي أُحد
-            </p>
-            <p className="mt-6 font-display text-t1 leading-[2.05] text-white/95">
+          {/* The ayah carries this panel on its own — the mosque is already
+              named by the lockup above it, so repeating it only crowds. */}
+          <div className="relative my-auto max-w-[34rem] py-10">
+            <p className="font-display text-d2 leading-[1.95] text-white lg:text-d1 lg:leading-[1.85]">
               وَلَقَدْ يَسَّرْنَا الْقُرْآنَ لِلذِّكْرِ فَهَلْ مِن مُّدَّكِرٍ
             </p>
-            <cite className="mt-3 block text-xs2 not-italic text-white/55">سورة القمر — الآية ١٧</cite>
+            <cite className="mt-5 block text-sm2 not-italic text-white/55">سورة القمر — الآية ١٧</cite>
           </div>
 
           {/* Real figures, read from what this installation actually holds —
@@ -163,4 +184,8 @@ export default function LoginPage() {
       </div>
     </div>
   );
+}
+
+export default function LoginPage() {
+  return <Suspense><LoginScreen /></Suspense>;
 }
