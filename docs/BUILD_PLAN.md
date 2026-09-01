@@ -95,7 +95,7 @@ This is the load-bearing phase. Everything later reads from it.
 - [ ] Seed 468 exam records + 47 tajweed records from `الاختبارات.xlsx` — needs the client workbook, which stays outside the repo
 - [ ] `/admin/exams/import` — Qiyas importer. Buildable from §5.2 but **unverifiable without a sample export**; ask for one first
 - [~] Post-save automations: **next-level suggestion built**; the student page and the teacher report do not exist yet, so their halves wait on §6.2 and §6.11
-- [ ] `/admin/exams/onsite` — bookings + exam screen with **variable question count** and **per-question surah field**, live score, one-tap approve
+- [x] `/admin/exams/onsite` — bookings + exam screen with **variable question count** and **per-question surah field**, live score, one-tap approve. Surah suggestions come from the uploaded curriculum for the student's own level; the day's list prints at `/print/bookings`
 
 **Checkpoint:** history is in, and the supervisor records one live exam end to end.
 

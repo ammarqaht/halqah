@@ -279,3 +279,55 @@ export type PlanDayOverride = {
   toAyah: string;
   note: string;
 };
+
+/* ── On-site exam — SPEC.md §3.4, PDF §9 (إد-٥-ج) ─────────────────────────────
+   The two sheets the client keeps today, «حجز اختبار» and «صفحة الاختبار»,
+   moved onto the screen. And the sentence that governs the whole feature:
+   «النظام لا يصحّح التسميع — أنتم من يستمع ويحكم. دور النظام أن يعدّ الأخطاء
+   ويحسب الدرجة ويحفظ النتيجة، بدل الورقة والقلم والآلة الحاسبة.» */
+
+export type BookingStatus = 'BOOKED' | 'DONE' | 'CANCELLED';
+
+export const BOOKING_STATUS_AR: Record<BookingStatus, string> = {
+  BOOKED: 'محجوز', DONE: 'أُجري', CANCELLED: 'أُلغي',
+};
+
+/** «تُسجّل من سيُختبر ومتى وفي أي مستوى ولأي وسام». */
+export type ExamBooking = {
+  id: string;
+  studentId: string;
+  /** ISO date — the day's list is built from this. */
+  scheduledOn: string;
+  level: number | null;
+  /** Only the two badges are sat on screen; the association exam is external. */
+  badge: 'BADGE_GOLDEN' | 'BADGE_DIAMOND';
+  status: BookingStatus;
+  /** Set once the sheet is approved and an exam record exists. */
+  examId: string | null;
+  note: string;
+  createdAt: string;
+};
+
+/**
+ * One row of the on-site sheet.
+ *
+ * `examId` holds the BOOKING's id while the sheet is still a draft — an exam
+ * that was never sat must not exist as a record — and `approveBooking` rewrites
+ * every row to the real exam id in the same commit. That keeps SPEC §3.4's
+ * single `exam_id` column and still lets the supervisor close the laptop
+ * mid-exam without losing his counters.
+ */
+export type ExamQuestion = {
+  id: string;
+  examId: string;
+  seq: number;
+  /** «السورة، ويمكن معها رقم الآية» — kept so the same passages are not set
+      again next time: «ألّا تُعيد عليه المواضع نفسها في اختباره القادم». */
+  surah: string;
+  ayahFrom: string;
+  ayahTo: string;
+  errors: number;
+  warnings: number;
+  tajweedErrors: number;
+  note: string;
+};

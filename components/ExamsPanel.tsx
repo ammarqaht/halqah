@@ -39,6 +39,15 @@ export function ExamsPanel({ onClose }: { onClose: () => void }) {
     return { byType, byHalaqa, unpaid };
   }, [db.exams]);
 
+  /* DESIGN.md §4 promised a booking queue here; it was absent while إد-٥-ج did
+     not exist. Now it can be computed, so it appears. */
+  const dueToday = useMemo(() => {
+    const today = new Date();
+    const iso = [today.getFullYear(), String(today.getMonth() + 1).padStart(2, '0'),
+                 String(today.getDate()).padStart(2, '0')].join('-');
+    return db.bookings.filter((b) => b.scheduledOn === iso && b.status === 'BOOKED').length;
+  }, [db.bookings]);
+
   const type = sp.get('type');
   const halaqa = sp.get('halaqa');
   const onLog = path === '/admin/exams';
@@ -55,6 +64,10 @@ export function ExamsPanel({ onClose }: { onClose: () => void }) {
           count={db.exams.length || undefined}>سجلّ الاختبارات</PanelItem>
         <PanelItem active={path.startsWith('/admin/exams/new')}
           onClick={() => router.push('/admin/exams/new')}>تسجيل اختبار</PanelItem>
+        <PanelItem active={path.startsWith('/admin/exams/onsite')}
+          onClick={() => router.push('/admin/exams/onsite')}
+          count={dueToday || undefined}
+          tone={dueToday > 0 ? 'warn' : undefined}>الاختبار على الشاشة</PanelItem>
       </PanelGroup>
 
       {onLog && db.exams.length > 0 && (

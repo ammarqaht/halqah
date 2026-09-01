@@ -6,6 +6,7 @@ import { useSyncExternalStore } from 'react';
 import type {
   Student, Halaqa, PointTxn, PointCodeBatch, PointCode, TxnKind, Gift, Order,
   Exam, TajweedTopic, CurriculumDay, StudentPlan, PlanDayOverride,
+  ExamBooking, ExamQuestion,
 } from './types';
 import { SEED_TAJWEED_TOPIC } from './types';
 import {
@@ -26,6 +27,8 @@ export type DB = {
   gifts: Gift[];
   orders: Order[];
   exams: Exam[];
+  bookings: ExamBooking[];
+  examQuestions: ExamQuestion[];
   /** Reference data, loaded once from «منهج الحفظ.xlsx» and rarely touched. */
   curriculum: CurriculumDay[];
   plans: StudentPlan[];
@@ -38,7 +41,8 @@ export type DB = {
 };
 
 const EMPTY: DB = {
-  students: [], halaqat: [], txns: [], batches: [], codes: [], gifts: [], orders: [], exams: [], curriculum: [], plans: [], planOverrides: [],
+  students: [], halaqat: [], txns: [], batches: [], codes: [], gifts: [], orders: [], exams: [], bookings: [], examQuestions: [],
+  curriculum: [], plans: [], planOverrides: [],
   tajweedTopics: [{ id: 'tt1', name: SEED_TAJWEED_TOPIC, active: true }],
   importedAt: null, sourceFile: null,
 };
@@ -631,6 +635,88 @@ export const store = {
     }
     commit({ ...cur, curriculum,
       planOverrides: cur.planOverrides.filter((o) => o.planId !== planId) });
+  },
+
+
+  /* ── On-site exam — SPEC.md §6.9, approved PDF §9 (إد-٥-ج) ──────────────────
+     A booking is a promise; an exam is a record. Nothing is written into
+     `exams` until the sheet is approved, because an exam that was never sat
+     must not exist — but the counters are persisted the whole way through, so
+     the supervisor can close the laptop mid-recitation and come back. */
+
+  book(b: Omit<ExamBooking, 'id' | 'status' | 'examId' | 'createdAt'>): ExamBooking {
+    const cur = load();
+    const booking: ExamBooking = {
+      ...b, id: uid(), status: 'BOOKED', examId: null, createdAt: new Date().toISOString(),
+    };
+    commit({ ...cur, bookings: [...cur.bookings, booking] });
+    return booking;
+  },
+
+  cancelBooking(bookingId: string) {
+    const cur = load();
+    commit({ ...cur, bookings: cur.bookings.map((b) =>
+      (b.id === bookingId && b.status === 'BOOKED' ? { ...b, status: 'CANCELLED' } : b)) });
+  },
+
+  /** Replace the whole sheet for one booking. Renumbering happens in the screen
+      (§9: «يعيد النظام ترقيم الأسئلة … مع كل تغيير»), so this just persists. */
+  setQuestions(ownerId: string, questions: ExamQuestion[]) {
+    const cur = load();
+    commit({ ...cur, examQuestions: [
+      ...cur.examQuestions.filter((q) => q.examId !== ownerId),
+      ...questions,
+    ] });
+  },
+
+  /**
+   * «الاعتماد: بضغطة واحدة تُحفظ نتيجة الاختبار كاملة، فتذهب إلى كل الشاشات،
+   * وتُضاف نقاط الاجتياز.»
+   *
+   * One commit does all of it: the exam row, the questions re-pointed from the
+   * booking to it, the booking closed, and the points movement — which reuses
+   * the same reconciliation `saveExam` uses, so an approval can never pay
+   * twice. Talqeen is refused here as well as on the screen.
+   */
+  approveBooking(args: {
+    bookingId: string; exam: Omit<Exam, 'id'>; by?: string | null;
+  }): Exam | null {
+    const cur = load();
+    const booking = cur.bookings.find((b) => b.id === args.bookingId);
+    if (!booking || booking.status !== 'BOOKED') return null;
+
+    const student = cur.students.find((s) => s.id === args.exam.studentId);
+    if (!student) return null;
+
+    const examId = uid();
+    const exam: Exam = { ...args.exam, id: examId };
+
+    const paysPoints = exam.pointsPaid && earnsPoints(student) && exam.pointsAwarded > 0;
+    const txns = paysPoints
+      ? [...cur.txns, {
+          id: uid(),
+          studentId: exam.studentId,
+          delta: exam.pointsAwarded,
+          kind: 'EXAM' as TxnKind,
+          reason: `اجتياز — ${EXAM_LABEL(exam.type)}`,
+          refType: 'exam' as const,
+          refId: examId,
+          createdBy: args.by ?? 'المشرف',
+          createdAt: new Date().toISOString(),
+        }]
+      : cur.txns;
+
+    commit({
+      ...cur,
+      exams: [...cur.exams, exam],
+      /* The draft rows were filed under the booking; they belong to the exam now. */
+      examQuestions: cur.examQuestions.map((q) =>
+        (q.examId === booking.id ? { ...q, examId } : q)),
+      bookings: cur.bookings.map((b) =>
+        (b.id === booking.id ? { ...b, status: 'DONE', examId } : b)),
+      txns,
+    });
+    return exam;
   },
 
   reset() { commit(EMPTY); },
