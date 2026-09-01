@@ -210,3 +210,72 @@ export type Exam = {
 export type TajweedTopic = { id: string; name: string; active: boolean };
 
 export const SEED_TAJWEED_TOPIC = 'النون الساكنة والتنوين';
+
+/* ── Curriculum & plans — SPEC.md §3.2/§3.3, PDF §9 (إد-٥-أ) ──────────────────
+   The curriculum is reference data, loaded once from «منهج الحفظ.xlsx» and
+   rarely touched. A student's plan is a THIN layer over it: the plan records
+   which level was issued and when, and only the days that differ from the
+   curriculum are stored. That is what makes «لا يُفقد الأصل أبدًا» true —
+   deleting the overrides restores the original, because the original was never
+   overwritten. */
+
+export type PlanKind = 'DARS' | 'MURAJAA_SUGHRA' | 'MURAJAA_KUBRA';
+
+export const PLAN_KIND_AR: Record<PlanKind, string> = {
+  DARS: 'درس', MURAJAA_SUGHRA: 'م.ص', MURAJAA_KUBRA: 'م.ك',
+};
+
+/** The order they appear in on the printed sheet, top to bottom. */
+export const PLAN_KIND_ORDER: PlanKind[] = ['MURAJAA_KUBRA', 'MURAJAA_SUGHRA', 'DARS'];
+
+export const AR_PLAN_KIND: Record<string, PlanKind> = {
+  'درس': 'DARS', 'م.ص': 'MURAJAA_SUGHRA', 'م.ك': 'MURAJAA_KUBRA',
+};
+
+export type CurriculumDay = {
+  track: Track;
+  level: number;
+  dayNo: number;                   // 1..24 by default
+  kind: PlanKind;
+  /** Text, not numbers: the file carries «آخر» for the end of a surah. */
+  fromSurah: string;
+  fromAyah: string;
+  toSurah: string;
+  toAyah: string;
+  note: string;
+};
+
+/** «الوسام الذهبي» on day 12, «الوسام الماسي» on day 24 — these rows carry a
+    date box on the sheet, not a memorisation range (§9). Movable per plan. */
+export type ExamDayMap = { BADGE_GOLDEN: number; BADGE_DIAMOND: number };
+
+export type StudentPlan = {
+  id: string;
+  studentId: string;
+  track: Track;
+  level: number;
+  /** «متى أعطيته الورقة» — written by the act of printing, and what the
+      «تأخّر في مستواه» alert measures from. */
+  issuedAt: string;
+  issuedBy: string | null;
+  /** How many working days this student's sheet runs to. 24 unless edited. */
+  dayCount: number;
+  examDays: ExamDayMap;
+  /** Half a page for Silver, a page for Golden — overridable per student
+      «لطالب يحتاج تخفيفًا أو زيادة عن مقرّر مساره المعتاد». */
+  dailyAmount: string;
+  printedCount: number;
+  createdAt: string;
+};
+
+/** Only the rows that DIFFER from the curriculum. One per (day, kind). */
+export type PlanDayOverride = {
+  planId: string;
+  dayNo: number;
+  kind: PlanKind;
+  fromSurah: string;
+  fromAyah: string;
+  toSurah: string;
+  toAyah: string;
+  note: string;
+};

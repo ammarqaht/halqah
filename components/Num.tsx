@@ -32,4 +32,5 @@ export const studentWord = (n: number) => pluralNoun(n, 'طالب', 'طالبا�
 /** And the other two. بطاقة · بطاقتان · بطاقات · بطاقة — نقطة · نقطتان · نقاط · نقطة */
 export const cardWord = (n: number) => pluralNoun(n, 'بطاقة', 'بطاقتان', 'بطاقات', 'بطاقة');
 export const pointWord = (n: number) => pluralNoun(n, 'نقطة', 'نقطتان', 'نقاط', 'نقطة');
+export const juzWord = (n: number) => pluralNoun(n, 'جزء', 'جزآن', 'أجزاء', 'جزءًا');
 export const orderWord = (n: number) => pluralNoun(n, 'طلب', 'طلبان', 'طلبات', 'طلبًا');

@@ -5,7 +5,7 @@
 import { useSyncExternalStore } from 'react';
 import type {
   Student, Halaqa, PointTxn, PointCodeBatch, PointCode, TxnKind, Gift, Order,
-  Exam, TajweedTopic,
+  Exam, TajweedTopic, CurriculumDay, StudentPlan, PlanDayOverride,
 } from './types';
 import { SEED_TAJWEED_TOPIC } from './types';
 import {
@@ -26,6 +26,11 @@ export type DB = {
   gifts: Gift[];
   orders: Order[];
   exams: Exam[];
+  /** Reference data, loaded once from «منهج الحفظ.xlsx» and rarely touched. */
+  curriculum: CurriculumDay[];
+  plans: StudentPlan[];
+  /** Only the rows that DIFFER from the curriculum — SPEC.md §3.3. */
+  planOverrides: PlanDayOverride[];
   /** Admin-managed; seeded with the one topic the client records today. */
   tajweedTopics: TajweedTopic[];
   importedAt: string | null;
@@ -33,7 +38,7 @@ export type DB = {
 };
 
 const EMPTY: DB = {
-  students: [], halaqat: [], txns: [], batches: [], codes: [], gifts: [], orders: [], exams: [],
+  students: [], halaqat: [], txns: [], batches: [], codes: [], gifts: [], orders: [], exams: [], curriculum: [], plans: [], planOverrides: [],
   tajweedTopics: [{ id: 'tt1', name: SEED_TAJWEED_TOPIC, active: true }],
   importedAt: null, sourceFile: null,
 };
@@ -488,6 +493,144 @@ export const store = {
       ? cur.tajweedTopics.map((t) => (t.id === topic.id ? topic : t))
       : [...cur.tajweedTopics, topic];
     commit({ ...cur, tajweedTopics });
+  },
+
+
+  /* ── Curriculum & plans — SPEC.md §3.2/§3.3, approved PDF §9 (إد-٥-أ) ───────
+     The curriculum is reference data: it is REPLACED per track on import, not
+     merged, because a re-upload of «منهج الحفظ» is a corrected file rather than
+     an addition. Student plans and their overrides survive it untouched — a
+     supervisor fixing a typo in the curriculum must not lose the sheets he has
+     already issued. */
+
+  /** Replace one track's curriculum. The other track, and every plan, stand. */
+  replaceCurriculum(track: Student['track'], days: CurriculumDay[], sourceFile: string) {
+    const cur = load();
+    commit({
+      ...cur,
+      curriculum: [...cur.curriculum.filter((d) => d.track !== track), ...days],
+      importedAt: new Date().toISOString(),
+      sourceFile,
+    });
+  },
+
+  /**
+   * Issue a plan — or hand back the one already issued for that level.
+   *
+   * §9 is explicit that printing is what records the date: «الحفظ يقع تلقائيًا
+   * مع الطباعة — لا تحتاج زر حفظ منفصلًا». So this creates the record and
+   * `markPrinted` stamps it, and the screen calls them together.
+   */
+  issuePlan(args: {
+    studentId: string; track: Exclude<Student['track'], null>; level: number;
+    dailyAmount: string; by?: string | null;
+  }): StudentPlan {
+    const cur = load();
+    const existing = cur.plans.find(
+      (p) => p.studentId === args.studentId && p.track === args.track && p.level === args.level);
+    if (existing) return existing;
+
+    const now = new Date().toISOString();
+    const plan: StudentPlan = {
+      id: uid(),
+      studentId: args.studentId,
+      track: args.track,
+      level: args.level,
+      issuedAt: now,
+      issuedBy: args.by ?? 'المشرف',
+      dayCount: 24,
+      examDays: { BADGE_GOLDEN: 12, BADGE_DIAMOND: 24 },
+      dailyAmount: args.dailyAmount,
+      printedCount: 0,
+      createdAt: now,
+    };
+    commit({ ...cur, plans: [...cur.plans, plan] });
+    return plan;
+  },
+
+  /**
+   * «الحفظ يقع تلقائيًا مع الطباعة» — and the date it writes is what the
+   * «تأخّر في مستواه» alert measures from, so the FIRST print sets it and later
+   * reprints only raise the count. Re-printing a sheet a month later must not
+   * make a late student look freshly issued.
+   */
+  markPrinted(planId: string) {
+    const cur = load();
+    commit({ ...cur, plans: cur.plans.map((p) => (p.id === planId
+      ? { ...p, printedCount: p.printedCount + 1, issuedAt: p.printedCount === 0 ? new Date().toISOString() : p.issuedAt }
+      : p)) });
+  },
+
+  updatePlan(planId: string, patch: Partial<StudentPlan>) {
+    const cur = load();
+    commit({ ...cur, plans: cur.plans.map((p) => (p.id === planId ? { ...p, ...patch, id: p.id } : p)) });
+  },
+
+  /** One row of one day, for THIS student only — the default scope in §9. */
+  setPlanOverride(o: PlanDayOverride) {
+    const cur = load();
+    const rest = cur.planOverrides.filter(
+      (x) => !(x.planId === o.planId && x.dayNo === o.dayNo && x.kind === o.kind));
+    commit({ ...cur, planOverrides: [...rest, o] });
+  },
+
+  /** Wholesale replacement after a day is inserted or removed and everything
+      below it is renumbered. */
+  replacePlanOverrides(planId: string, overrides: PlanDayOverride[]) {
+    const cur = load();
+    commit({ ...cur,
+      planOverrides: [...cur.planOverrides.filter((o) => o.planId !== planId), ...overrides] });
+  },
+
+  /**
+   * «زرّ إرجاع إلى المنهج الأصلي» — and it is a genuine restore rather than a
+   * re-copy, because the curriculum was never written over in the first place.
+   */
+  restorePlan(planId: string) {
+    const cur = load();
+    commit({
+      ...cur,
+      planOverrides: cur.planOverrides.filter((o) => o.planId !== planId),
+      plans: cur.plans.map((p) => (p.id === planId
+        ? { ...p, dayCount: 24, examDays: { BADGE_GOLDEN: 12, BADGE_DIAMOND: 24 } } : p)),
+    });
+  },
+
+  /**
+   * «لكل من يأخذ هذا المستوى» — the second save scope, which needs an extra
+   * confirmation because it touches other students. It writes the curriculum
+   * itself, and then the plan's own overrides for those rows become redundant
+   * and are dropped, so the student is not pinned to a stale copy of what he
+   * just promoted.
+   */
+  applyPlanToLevel(planId: string) {
+    const cur = load();
+    const plan = cur.plans.find((p) => p.id === planId);
+    if (!plan) return;
+    const mine = cur.planOverrides.filter((o) => o.planId === planId);
+    if (!mine.length) return;
+
+    const key = (dayNo: number, kind: string) => `${dayNo}:${kind}`;
+    const patch = new Map(mine.map((o) => [key(o.dayNo, o.kind), o]));
+
+    const curriculum = cur.curriculum.map((d) => {
+      if (d.track !== plan.track || d.level !== plan.level) return d;
+      const o = patch.get(key(d.dayNo, d.kind));
+      if (!o) return d;
+      patch.delete(key(d.dayNo, d.kind));
+      return { ...d, fromSurah: o.fromSurah, fromAyah: o.fromAyah,
+               toSurah: o.toSurah, toAyah: o.toAyah, note: o.note };
+    });
+    /* Rows he added beyond the curriculum become curriculum rows of their own. */
+    for (const o of patch.values()) {
+      curriculum.push({
+        track: plan.track, level: plan.level, dayNo: o.dayNo, kind: o.kind,
+        fromSurah: o.fromSurah, fromAyah: o.fromAyah,
+        toSurah: o.toSurah, toAyah: o.toAyah, note: o.note,
+      });
+    }
+    commit({ ...cur, curriculum,
+      planOverrides: cur.planOverrides.filter((o) => o.planId !== planId) });
   },
 
   reset() { commit(EMPTY); },
