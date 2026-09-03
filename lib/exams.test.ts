@@ -7,6 +7,7 @@ import {
   SCORE_DEDUCTIONS, PASSING_SCORE, nextLevel, ajzaForLevel, isMidJuz,
   scoreFromCounters, isPassing, isPassingFor, scoreMax, passMarkFor,
   totalCounts, readyForAssociation, suggestionAfter,
+  LEVEL_LATE_AFTER_DAYS, daysSince, isLate, examOverdue,
 } from './exams';
 
 describe('level progression — §4.1', () => {
@@ -132,16 +133,32 @@ describe('ready for the association exam — §4.8 / §13.6', () => {
     expect(r).toEqual({ ready: true, ajza: 2, reason: null });
   });
 
-  it('refuses a level that has not completed a whole juz', () => {
-    const r = readyForAssociation({ track: 'SILVER', level: 58, exams: [diamond(1)] });
+  /* §9(d): the diamond alone advances — the supervisor prints the next sheet
+     without waiting for the association, and «فمن تحقّق فيه الشرطان ولم يُختبر
+     بالجمعية بعد، ظهر في كشف الجاهزين» must keep holding for the juz he DID
+     complete. He stays listed until the association examines him on it. */
+  it('keeps a student listed after he advances to the next level', () => {
+    // passed the diamond on juz 2 at level 29, now holding the level-28 sheet
+    expect(readyForAssociation({ track: 'GOLDEN', level: 28, exams: [diamond(2)] }))
+      .toEqual({ ready: true, ajza: 2, reason: null });
+    // silver mid-juz level: still listed for the juz he finished
+    expect(readyForAssociation({ track: 'SILVER', level: 58, exams: [diamond(1)] }))
+      .toEqual({ ready: true, ajza: 1, reason: null });
+  });
+
+  it('reports the furthest juz when several await the association', () => {
+    const r = readyForAssociation({ track: 'GOLDEN', level: 27, exams: [diamond(1), diamond(2)] });
+    expect(r).toEqual({ ready: true, ajza: 2, reason: null });
+  });
+
+  it('refuses a level that has not completed a whole juz, with no diamond behind it', () => {
+    const r = readyForAssociation({ track: 'SILVER', level: 58, exams: [] });
     expect(r.ready).toBe(false);
     expect(r.ajza).toBeNull();
   });
 
-  it('refuses when the diamond was never passed on that juz', () => {
+  it('refuses when no diamond was ever passed', () => {
     expect(readyForAssociation({ track: 'GOLDEN', level: 29, exams: [] }).ready).toBe(false);
-    // passed the diamond, but on a different juz
-    expect(readyForAssociation({ track: 'GOLDEN', level: 29, exams: [diamond(1)] }).ready).toBe(false);
     // sat the diamond on the right juz but did not pass it
     expect(readyForAssociation({
       track: 'GOLDEN', level: 29, exams: [{ type: 'BADGE_DIAMOND', passed: false, ajza: 2 }],
@@ -164,6 +181,59 @@ describe('ready for the association exam — §4.8 / §13.6', () => {
 
   it('never lists a talqeen student', () => {
     expect(readyForAssociation({ track: 'TALQEEN', level: null, exams: [] }).ready).toBe(false);
+  });
+});
+
+describe('late on level — §4.9', () => {
+  /* Local-time strings on purpose: a `Z` suffix would make the expected day
+     count depend on the machine's timezone. */
+  const at = (iso: string) => new Date(iso);
+
+  it('counts calendar days, ignoring the time of day', () => {
+    // issued at ten in the evening ⇒ one day old the next morning, not zero
+    expect(daysSince('2026-08-31T22:00:00', at('2026-09-01T08:00:00'))).toBe(1);
+    expect(daysSince('2026-09-01T08:00:00', at('2026-09-01T23:00:00'))).toBe(0);
+  });
+
+  it('has nothing to measure without a date', () => {
+    expect(daysSince(null)).toBeNull();
+    expect(daysSince('ليس تاريخًا')).toBeNull();
+  });
+
+  /* `takenOn` is written date-only ('YYYY-MM-DD'). The engine parses that
+     shape as UTC midnight, which on a machine west of UTC used to collapse it
+     to the previous local day and flag the 35-day boundary one day early.
+     `asDate` pins a date-only string to the LOCAL day in every timezone. */
+  it('keeps a date-only string on its own calendar day in any timezone', () => {
+    expect(daysSince('2026-08-25', at('2026-08-26T01:00:00'))).toBe(1);
+    expect(daysSince('2026-08-25', at('2026-08-25T23:00:00'))).toBe(0);
+  });
+
+  /* «أعطيته ٢٦ في شهر ٧، المفروض ينتقل خلال شهر» — §3.8 puts the line at 35. */
+  it('turns late strictly after 35 days from issue', () => {
+    expect(LEVEL_LATE_AFTER_DAYS).toBe(35);
+    const plan = { issuedAt: '2026-07-01T10:00:00' };
+    expect(isLate(plan, at('2026-08-05T10:00:00'))).toBe(false);  // day 35 — on time still
+    expect(isLate(plan, at('2026-08-06T10:00:00'))).toBe(true);   // day 36 — late
+  });
+
+  it('a student with no plan is «لا توجد خطة», not late', () => {
+    expect(isLate(null)).toBe(false);
+    expect(isLate(undefined)).toBe(false);
+  });
+});
+
+describe('not examined recently — §6.1', () => {
+  const at = (iso: string) => new Date(iso);
+
+  it('is overdue strictly after the threshold', () => {
+    expect(examOverdue('2026-07-01T10:00:00', at('2026-08-05T10:00:00'))).toBe(false);
+    expect(examOverdue('2026-07-01T10:00:00', at('2026-08-06T10:00:00'))).toBe(true);
+  });
+
+  /* The list exists to surface exactly the student everyone forgot. */
+  it('a student never examined at all is overdue, not invisible', () => {
+    expect(examOverdue(null)).toBe(true);
   });
 });
 

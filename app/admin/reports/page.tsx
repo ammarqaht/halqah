@@ -1,70 +1,89 @@
 'use client';
-/* مركز التقارير — SPEC.md §6.11 (إد-٥-هـ)
-   Everything printable, in one place. Print is a first-class output here: the
-   supervisor prints daily, and until now each report lived behind the screen
-   that produced it. */
-import { useState } from 'react';
+/* التقارير — SPEC.md §6.11, approved PDF §9 (إد-٥-هـ).
+   The hub: every phase-1 report from one screen. Each printed report is a
+   `/print/*` route (DESIGN.md §8); this screen only chooses the scope —
+   which student, which halaqa, which period — and opens the sheet.
+   The two reports that live inside their own workflows (ورقة الخطة، بطاقات
+   الأكواد) link to their screens rather than duplicating them here. */
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
-  FileText, Users2, BarChart3, Award, Ticket, PackageCheck, Trophy,
-  ClipboardList, Printer, ExternalLink, Inbox,
+  Printer, FileText, Users, Landmark, Award, Coins, Trophy, PackageCheck,
+  QrCode, Inbox,
 } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
 import { TopBar } from '@/components/TopBar';
-import { Sheet, SheetHead } from '@/components/Sheet';
-import { Btn, Empty, Chip } from '@/components/ui';
+import { Sheet } from '@/components/Sheet';
+import { Btn, Empty, Segmented, INPUT, Field } from '@/components/ui';
 import { Combobox } from '@/components/Combobox';
-import { Num } from '@/components/Num';
+import { Count } from '@/components/Num';
 import { usePanel } from '@/components/PanelState';
 import { useDB } from '@/lib/store';
-import { shortName } from '@/lib/normalise';
+import { followUpRows, followedRows, listRows } from '@/lib/followup';
+import { TRACK_AR } from '@/lib/types';
+import { shortName, teacherName } from '@/lib/normalise';
+import { cx } from '@/lib/cx';
+import type { LucideIcon } from 'lucide-react';
 
-type Report = {
-  id: string;
-  title: string;
-  body: string;
-  icon: LucideIcon;
-  href?: string;
-  /** Reports that need a halaqa chosen before they mean anything. */
-  needsHalaqa?: boolean;
-  count?: number;
-};
+function ReportCard({ icon: Ico, title, body, assoc, children }:
+  { icon: LucideIcon; title: string; body: string; assoc?: boolean; children: React.ReactNode }) {
+  return (
+    <Sheet className="flex flex-col">
+      <div className="mb-4 flex items-start gap-3">
+        <span className={cx('rounded-lg p-2',
+          assoc ? 'bg-assoc-100 text-assoc-900' : 'bg-brand-100 text-brand-800')}>
+          <Ico size={18} strokeWidth={1.9} />
+        </span>
+        <div className="min-w-0">
+          <h2 className="text-lg2 font-bold text-ink-900">{title}</h2>
+          <p className="mt-0.5 text-xs2 text-ink-500">{body}</p>
+        </div>
+      </div>
+      <div className="mt-auto flex flex-wrap items-end gap-3">{children}</div>
+    </Sheet>
+  );
+}
 
-export default function ReportsPage() {
+export default function Page() {
   const { panelOpen, setPanelOpen } = usePanel();
   const db = useDB();
-  const [halaqaId, setHalaqaId] = useState('');
+  const router = useRouter();
 
-  const activeBatches = db.batches.filter((b) => !b.revokedAt).length;
-  const pending = db.orders.filter((o) => o.status === 'PENDING').length;
+  const [studentId, setStudentId] = useState('');
+  const [halaqaFor, setHalaqaFor] = useState<Record<string, string>>({});
+  const [statsMode, setStatsMode] = useState<'all' | 'period'>('all');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
 
-  const reports: Report[] = [
-    {
-      id: 'halaqa', title: 'تقرير المعلّم عن حلقته', icon: Users2, needsHalaqa: true,
-      body: 'طلاب الحلقة ومستوياتهم وآخر اختباراتهم، ومن اختُبر لدى الجمعية مظلَّلًا. هو ما تطبعه كل ثلاثة أسابيع.',
-    },
-    {
-      id: 'statistics', title: 'إحصائية الجمعية', icon: BarChart3, href: '/print/statistics',
-      body: 'أعداد الطلاب والحلقات، وتوزيعهم على المسارات والمراحل والجنسيات، والأجزاء المختبَرة.',
-    },
-    {
-      id: 'honour', title: 'لوحة الشرف', icon: Trophy, href: '/print/honour',
-      body: 'أعلى الطلاب في النقاط — للتعليق في الحلقة.',
-    },
-    {
-      id: 'bookings', title: 'قائمة اختبارات اليوم', icon: ClipboardList, href: '/print/bookings',
-      body: 'من حُجز له اختبار، بمستواه ونوع وسامه.', count: db.bookings.length,
-    },
-    {
-      id: 'pick-list', title: 'قائمة تسليم الهدايا', icon: PackageCheck, href: '/print/pick-list',
-      body: 'الطلبات المعلّقة مرتّبة بالحلقة، لتسلّمها للمعلّمين.', count: pending,
-    },
-  ];
+  const readyCount = useMemo(
+    () => listRows(followedRows(followUpRows(db)), 'ready').length, [db]);
 
-  const halaqaOptions = [
-    { value: '', label: '— اختر حلقة —' },
-    ...db.halaqat.map((h) => ({ value: h.id, label: shortName(h.teacher), hint: h.timeSlot })),
-  ];
+  const studentOptions = useMemo(() => db.students
+    .filter((s) => s.status === 'ACTIVE')
+    .map((s) => ({
+      value: s.id, label: s.fullName,
+      hint: [teacherName(db.halaqat, s.halaqaId, 'بلا حلقة'),
+             s.track ? TRACK_AR[s.track] : 'بلا مسار'].join(' · '),
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label, 'ar')),
+  [db.students, db.halaqat]);
+  const halaqaOptions = useMemo(() => db.halaqat.map((h) => ({
+    value: h.id, label: shortName(h.teacher), hint: h.timeSlot,
+  })), [db.halaqat]);
+
+  /** One halaqa pick per card, so choosing for one report does not move another. */
+  const halaqaPick = (key: string, extra?: { value: string; label: string }) => (
+    <div className="min-w-[13rem] flex-1">
+      <Combobox value={halaqaFor[key] ?? extra?.value ?? ''} placeholder="اختر الحلقة…"
+        onChange={(v) => setHalaqaFor((m) => ({ ...m, [key]: v }))}
+        options={extra ? [extra, ...halaqaOptions] : halaqaOptions} />
+    </div>
+  );
+
+  const statsHref = statsMode === 'period'
+    ? `/print/association?${new URLSearchParams({
+        ...(from ? { from } : {}), ...(to ? { to } : {}) })}`
+    : '/print/association';
 
   if (!db.students.length) {
     return (
@@ -72,9 +91,10 @@ export default function ReportsPage() {
         <TopBar title="التقارير" panelOpen={panelOpen} onOpenPanel={() => setPanelOpen(true)} />
         <div className="mx-auto max-w-column px-6 py-8">
           <Sheet className="rise">
-            <Empty icon={Inbox} title="لا توجد بيانات بعد"
-              body="التقارير تُبنى من بياناتك — ارفع ملفًا أولًا."
-              action={<Link href="/admin/students/import"><Btn variant="primary" size="lg">رفع ملف</Btn></Link>} />
+            <Empty icon={Inbox} title="لا بيانات تُطبع بعد"
+              body="التقارير الثمانية تُبنى من قاعدة البيانات لحظة الطباعة. ابدأ برفع ملف الطلاب."
+              action={<Link href="/admin/students/import">
+                <Btn variant="primary" size="lg">رفع ملف</Btn></Link>} />
           </Sheet>
         </div>
       </>
@@ -86,70 +106,94 @@ export default function ReportsPage() {
       <TopBar title="التقارير" panelOpen={panelOpen} onOpenPanel={() => setPanelOpen(true)} />
 
       <div className="mx-auto max-w-column px-6 py-8 pb-16">
-        <header className="rise mb-8">
-          <h2 className="font-display text-d1 text-ink-900">مركز التقارير</h2>
-          <p className="mt-2 max-w-[44rem] text-base2 text-ink-600">
-            كل ما تحتاج طباعته في مكان واحد. تُفتح في صفحة مستقلّة بمقاس A4، فما تراه هو ما يُطبع.
-          </p>
-        </header>
+        <div className="rise grid gap-4 lg:grid-cols-2">
 
-        <Sheet className="rise mb-4">
-          <SheetHead title="تقرير حلقة" meta="اختر الحلقة ثم افتح التقرير" />
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="min-w-[18rem] flex-1">
-              <Combobox value={halaqaId} onChange={setHalaqaId} options={halaqaOptions}
-                placeholder="اختر حلقة" searchPlaceholder="ابحث باسم المعلّم…" />
+          <ReportCard icon={FileText} title="التقرير الشامل للطالب"
+            body="بياناته، مستواه وخطته، اختباراته كلها، رصيده وآخر حركاته، ولقطة رتل — صفحة واحدة لملفه أو لوليّ أمره.">
+            <div className="min-w-[13rem] flex-1">
+              <Combobox value={studentId} onChange={setStudentId}
+                options={studentOptions} placeholder="اختر طالبًا…" searchPlaceholder="ابحث بالاسم…" />
             </div>
-            <Link href={halaqaId ? `/print/halaqa?halaqa=${halaqaId}` : '#'} target="_blank"
-              className={!halaqaId ? 'pointer-events-none opacity-50' : undefined}>
-              <Btn variant="primary" icon={Printer}>فتح التقرير</Btn>
-            </Link>
-          </div>
-        </Sheet>
+            <Btn variant="primary" icon={Printer} disabled={!studentId}
+              onClick={() => router.push(`/print/student/${studentId}`)}>طباعة</Btn>
+          </ReportCard>
 
-        <div className="rise grid gap-3 sm:grid-cols-2">
-          {reports.filter((r) => r.href).map((r) => (
-            <Link key={r.id} href={r.href!} target="_blank"
-              className="group flex flex-col rounded-xl border border-ink-150 bg-paper p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-soft">
-              <div className="mb-3 flex items-start justify-between gap-3">
-                <span className="rounded-lg bg-ink-100 p-2 text-ink-600 transition-colors group-hover:bg-brand-100 group-hover:text-brand-800">
-                  <r.icon size={17} strokeWidth={1.9} />
-                </span>
-                {r.count !== undefined && (
-                  <Chip tone={r.count ? 'brand' : 'ink'}><Num>{r.count}</Num></Chip>
-                )}
-              </div>
-              <p className="flex items-center gap-1.5 text-lg2 font-medium text-ink-900">
-                {r.title}
-                <ExternalLink size={13} className="text-ink-400" />
-              </p>
-              <p className="mt-1.5 text-panel leading-relaxed text-ink-600">{r.body}</p>
-            </Link>
-          ))}
+          <ReportCard icon={Users} title="تقرير حلقة المعلّم"
+            body="كشف الحلقة كاملًا — ومن اختبرته الجمعية صفّه مظلَّل مع ✓، بديل التظليل الأخضر اليدوي.">
+            {halaqaPick('halaqa')}
+            <Btn variant="primary" icon={Printer} disabled={!halaqaFor.halaqa}
+              onClick={() => router.push(`/print/halaqa/${halaqaFor.halaqa}`)}>طباعة</Btn>
+          </ReportCard>
+
+          <ReportCard icon={Landmark} assoc title="إحصاءات الجمعية"
+            body="الأعداد والمسارات والمراحل والجنسيات وحصيلة الاختبارات — تراكميًا، أو محصورة بفترة.">
+            <Segmented value={statsMode} onChange={setStatsMode}
+              options={[{ value: 'all', label: 'تراكمي' }, { value: 'period', label: 'فترة' }]} />
+            {statsMode === 'period' && (
+              <>
+                <Field label="من">
+                  <input type="date" value={from} onChange={(e) => setFrom(e.target.value)}
+                    className={cx(INPUT, 'h-9 w-40')} />
+                </Field>
+                <Field label="إلى">
+                  <input type="date" value={to} onChange={(e) => setTo(e.target.value)}
+                    className={cx(INPUT, 'h-9 w-40')} />
+                </Field>
+              </>
+            )}
+            <Btn variant="primary" icon={Printer}
+              disabled={statsMode === 'period' && !from && !to}
+              onClick={() => router.push(statsHref)}>طباعة</Btn>
+          </ReportCard>
+
+          <ReportCard icon={Award} assoc title="كشف الجاهزين لاختبار الجمعية"
+            body="من أتمّ الجزء واجتاز الوسام الماسي عليه — برقم الهوية كاملًا وعمود ملاحظات لمختبِر الجمعية.">
+            {halaqaPick('ready', { value: 'all', label: 'كل الحلقات' })}
+            <Btn variant="primary" icon={Printer}
+              onClick={() => {
+                const h = halaqaFor.ready;
+                router.push(h && h !== 'all' ? `/print/ready?halaqa=${h}` : '/print/ready');
+              }}>
+              طباعة
+            </Btn>
+            <p className="w-full text-micro text-ink-500">
+              {readyCount
+                ? <>في الكشف الآن <Count n={readyCount} one="طالب واحد" two="طالبان" few="طلاب" many="طالبًا" /></>
+                : 'الكشف فارغ حاليًا — يمتلئ فور اجتياز وسام ماسي على جزء مكتمل.'}
+            </p>
+          </ReportCard>
+
+          <ReportCard icon={Coins} title="قائمة نقاط الحلقة"
+            body="أرصدة حلقة واحدة بخط كبير — تُعلَّق في الحلقة أو تُمسك عند باب المتجر.">
+            {halaqaPick('points')}
+            <Btn variant="primary" icon={Printer} disabled={!halaqaFor.points}
+              onClick={() => router.push(`/print/points/${halaqaFor.points}`)}>طباعة</Btn>
+          </ReportCard>
+
+          <ReportCard icon={Trophy} title="لوحة الشرف"
+            body="أعلى عشرة أرصدة — للجامع كله أو لحلقة واحدة، بخط يُقرأ من بعيد.">
+            {halaqaPick('honour', { value: 'all', label: 'كل الحلقات' })}
+            <Btn variant="primary" icon={Printer}
+              onClick={() => {
+                const h = halaqaFor.honour;
+                router.push(h && h !== 'all' ? `/print/honour?halaqa=${h}` : '/print/honour');
+              }}>
+              طباعة
+            </Btn>
+          </ReportCard>
+
+          <ReportCard icon={PackageCheck} title="قائمة تسليم الهدايا"
+            body="الطلبات المنتظرة مرتّبة للتسليم على الطاولة — تُشطب ورقيًا ثم تُسلَّم في الشاشة.">
+            <Link href="/print/pick-list"><Btn variant="primary" icon={Printer}>طباعة</Btn></Link>
+          </ReportCard>
+
+          <ReportCard icon={QrCode} title="ورقة الخطة · بطاقات الأكواد"
+            body="لكلٍّ منهما شاشته: الخطة تُطبع من شاشة الخطط وتُسجَّل بالطباعة، والبطاقات من شاشة الأكواد.">
+            <Link href="/admin/plans"><Btn icon={FileText}>شاشة الخطط</Btn></Link>
+            <Link href="/admin/points/codes"><Btn icon={QrCode}>شاشة الأكواد</Btn></Link>
+          </ReportCard>
+
         </div>
-
-        <Sheet className="rise mt-4">
-          <SheetHead title="تقارير تُفتح من شاشاتها"
-            meta="لأنها تخصّ سجلًّا بعينه تختاره هناك" />
-          <div className="divide-y divide-ink-150">
-            {[
-              { icon: FileText, t: 'خطة الحفظ لمستوى', where: 'الخطط', href: '/admin/plans' },
-              { icon: Ticket, t: 'بطاقات أكواد النقاط', where: 'النقاط والأكواد', href: '/admin/points/codes',
-                n: activeBatches },
-              { icon: Award, t: 'تقرير الطالب الشامل', where: 'الطلاب والحلقات', href: '/admin/students' },
-            ].map((x) => (
-              <Link key={x.t} href={x.href}
-                className="flex items-center gap-3 py-3 transition-colors hover:bg-page/50">
-                <x.icon size={16} className="shrink-0 text-ink-400" />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-body text-ink-900">{x.t}</span>
-                  <span className="block text-micro text-ink-500">من شاشة «{x.where}»</span>
-                </span>
-                {x.n !== undefined && <Chip tone="ink"><Num>{x.n}</Num> دفعة</Chip>}
-              </Link>
-            ))}
-          </div>
-        </Sheet>
       </div>
     </>
   );

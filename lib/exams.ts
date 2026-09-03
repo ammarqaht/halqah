@@ -9,6 +9,7 @@
    §11 governs all of it: «النظام يقترح، وأنت تقرّر». Every function below
    computes a suggestion the supervisor can overrule — none of them decides. */
 import type { Track } from './types';
+import { asDate } from './dates';
 
 /* ── Settings ────────────────────────────────────────────────────────────────
    SPEC.md §3.8 seeds these; until that table exists they live here, and
@@ -39,6 +40,19 @@ export const passMarkFor = (type: string) => (PASSING_SCORE / 100) * scoreMax(ty
 
 /** §إد-٥-ج: the on-site sheet opens with this many questions and grows by tap. */
 export const DEFAULT_EXAM_QUESTIONS = 5;
+
+/** §3.8 `level_late_after_days` — a level is 24 *working* days ≈ 5 weeks of
+    circle days. His own sentence: «أعطيته ٢٦ في شهر ٧، المفروض ينتقل خلال شهر». */
+export const LEVEL_LATE_AFTER_DAYS = 35;
+
+/**
+ * §6.1 lists «Not examined in N days» without ever fixing N — no client figure
+ * exists. Working default: the exam cadence is one badge every half-level
+ * (~2.5 weeks), so a student silent for a whole level-length (35 days, the same
+ * yardstick as `level_late_after_days`) has certainly missed a cycle. One edit
+ * here when the client names his N.
+ */
+export const UNEXAMINED_AFTER_DAYS = 35;
 
 /* ── Level progression — §4.1 ───────────────────────────────────────────────── */
 
@@ -113,6 +127,13 @@ export const totalCounts = (rows: ErrorCounts[]): ErrorCounts => rows.reduce(
  *
  * Both conditions, and the third is implicit in the sentence: not already
  * examined by the association on that same juz.
+ *
+ * The whole exam HISTORY is scanned, not only the current level's juz —
+ * because §9(d) says the diamond alone advances the student, the supervisor
+ * prints the next level's sheet without waiting for the association, and a
+ * student must not vanish from the ready list merely for having moved on. He
+ * stays listed for every juz whose diamond he passed until the association
+ * examines him on it; when several are pending, the furthest juz is reported.
  */
 export function readyForAssociation(args: {
   track: Track | null;
@@ -124,21 +145,68 @@ export function readyForAssociation(args: {
   if (!track || track === 'TALQEEN') {
     return { ready: false, ajza: null, reason: 'مسار التلقين خارج الاختبارات المستوياتية' };
   }
+  const passed = new Set<number>();
+  const examined = new Set<number>();
+  for (const e of exams) {
+    if (e.ajza === null) continue;
+    if (e.type === 'BADGE_DIAMOND' && e.passed === true) passed.add(e.ajza);
+    if (e.type === 'ASSOCIATION') examined.add(e.ajza);
+  }
+  const pending = [...passed].filter((a) => !examined.has(a));
+  if (pending.length) {
+    return { ready: true, ajza: Math.max(...pending), reason: null };
+  }
+  /* Not ready — say why in terms of where he stands now. */
   const ajza = ajzaForLevel(track, level);
+  if (passed.size > 0) {
+    return { ready: false, ajza: Math.max(...passed), reason: 'اختبرته الجمعية على هذا الجزء من قبل' };
+  }
   if (ajza === null) {
     return { ready: false, ajza: null, reason: 'المستوى لم يُتمّ جزءًا كاملًا بعد' };
   }
-  const passedDiamond = exams.some(
-    (e) => e.type === 'BADGE_DIAMOND' && e.passed === true && e.ajza === ajza);
-  if (!passedDiamond) {
-    return { ready: false, ajza, reason: 'لم يجتز الوسام الماسي على هذا الجزء' };
-  }
-  const alreadyExamined = exams.some(
-    (e) => e.type === 'ASSOCIATION' && e.ajza === ajza);
-  if (alreadyExamined) {
-    return { ready: false, ajza, reason: 'اختبرته الجمعية على هذا الجزء من قبل' };
-  }
-  return { ready: true, ajza, reason: null };
+  return { ready: false, ajza, reason: 'لم يجتز الوسام الماسي على هذا الجزء' };
+}
+
+/* ── Late on level — §4.9 ───────────────────────────────────────────────────── */
+
+/**
+ * Whole calendar days from `iso`'s day to `now`'s day, time of day ignored —
+ * a sheet issued at ten in the evening is one day old the next morning, not
+ * zero. `null` when there is no date to measure from. `asDate` keeps a
+ * date-only `takenOn` on its own calendar day whatever the machine's timezone.
+ */
+export function daysSince(iso: string | null | undefined, now: Date = new Date()): number | null {
+  const d = asDate(iso);
+  if (!d) return null;
+  const startOf = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  return Math.round((startOf(now) - startOf(d)) / 86_400_000);
+}
+
+/**
+ * §4.9 — «تأخّر في مستواه»: the alert the client tracks by hand today.
+ * Measured from `issuedAt`, which the FIRST print writes (`store.markPrinted`),
+ * so a reprint cannot make a late student look freshly issued. A student with
+ * no plan is not late — he is «لا توجد خطة», a different row in the sheet.
+ */
+export function isLate(
+  plan: { issuedAt: string } | null | undefined,
+  now: Date = new Date(),
+): boolean {
+  const days = daysSince(plan?.issuedAt, now);
+  return days !== null && days > LEVEL_LATE_AFTER_DAYS;
+}
+
+/**
+ * §6.1's «Not examined in N days» — `max(taken_on)` per student, and a student
+ * never examined at all is overdue rather than invisible: the list exists to
+ * surface exactly him.
+ */
+export function examOverdue(
+  lastTakenOn: string | null | undefined,
+  now: Date = new Date(),
+): boolean {
+  const days = daysSince(lastTakenOn, now);
+  return days === null || days > UNEXAMINED_AFTER_DAYS;
 }
 
 /* ── Which exam is due next — §4.3 ──────────────────────────────────────────── */

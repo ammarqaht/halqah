@@ -26,6 +26,17 @@ export function plural(n: number, one: string, two: string, few: string, many: s
   return `${n} ${pluralNoun(n, one, two, few, many)}`;
 }
 
+/**
+ * Number and noun as JSX, the figure bidi-isolated per DESIGN.md §2.2 — for
+ * counts sitting inside Arabic prose, where `plural()`'s plain string would
+ * leave an unisolated Latin run. Singular and dual carry no figure at all.
+ */
+export function Count({ n, one, two, few, many }:
+  { n: number; one: string; two: string; few: string; many: string }) {
+  if (n === 1 || n === 2) return <>{pluralNoun(n, one, two, few, many)}</>;
+  return <><Num className="font-medium">{n}</Num> {pluralNoun(n, one, two, few, many)}</>;
+}
+
 /** The noun this product counts constantly. طالب · طالبان · طلاب · طالبًا */
 export const studentWord = (n: number) => pluralNoun(n, 'طالب', 'طالبان', 'طلاب', 'طالبًا');
 

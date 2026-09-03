@@ -18,6 +18,20 @@ export const EXAM_TYPE_AR: Record<ExamType, string> = {
   ASSOCIATION: 'اختبار الجمعية', MOCK: 'اختبار تجريبي', TAJWEED: 'اختبار تجويد',
 };
 
+/** One-word labels for columns with no room for «الوسام الذهبي» twice a row. */
+export const EXAM_TYPE_SHORT_AR: Record<ExamType, string> = {
+  BADGE_GOLDEN: 'الذهبي', BADGE_DIAMOND: 'الماسي', ASSOCIATION: 'الجمعية',
+  MOCK: 'تجريبي', TAJWEED: 'تجويد',
+};
+
+/** The chip tone per exam type — the SAME everywhere a type is coloured, so a
+    diamond is one colour across the log, the follow-up and the prints.
+    `assoc` is DESIGN §1.3's reserved association palette. */
+export const EXAM_TYPE_TONE: Record<ExamType, 'warn' | 'brand' | 'assoc' | 'info' | 'ink'> = {
+  BADGE_GOLDEN: 'warn', BADGE_DIAMOND: 'brand', ASSOCIATION: 'assoc',
+  MOCK: 'ink', TAJWEED: 'info',
+};
+
 /** §13.5, verbatim: الفضي ٥٠/١٠٠/٢٠٠ · الذهبي ١٠٠/٢٠٠/٢٠٠. */
 export const EXAM_POINTS: Record<'SILVER' | 'GOLDEN', Record<string, number>> = {
   SILVER: { BADGE_GOLDEN: 50, BADGE_DIAMOND: 100, ASSOCIATION: 200 },

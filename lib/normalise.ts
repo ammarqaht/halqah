@@ -51,3 +51,14 @@ export function shortName(full: unknown): string {
   if (parts.length <= 2) return parts.join(' ');
   return `${parts[0]} ${parts[parts.length - 1]}`;
 }
+
+/** A student's teacher, short form — the lookup every roster-shaped screen
+    needs, kept in ONE place so the no-halaqa wording cannot drift per file. */
+export function teacherName(
+  halaqat: { id: string; teacher: string }[],
+  halaqaId: string | null | undefined,
+  fallback = '—',
+): string {
+  const t = halaqaId ? halaqat.find((h) => h.id === halaqaId)?.teacher : null;
+  return t ? shortName(t) : fallback;
+}

@@ -80,7 +80,7 @@ This is the load-bearing phase. Everything later reads from it.
 - [ ] `/print/plan/[planId]` — header, 24-day table, exam days 12/24, tajweed footer
 - [ ] **Print action saves `issued_at` in the same request** — no separate save button
 - [ ] Seed `student_plans` history from `قاعدة بيانات متابعة خطة الحفظ` (984 rows)
-- [ ] `isLate` rule + test; "late on level" alert live
+- [x] `isLate` rule + test; "late on level" alert live
 - [ ] Bulk print
 
 **Checkpoint:** the supervisor prints a real plan for a real student and compares it against his Excel printout side by side.
@@ -136,10 +136,10 @@ This is the load-bearing phase. Everything later reads from it.
 
 - [ ] `ratel_imports` / `ratel_rows`; header-detection parser + normalisation (SPEC §5.1)
 - [ ] Preview → matched / new / needs-review; commit; never delete
-- [ ] `/admin/follow-up` by halaqa and by student
-- [ ] Ready lists: association-ready, late, not-examined, top performers
+- [x] `/admin/follow-up` by halaqa and by student
+- [x] Ready lists: association-ready, late, not-examined, top performers
 - [ ] `/admin` overview: counters, all 8 alerts in one CTE query, halaqa progress
-- [ ] Remaining phase-1 reports (SPEC §6.11)
+- [x] Remaining phase-1 reports (SPEC §6.11)
 - [ ] CranL cron: nightly alert recompute + `pg_dump` to S3
 
 **Done when:** the client can answer "how is my circle doing?" without opening a spreadsheet.
