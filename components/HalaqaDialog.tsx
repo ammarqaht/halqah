@@ -27,24 +27,16 @@ export function HalaqaDialog({ open, halaqa, onClose }:
   const trackChanged = !!f.track && f.track !== halaqa?.track;
   const offTrack = f.track ? students.filter((s) => s.track !== f.track).length : 0;
 
-  const [saving, setSaving] = useState(false);
-  const [err, setErr] = useState('');
-
-  const save = async () => {
+  const save = () => {
     const name = f.name.trim() || (f.teacher.trim() ? `تحفيظ ${f.teacher.trim()} (${f.timeSlot})` : '');
     if (!name || !f.teacher.trim()) return;
-    setSaving(true); setErr('');
-    try {
-      /* A halaqa runs one track, so it is carried to its students in the same
-         write instead of being repeated on each one. Opt-out, never silent. */
-      await store.upsertHalaqa({
-        ...f, name,
-        applyTrackToStudents: Boolean(f.track && applyTrack && offTrack > 0),
-      });
-      onClose();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : 'تعذّر الحفظ');
-    } finally { setSaving(false); }
+    store.upsertHalaqa({ ...f, name });
+    /* A halaqa runs one track, so setting it here can carry to its students
+       instead of being repeated on each one. Opt-out, never silent. */
+    if (f.track && applyTrack && offTrack > 0) {
+      store.setTrackForHalaqa(f.id, f.track);
+    }
+    onClose();
   };
 
   return (
@@ -53,22 +45,15 @@ export function HalaqaDialog({ open, halaqa, onClose }:
         <>
           {!isNew && (
             <Btn variant="ghost" className="me-auto text-risk-700"
-              onClick={async () => {
-                if (!confirm('سيُفصل طلاب الحلقة عنها ولن تُحذف بياناتهم. متابعة؟')) return;
-                setSaving(true);
-                try { await store.removeHalaqa(f.id); onClose(); }
-                catch (e) { setErr(e instanceof Error ? e.message : 'تعذّر الحذف'); }
-                finally { setSaving(false); }
-              }}>
+              onClick={() => { if (confirm('سيُفصل طلاب الحلقة عنها ولن تُحذف بياناتهم. متابعة؟')) { store.removeHalaqa(f.id); onClose(); } }}>
               حذف الحلقة
             </Btn>
           )}
-          <Btn onClick={onClose} disabled={saving}>إلغاء</Btn>
-          <Btn variant="primary" onClick={save} disabled={saving}>{saving ? 'جارٍ الحفظ…' : 'حفظ'}</Btn>
+          <Btn onClick={onClose}>إلغاء</Btn>
+          <Btn variant="primary" onClick={save}>حفظ</Btn>
         </>
       }>
       <div className="space-y-4">
-        {err && <p role="alert" className="rounded-md border border-risk-200 bg-risk-100 px-3 py-2.5 text-panel text-risk-700">{err}</p>}
         <Field label="المعلّم المسمِّع" hint="يظهر في القوائم والتقارير">
           <input className={INPUT} value={f.teacher} onChange={(e) => setF({ ...f, teacher: e.target.value })}
             placeholder="حسن محمد ماهر علي" autoFocus />

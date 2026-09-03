@@ -9,6 +9,12 @@ const BTN = {
   default: 'bg-paper text-ink-800 border border-ink-200 hover:bg-ink-100 hover:border-ink-300',
   ghost:   'text-ink-600 hover:bg-ink-100 hover:text-ink-900',
   quiet:   'bg-brand-50 text-brand-800 border border-brand-200 hover:bg-brand-100',
+  /* Destructive, and it has to LOOK destructive without shouting: an outlined
+     risk button beside a quiet default reads as the heavier of the two. Tinting
+     a `default` button with a className cannot do this — two utilities of equal
+     specificity resolve by stylesheet order, not by the order they were
+     written, so the colour that wins is whichever Tailwind emitted last. */
+  danger:  'bg-risk-100 text-risk-700 border border-risk-200 hover:bg-risk-200',
 } as const;
 const SIZE = {
   sm: 'h-8 px-3 text-cap gap-1.5', md: 'h-9 px-3.5 text-body gap-2',
@@ -109,4 +115,28 @@ export function Chip({ children, tone = 'ink' }:
     assoc: 'bg-assoc-100 text-assoc-900',
   }[tone];
   return <span className={cx('inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-2xs font-medium', t)}>{children}</span>;
+}
+
+/* Two or three views of the same data, switched in place. Tabs would imply
+   separate destinations; these are one screen looked at two ways, so the
+   control stays inline with the content it changes. DESIGN.md §7. */
+export function Segmented<T extends string>({ value, onChange, options }:
+  { value: T; onChange: (v: T) => void; options: { value: T; label: string; count?: number }[] }) {
+  return (
+    <div role="tablist" className="inline-flex rounded-lg border border-ink-200 bg-paper p-0.5">
+      {options.map((o) => {
+        const on = o.value === value;
+        return (
+          <button key={o.value} role="tab" aria-selected={on} onClick={() => onChange(o.value)}
+            className={cx('rounded-md px-3.5 py-1.5 text-cap font-medium transition-colors duration-150',
+              on ? 'bg-brand-800 text-white' : 'text-ink-600 hover:bg-ink-100 hover:text-ink-900')}>
+            {o.label}
+            {o.count != null && (
+              <span className={cx('ms-1.5 text-2xs', on ? 'text-white/70' : 'text-ink-400')}>{o.count}</span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
 }

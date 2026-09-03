@@ -89,7 +89,11 @@ export function Combobox({
   const onKey = (e: React.KeyboardEvent) => {
     if (!open && (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setOpen(true); return; }
     if (!open) return;
-    if (e.key === 'Escape') { e.preventDefault(); setOpen(false); btnRef.current?.focus(); }
+    /* Escape dismisses the LIST, and stops there. Without stopPropagation the
+       event reaches the enclosing Modal's document listener and closes the whole
+       dialog, throwing away a half-filled form because someone changed their
+       mind about one dropdown. */
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setOpen(false); btnRef.current?.focus(); }
     else if (e.key === 'ArrowDown') { e.preventDefault(); setActive((i) => Math.min(i + 1, filtered.length - 1)); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); setActive((i) => Math.max(i - 1, 0)); }
     else if (e.key === 'Home') { e.preventDefault(); setActive(0); }

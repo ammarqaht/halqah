@@ -58,38 +58,26 @@ export function StudentDialog({ open, student, defaultHalaqa, onClose }:
 
   const halaqa = db.halaqat.find((h) => h.id === f.halaqaId) ?? null;
 
-  const [saving, setSaving] = useState(false);
-  const [err, setErr] = useState('');
-
-  const save = async () => {
+  const save = () => {
     if (!f.fullName.trim()) return;
-    setSaving(true); setErr('');
     const { id, flag } = normaliseNationalId(f.nationalId);
-    try {
-      await store.upsertStudent({
-        ...f,
-        fullName: f.fullName.trim(),
-        nationalId: id,
-        nationalIdFlag: flag,
-        guardianPhone: normalisePhone(f.guardianPhone),
-        /* The track belongs to the halaqa — a halaqa runs one track — so the
-           student inherits it instead of being set separately. */
-        track: halaqa?.track ?? f.track,
-      });
-      onClose();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : 'تعذّر الحفظ');
-    } finally { setSaving(false); }
+    store.upsertStudent({
+      ...f,
+      fullName: f.fullName.trim(),
+      nationalId: id,
+      nationalIdFlag: flag,
+      guardianPhone: normalisePhone(f.guardianPhone),
+      /* The track belongs to the halaqa — a halaqa runs one track — so the
+         student inherits it instead of being set separately. */
+      track: halaqa?.track ?? f.track,
+    });
+    onClose();
   };
 
   return (
     <Modal open={open} onClose={onClose} wide
       title={student ? `تعديل بيانات ${student.fullName}` : 'إضافة طالب'}
-      footer={<>
-        <Btn onClick={onClose} disabled={saving}>إلغاء</Btn>
-        <Btn variant="primary" onClick={save} disabled={saving}>{saving ? 'جارٍ الحفظ…' : 'حفظ'}</Btn>
-      </>}>
-      {err && <p role="alert" className="mb-4 rounded-md border border-risk-200 bg-risk-100 px-3 py-2.5 text-panel text-risk-700">{err}</p>}
+      footer={<><Btn onClick={onClose}>إلغاء</Btn><Btn variant="primary" onClick={save}>حفظ</Btn></>}>
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="sm:col-span-2">
           <Field label="اسم الطالب">

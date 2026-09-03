@@ -6,6 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "db:seed": "node scripts/seed-settings.mjs",
@@ -19,6 +21,7 @@
     "lucide-react": "^0.460.0",
     "next": "^15.5.0",
     "prisma": "^6.19.3",
+    "qrcode": "^1.5.4",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "server-only": "^0.0.1",
@@ -27,11 +30,13 @@
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
-    "typescript": "^5.7"
+    "typescript": "^5.7",
+    "vitest": "^4.1.11"
   }
 }
