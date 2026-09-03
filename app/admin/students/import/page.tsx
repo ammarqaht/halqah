@@ -114,13 +114,31 @@ export default function ImportPage() {
     halaqat: new Set(ready.flatMap((j) => j.result?.halaqat.map((h) => h.name) ?? [])).size,
   }), [ready]);
 
-  const commit = () => {
+  const [committing, setCommitting] = useState(false);
+  const [commitErr, setCommitErr] = useState('');
+
+  const commit = async () => {
+    setCommitting(true); setCommitErr('');
+    /* Roster before Ratel: the roster establishes identity and «المسار», the
+       Ratel report layers the weekly snapshot on top. */
     const sorted = [...ready].sort(
       (a, b) => ORDER.indexOf(a.chosen?.kind ?? 'UNKNOWN') - ORDER.indexOf(b.chosen?.kind ?? 'UNKNOWN'));
-    for (const j of sorted) {
-      store.merge(j.result!.rows.map((r) => r.student), j.result!.halaqat, j.name);
-    }
-    setDone({ students: totals.students, halaqat: totals.halaqat, files: sorted.length });
+    try {
+      let created = 0, updated = 0;
+      for (const j of sorted) {
+        const r = await store.commitImport({
+          students: j.result!.rows.map((x) => x.student),
+          halaqat: j.result!.halaqat,
+          fileName: j.name,
+          sheetName: j.chosen?.sheet ?? '',
+          kind: j.chosen?.kind ?? 'UNKNOWN',
+        });
+        created += r.created ?? 0; updated += r.updated ?? 0;
+      }
+      setDone({ students: created + updated, halaqat: totals.halaqat, files: sorted.length });
+    } catch (e) {
+      setCommitErr(e instanceof Error ? e.message : 'تعذّر الاستيراد');
+    } finally { setCommitting(false); }
   };
 
   const open = jobs.find((j) => j.id === openId) ?? null;
@@ -272,6 +290,13 @@ export default function ImportPage() {
           </Sheet>
         )}
 
+        {commitErr && (
+          <div className="rise mt-4 flex items-start gap-3 rounded-xl border border-risk-200 bg-risk-100 p-4">
+            <XCircle size={18} className="mt-0.5 shrink-0 text-risk-700" />
+            <p className="text-base2 text-risk-700">{commitErr}</p>
+          </div>
+        )}
+
         {/* ── commit bar ─────────────────────────────────────────────────── */}
         {ready.length > 0 && (
           <div className="rise sticky bottom-0 -mx-6 mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-ink-150 bg-page/90 px-6 py-4 backdrop-blur-md">
@@ -282,7 +307,9 @@ export default function ImportPage() {
               {totals.review > 0 && <> · <Num className="font-medium text-warn-700">{totals.review}</Num> تحتاج مراجعتك</>}
               . الاستيراد يضيف ويحدّث فقط — <strong>لا يحذف أحدًا ولا يمسح حقلًا لا يحمله الملف</strong>.
             </p>
-            <Btn variant="primary" size="lg" onClick={commit}>اعتماد الاستيراد</Btn>
+            <Btn variant="primary" size="lg" onClick={commit} disabled={committing}>
+              {committing ? <><Loader2 size={17} className="animate-spin" />جارٍ الحفظ…</> : 'اعتماد الاستيراد'}
+            </Btn>
           </div>
         )}
       </div>

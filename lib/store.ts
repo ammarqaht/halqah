@@ -1,114 +1,84 @@
 'use client';
-/* Client-side store — a stand-in for Prisma until BUILD_PLAN phase 1 lands.
-   It starts EMPTY on purpose: the supervisor populates it by importing his own
-   workbook, which is the only honest way to test the importer. */
+/* The screens' view of the data. It used to live in localStorage, which meant
+   an upload filled one browser tab and reached nothing else. It now reads and
+   writes the server, so a file uploaded once is what every screen sees —
+   including on the supervisor's own machine.
+
+   The shape of `useDB()` is unchanged, so no screen had to be rewritten. */
 import { useSyncExternalStore } from 'react';
 import type { Student, Halaqa } from './types';
 
-export type DB = { students: Student[]; halaqat: Halaqa[]; importedAt: string | null; sourceFile: string | null };
+export type DB = {
+  students: Student[];
+  halaqat: Halaqa[];
+  importedAt: string | null;
+  sourceFile: string | null;
+  loading: boolean;
+  error: string | null;
+};
 
-const EMPTY: DB = { students: [], halaqat: [], importedAt: null, sourceFile: null };
-const KEY = 'halqah.db.v1';
+const EMPTY: DB = {
+  students: [], halaqat: [], importedAt: null, sourceFile: null,
+  loading: true, error: null,
+};
 
 let db: DB = EMPTY;
-let loaded = false;
+let started = false;
 const subs = new Set<() => void>();
 
-function load(): DB {
-  if (loaded) return db;
-  loaded = true;
+const emit = () => subs.forEach((f) => f());
+
+async function refresh() {
   try {
-    const raw = localStorage.getItem(KEY);
-    if (raw) db = { ...EMPTY, ...JSON.parse(raw) };
-  } catch { /* private mode — stay in memory */ }
-  return db;
+    const r = await fetch('/api/data', { cache: 'no-store' });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      db = { ...db, loading: false, error: d.error ?? 'تعذّر تحميل البيانات' };
+      emit(); return;
+    }
+    const d = await r.json();
+    db = {
+      students: d.students ?? [], halaqat: d.halaqat ?? [],
+      importedAt: d.importedAt ?? null, sourceFile: d.sourceFile ?? null,
+      loading: false, error: null,
+    };
+  } catch {
+    db = { ...db, loading: false, error: 'تعذّر الاتصال بالخادم' };
+  }
+  emit();
 }
 
-function commit(next: DB) {
-  db = next;
-  try { localStorage.setItem(KEY, JSON.stringify(next)); } catch {}
-  subs.forEach((f) => f());
+async function send(url: string, method: string, body?: unknown) {
+  const r = await fetch(url, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error ?? 'تعذّرت العملية');
+  await refresh();
+  return d;
 }
 
 export const store = {
-  get: () => load(),
-  subscribe(f: () => void) { subs.add(f); return () => { subs.delete(f); }; },
-
-  replaceAll(students: Student[], halaqat: Halaqa[], sourceFile: string) {
-    commit({ students, halaqat, importedAt: new Date().toISOString(), sourceFile });
+  get: () => db,
+  subscribe(f: () => void) {
+    subs.add(f);
+    if (!started) { started = true; refresh(); }
+    return () => { subs.delete(f); };
   },
-  /** Imports add and update; they never delete. SPEC.md §5.
-      Two things this has to get right:
-      1. Each parse mints fresh halaqa ids, so an incoming student's halaqaId
-         points into ITS OWN batch. Halaqat are deduped by name, so those ids
-         must be translated to the surviving halaqa or every link dangles.
-      2. Identity is the national id, but two rows in one file can legitimately
-         share one (the roster has such a pair). Both must survive, so the
-         parser hands us a dedupeKey that disambiguates within a batch. */
-  merge(students: Student[], halaqat: Halaqa[], sourceFile: string) {
-    const cur = load();
-
-    const halMap = new Map(cur.halaqat.map((h) => [h.name, h]));
-    const incomingIdToName = new Map(halaqat.map((h) => [h.id, h.name]));
-    for (const h of halaqat) if (!halMap.has(h.name)) halMap.set(h.name, h);
-    const canonicalId = (incomingId: string | null) => {
-      if (!incomingId) return null;
-      const name = incomingIdToName.get(incomingId);
-      return name ? halMap.get(name)!.id : incomingId;
-    };
-
-    const keyOf = (s: Student) => s.dedupeKey || s.nationalId || s.fullName;
-    const byKey = new Map(cur.students.map((s) => [keyOf(s), s]));
-
-    for (const raw of students) {
-      const s: Student = { ...raw, halaqaId: canonicalId(raw.halaqaId) };
-      const k = keyOf(s);
-      const prev = byKey.get(k);
-      if (!prev) { byKey.set(k, s); continue; }
-      /* An import updates only what its file actually carries. A Ratel report
-         has no «المسار» column — it must not wipe the track a roster set. */
-      const patch: Partial<Student> = {};
-      for (const [key, val] of Object.entries(s) as [keyof Student, unknown][]) {
-        if (key === 'id') continue;
-        if (val === null || val === undefined || val === '') continue;
-        (patch as Record<string, unknown>)[key] = val;
-      }
-      byKey.set(k, { ...prev, ...patch, id: prev.id });
-    }
-
-    commit({ students: [...byKey.values()], halaqat: [...halMap.values()],
-             importedAt: new Date().toISOString(), sourceFile });
-  },
-  upsertHalaqa(h: Halaqa) {
-    const cur = load();
-    const i = cur.halaqat.findIndex((x) => x.id === h.id);
-    const halaqat = i >= 0 ? cur.halaqat.map((x) => (x.id === h.id ? h : x)) : [...cur.halaqat, h];
-    commit({ ...cur, halaqat });
-  },
-  removeHalaqa(id: string) {
-    const cur = load();
-    commit({ ...cur,
-      halaqat: cur.halaqat.filter((h) => h.id !== id),
-      students: cur.students.map((s) => (s.halaqaId === id ? { ...s, halaqaId: null } : s)) });
-  },
-  upsertStudent(s: Student) {
-    const cur = load();
-    const i = cur.students.findIndex((x) => x.id === s.id);
-    const students = i >= 0 ? cur.students.map((x) => (x.id === s.id ? s : x)) : [...cur.students, s];
-    commit({ ...cur, students });
-  },
-  /** A halaqa runs one track, so it can be set once and carried to its members. */
-  setTrackForHalaqa(halaqaId: string, track: Student['track']) {
-    const cur = load();
-    commit({ ...cur, students: cur.students.map((s) => (s.halaqaId === halaqaId ? { ...s, track } : s)) });
-  },
-  /** Moving a student carries all their history — nothing resets. SPEC.md §6.3 */
-  moveStudents(ids: string[], halaqaId: string | null) {
-    const cur = load();
-    const set = new Set(ids);
-    commit({ ...cur, students: cur.students.map((s) => (set.has(s.id) ? { ...s, halaqaId } : s)) });
-  },
-  reset() { commit(EMPTY); },
+  refresh,
+  upsertStudent: (s: Student) => send('/api/students', 'POST', s),
+  moveStudents: (ids: string[], halaqaId: string | null) =>
+    send('/api/students', 'PATCH', { ids, halaqaId }),
+  upsertHalaqa: (h: Halaqa & { applyTrackToStudents?: boolean }) =>
+    send('/api/halaqat', 'POST', h),
+  removeHalaqa: (id: string) => send('/api/halaqat', 'DELETE', { id }),
+  commitImport: (payload: {
+    students: Student[]; halaqat: Halaqa[];
+    fileName: string; sheetName: string; kind: string;
+  }) => send('/api/import', 'POST', payload),
+  reset: () => refresh(),
 };
 
 export function useDB(): DB {

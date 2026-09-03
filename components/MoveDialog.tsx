@@ -11,10 +11,16 @@ export function MoveDialog({ open, ids, onClose }:
   { open: boolean; ids: string[]; onClose: () => void }) {
   const db = useDB();
   const [target, setTarget] = useState('');
+  const [busy, setBusy] = useState(false);
   return (
     <Modal open={open} onClose={onClose} title={`نقل ${ids.length} طالبًا إلى حلقة`}
       footer={<><Btn onClick={onClose}>إلغاء</Btn>
-        <Btn variant="primary" onClick={() => { store.moveStudents(ids, target || null); onClose(); }}>نقل</Btn></>}>
+        <Btn variant="primary" disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            try { await store.moveStudents(ids, target || null); onClose(); }
+            finally { setBusy(false); }
+          }}>{busy ? 'جارٍ النقل…' : 'نقل'}</Btn></>}>
       <Field label="الحلقة الجديدة">
         <Combobox value={target} onChange={setTarget}
           options={[{ value: '', label: '— بلا حلقة —' },
