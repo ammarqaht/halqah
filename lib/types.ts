@@ -331,3 +331,15 @@ export type ExamQuestion = {
   tajweedErrors: number;
   note: string;
 };
+
+/** Levels count DOWN: Silver 60→1, Golden 30→1. Talqeen has none — it is a
+    classification, not a curriculum (القرار المعتمد ١). */
+export const LEVEL_MAX: Record<Track, number | null> = {
+  SILVER: 60, GOLDEN: 30, TALQEEN: null,
+};
+
+export function levelsFor(track: Track | null): number[] {
+  const max = track ? LEVEL_MAX[track] : null;
+  if (!max) return [];
+  return Array.from({ length: max }, (_, i) => max - i);
+}

@@ -41,12 +41,28 @@ export default function MyLevel() {
   if (!me) return <StudentPicker onPick={setId} />;
 
   if (!plan) {
+    const lvl = me.currentLevel;
+    const a = ajzaForLevel(me.track, lvl);
     return (
-      <div className="mx-auto max-w-lg px-5 py-10">
-        <Empty icon={BookOpen} title="لا توجد خطة بعد"
-          body={me.track === 'TALQEEN'
-            ? 'مسار التلقين بلا خطة مطبوعة — اسأل معلّمك عن مقرّرك.'
-            : 'اطلب من المشرف أن يطبع لك ورقة مستواك.'} />
+      <div className="mx-auto max-w-lg px-5 py-6">
+        <h1 className="font-display text-d2 text-ink-900">مستواي</h1>
+        {lvl != null && (
+          <Sheet className="mt-5 border-brand-200 bg-brand-50">
+            <div className="flex items-baseline gap-3">
+              <span className="font-display text-d1 text-brand-900"><Num>{lvl}</Num></span>
+              <p className="text-body font-medium text-ink-900">
+                {me.track ? `المسار ${TRACK_AR[me.track]}` : ''}
+                {a !== null && ` · ${juzWord(a)}`}
+              </p>
+            </div>
+          </Sheet>
+        )}
+        <Sheet className="mt-4">
+          <Empty icon={BookOpen} title="لا توجد خطة مطبوعة بعد"
+            body={me.track === 'TALQEEN'
+              ? 'مسار التلقين بلا خطة مطبوعة — اسأل معلّمك عن مقرّرك.'
+              : 'اطلب من المشرف أن يطبع لك ورقة مستواك.'} />
+        </Sheet>
       </div>
     );
   }

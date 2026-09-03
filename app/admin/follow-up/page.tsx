@@ -18,6 +18,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Users, Award, Hourglass, CalendarClock, Search, Inbox, Printer, FileText,
 } from 'lucide-react';
+import { LevelEditor } from '@/components/LevelEditor';
 import { TopBar } from '@/components/TopBar';
 import { Sheet, SheetHead } from '@/components/Sheet';
 import { Btn, Empty, Chip, Segmented, INPUT } from '@/components/ui';
@@ -412,10 +413,8 @@ function FollowUpScreen() {
                     ) : sel.plan ? (
                       <>
                         <Def label="المستوى الحالي">
-                          <Num className="font-medium">{sel.student.currentLevel ?? sel.plan.level}</Num>
-                          {isMidJuz(sel.student.track, sel.student.currentLevel) && (
-                            <span className="ms-1.5 text-micro text-ink-500">منتصف الجزء</span>
-                          )}
+                          <LevelEditor studentId={sel.student.id} track={sel.student.track}
+                            level={sel.student.currentLevel ?? sel.plan.level} />
                         </Def>
                         <Def label="ورقة المستوى">
                           <Num>{sel.plan.level}</Num> — {TRACK_AR[sel.plan.track]}
@@ -442,7 +441,11 @@ function FollowUpScreen() {
                       </>
                     ) : (
                       <>
-                        <p className="text-base2 text-ink-600">لا توجد خطة مُصدرة لهذا الطالب.</p>
+                        <Def label="المستوى الحالي">
+                          <LevelEditor studentId={sel.student.id} track={sel.student.track}
+                            level={sel.student.currentLevel} />
+                        </Def>
+                        <p className="mt-3 text-base2 text-ink-600">لا توجد خطة مُصدرة لهذا الطالب.</p>
                         <div className="mt-4">
                           <Link href={`/admin/plans?student=${sel.student.id}`}>
                             <Btn size="sm" variant="primary" icon={FileText}>إصدار خطة</Btn>

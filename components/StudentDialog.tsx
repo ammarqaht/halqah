@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Modal, Btn, Field, INPUT } from '@/components/ui';
 import { Combobox } from '@/components/Combobox';
 import { store, useDB } from '@/lib/store';
-import { ALL_GRADES, BASE_NATIONALITIES, GRADES_BY_STAGE, STAGES, TRACK_AR, type Student } from '@/lib/types';
+import { ALL_GRADES, BASE_NATIONALITIES, GRADES_BY_STAGE, STAGES, TRACK_AR, levelsFor, type Student } from '@/lib/types';
 import { normalisePhone, normaliseNationalId, shortName } from '@/lib/normalise';
 import { Num } from '@/components/Num';
 
@@ -58,6 +58,14 @@ export function StudentDialog({ open, student, defaultHalaqa, onClose }:
 
   const halaqa = db.halaqat.find((h) => h.id === f.halaqaId) ?? null;
 
+  /* The level belongs to the track, and the track comes from the halaqa.
+     Talqeen has no levels at all, so the field disappears rather than
+     offering a choice that means nothing. */
+  const track = halaqa?.track ?? f.track;
+  const levels = useMemo(
+    () => levelsFor(track).map((n) => ({ value: String(n), label: `المستوى ${n}` })),
+    [track]);
+
   const save = () => {
     if (!f.fullName.trim()) return;
     const { id, flag } = normaliseNationalId(f.nationalId);
@@ -66,7 +74,8 @@ export function StudentDialog({ open, student, defaultHalaqa, onClose }:
       fullName: f.fullName.trim(),
       nationalId: id,
       nationalIdFlag: flag,
-      guardianPhone: normalisePhone(f.guardianPhone),
+        guardianPhone: normalisePhone(f.guardianPhone),
+        currentLevel: track === 'TALQEEN' ? null : f.currentLevel,
       /* The track belongs to the halaqa — a halaqa runs one track — so the
          student inherits it instead of being set separately. */
       track: halaqa?.track ?? f.track,
@@ -109,6 +118,18 @@ export function StudentDialog({ open, student, defaultHalaqa, onClose }:
           <Combobox value={f.grade} onChange={(v) => setF({ ...f, grade: v })}
             options={grades} placeholder="اختر الصف" />
         </Field>
+
+        {track && track !== 'TALQEEN' && (
+          <div className="sm:col-span-2">
+            <Field label="المستوى الحالي"
+              hint={`المسار ${TRACK_AR[track]} — المستويات تنزل من ${levelsFor(track)[0]} إلى ١`}>
+              <Combobox value={f.currentLevel != null ? String(f.currentLevel) : ''}
+                onChange={(v) => setF({ ...f, currentLevel: v ? Number(v) : null })}
+                options={[{ value: '', label: '— بلا مستوى —' }, ...levels]}
+                placeholder="اختر المستوى" searchPlaceholder="اكتب رقم المستوى…" />
+            </Field>
+          </div>
+        )}
         <Field label="الجنسية" hint="اكتب جنسية جديدة وستُحفظ في القائمة">
           <Combobox value={f.nationality} onChange={(v) => setF({ ...f, nationality: v })}
             options={nationalities} placeholder="اختر أو اكتب" searchPlaceholder="ابحث أو اكتب جنسية…"

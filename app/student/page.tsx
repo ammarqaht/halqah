@@ -32,7 +32,7 @@ export default function StudentHome() {
 
   if (!me) return <StudentPicker onPick={setId} />;
 
-  const level = plan?.level ?? me.currentLevel ?? null;
+  const level = me.currentLevel ?? plan?.level ?? null;
   const ajza = ajzaForLevel(me.track, level);
   const total = me.track === 'GOLDEN' ? 30 : 60;
   const pct = level ? Math.round(((total - level) / total) * 100) : 0;

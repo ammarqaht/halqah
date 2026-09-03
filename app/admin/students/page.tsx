@@ -168,7 +168,7 @@ function StudentsScreen() {
             <Empty icon={Users2} title="لا نتائج" body="جرّب توسيع التصفية أو مسح البحث." />
           ) : (
             <div className="overflow-x-auto">
-              <table className={cx('w-full border-collapse text-body', halaqa ? 'min-w-[40rem]' : 'min-w-[52rem]')}>
+              <table className={cx('w-full border-collapse text-body', halaqa ? 'min-w-[44rem]' : 'min-w-[56rem]')}>
                 <thead>
                   <tr className="border-b border-ink-200 bg-page/50 text-cap text-ink-500">
                     <th className="w-10 px-3 py-3">
@@ -179,7 +179,7 @@ function StudentsScreen() {
                     </th>
                     {['الطالب', 'رقم الهوية',
                       ...(halaqa ? [] : ['المسار', 'الحلقة']),
-                      'الصف', 'الجنسية', 'جوال ولي الأمر', ''].map((h) => (
+                      'المستوى', 'الصف', 'الجنسية', 'جوال ولي الأمر', ''].map((h) => (
                       <th key={h} className="px-3 py-3 text-start font-medium">{h}</th>))}
                   </tr>
                 </thead>
@@ -216,6 +216,11 @@ function StudentsScreen() {
                           </td>
                         </>
                       )}
+                      <td className="px-3 py-3">
+                        {s.currentLevel != null
+                          ? <Num className="text-panel font-medium text-ink-800">{s.currentLevel}</Num>
+                          : <span className="text-micro text-ink-400">—</span>}
+                      </td>
                       <td className="px-3 py-3 text-panel text-ink-600">{s.grade || '—'}</td>
                       <td className="px-3 py-3 text-panel text-ink-600">{s.nationality || '—'}</td>
                       <td className="px-3 py-3"><Num className="text-panel text-ink-700">{s.guardianPhone || '—'}</Num></td>

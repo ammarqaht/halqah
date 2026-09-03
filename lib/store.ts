@@ -548,8 +548,24 @@ export const store = {
       printedCount: 0,
       createdAt: now,
     };
-    commit({ ...cur, plans: [...cur.plans, plan] });
+    /* Issuing a sheet IS the act of putting a student on a level, so the two
+       are written together. Reading `currentLevel` in fourteen places while
+       nothing ever wrote it is why every student showed «بلا مستوى». */
+    commit({
+      ...cur,
+      plans: [...cur.plans, plan],
+      students: cur.students.map((st) =>
+        st.id === args.studentId ? { ...st, currentLevel: args.level } : st),
+    });
     return plan;
+  },
+
+  /** Set a student's level directly, without issuing a sheet — the supervisor
+      knows where a student stands before the system does. */
+  setLevel(studentId: string, level: number | null) {
+    const cur = load();
+    commit({ ...cur, students: cur.students.map((s) =>
+      s.id === studentId ? { ...s, currentLevel: level } : s) });
   },
 
   /**
