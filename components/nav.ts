@@ -1,6 +1,6 @@
 /* Navigation map — DESIGN.md §6. Reconciled against the approved scope:
    attendance and recitation stay in Ratel; no guardian portal in phase 1. */
-import { Home, Users, FileText, ClipboardCheck, Coins, LineChart, Settings, LogOut } from 'lucide-react';
+import { Home, Users, FileText, ClipboardCheck, Coins, LineChart, Printer, Settings, LogOut } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 /** `badge` is supplied by the rail from live data, never written into this map:
@@ -19,7 +19,8 @@ export const NAV: NavItem[] = [
   { id: 'plans',     label: 'الخطط',              href: '/admin/plans',     icon: FileText },
   { id: 'exams',     label: 'الاختبارات',          href: '/admin/exams',     icon: ClipboardCheck },
   { id: 'points',    label: 'النقاط والمتجر',      href: '/admin/points',    icon: Coins, also: ['/admin/store'] },
-  { id: 'follow',    label: 'المتابعة والتقارير',  href: '/admin/follow-up', icon: LineChart },
+  { id: 'follow',    label: 'المتابعة',            href: '/admin/follow-up', icon: LineChart },
+  { id: 'reports',   label: 'التقارير',            href: '/admin/reports',   icon: Printer },
 ];
 
 export const NAV_FOOT: NavItem[] = [
