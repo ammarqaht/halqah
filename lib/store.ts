@@ -517,6 +517,20 @@ export const store = {
       sourceFile,
     });
   },
+  /** Edit one level's curriculum — the master, not a student's copy.
+      «لكل من يأخذ هذا المستوى» in §9: it touches everyone on that level, which
+      is why the screen asks twice before calling this. */
+  setCurriculumLevel(track: Exclude<Student['track'], null>, level: number, days: CurriculumDay[]) {
+    const cur = load();
+    commit({
+      ...cur,
+      curriculum: [
+        ...cur.curriculum.filter((d) => !(d.track === track && d.level === level)),
+        ...days,
+      ],
+    });
+  },
+
 
   /**
    * Issue a plan — or hand back the one already issued for that level.

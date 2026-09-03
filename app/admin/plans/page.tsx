@@ -136,6 +136,7 @@ function PlansScreen() {
         panelOpen={panelOpen} onOpenPanel={() => setPanelOpen(true)}
         action={
           <div className="flex items-center gap-2">
+            <Link href="/admin/plans/levels"><Btn icon={Pencil}>تعديل مستوى</Btn></Link>
             <Link href="/admin/plans/curriculum"><Btn icon={UploadCloud}>المنهج</Btn></Link>
             {plan && availability?.ok && (
               <a href={`/print/plan/${plan.id}`} target="_blank" rel="noreferrer">
