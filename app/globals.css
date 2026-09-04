@@ -79,3 +79,7 @@
      mechanism the client asked for, so they have to survive the printer. */
   *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
 }
+
+/* A sheet previewed inside the reports screen borrows that screen's chrome:
+   its own print button would be the second one on the page. */
+.embedded .no-print{display:none!important}
