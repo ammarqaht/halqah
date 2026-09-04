@@ -45,21 +45,13 @@ export function FollowUpPanel({ onClose }: { onClose: () => void }) {
   }, [rows, halaqa]);
 
   return (
-    <PanelShell title="المتابعة والتقارير"
+    <PanelShell title="المتابعة"
       meta={rows.length
         ? plural(rows.length, 'طالب واحد يُتابَع', 'طالبان يُتابَعان', 'طلاب يُتابَعون', 'طالبًا يُتابَع')
         : 'لا طلاب بعد'}
       onClose={onClose}>
 
-      <PanelGroup label="الشاشات">
-        <PanelItem active={onFollowUp} onClick={() => router.push('/admin/follow-up')}>
-          المتابعة
-        </PanelItem>
-        <PanelItem active={path.startsWith('/admin/reports')}
-          onClick={() => router.push('/admin/reports')}>
-          التقارير
-        </PanelItem>
-      </PanelGroup>
+      
 
       {onFollowUp && rows.length > 0 && (
         <>

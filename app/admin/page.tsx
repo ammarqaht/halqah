@@ -4,8 +4,7 @@
 import Link from 'next/link';
 import {
   Users, CircleDot, UploadCloud, AlertTriangle, FileText, ClipboardCheck, Ticket,
-  ArrowLeft, Inbox,
-} from 'lucide-react';
+  ArrowLeft, Inbox, Printer } from 'lucide-react';
 import { TopBar } from '@/components/TopBar';
 import { Sheet, SheetHead } from '@/components/Sheet';
 import { KPI, Split } from '@/components/Stat';
@@ -31,8 +30,8 @@ export default function OverviewPage() {
         <div className="mx-auto max-w-column px-6 py-8">
           <Sheet className="rise">
             <Empty icon={Inbox} title="لا توجد بيانات بعد"
-              body="ارفع تقرير رتل أو قاعدة بيانات الطلاب، وسيتعرّف النظام على شكل الملف بنفسه ويعرض عليك معاينة قبل الحفظ."
-              action={<Link href="/admin/students/import">
+              body="الرفع كلّه من هنا. اسحب ملفاتك — رتل، قاعدة الحلقات، الاختبارات، منهج الحفظ — دفعة واحدة، ويقرأ النظام كل ورقة فيها بنفسه وينشرها على شاشات الموقع كلّها بعد أن تراجع المعاينة."
+              action={<Link href="/admin/import">
                 <Btn variant="primary" size="lg" icon={UploadCloud}>رفع ملف</Btn></Link>} />
           </Sheet>
         </div>
@@ -46,7 +45,7 @@ export default function OverviewPage() {
     <>
       <TopBar title="الرئيسية" crumbs={['حلقات جامع محمد العبدالكريم']} panelOpen={panelOpen}
         onOpenPanel={() => setPanelOpen(true)}
-        action={<Link href="/admin/students/import"><Btn variant="primary" icon={UploadCloud}>رفع ملف</Btn></Link>} />
+        action={<Link href="/admin/import"><Btn variant="primary" icon={UploadCloud}>رفع ملف</Btn></Link>} />
 
       <div className="mx-auto max-w-column px-6 py-8 pb-16">
         <header className="rise mb-9">
@@ -128,11 +127,12 @@ export default function OverviewPage() {
           </div>
         </Sheet>
 
-        <div className="rise grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="rise grid grid-cols-2 gap-3 lg:grid-cols-5">
           {[
-            { icon: UploadCloud, label: 'رفع ملف', href: '/admin/students/import' },
+            { icon: UploadCloud, label: 'رفع ملف', href: '/admin/import' },
             { icon: FileText, label: 'طباعة خطة لطالب', href: '/admin/plans' },
             { icon: ClipboardCheck, label: 'تسجيل اختبار', href: '/admin/exams' },
+            { icon: Printer, label: 'التقارير', href: '/admin/reports' },
             { icon: Ticket, label: 'إصدار أكواد نقاط', href: '/admin/points' },
           ].map((s) => (
             <Link key={s.label} href={s.href}

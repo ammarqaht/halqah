@@ -508,6 +508,63 @@ export const store = {
      already issued. */
 
   /** Replace one track's curriculum. The other track, and every plan, stand. */
+  /** One upload, every kind of row it carried. The screens do not each get
+      their own uploader: a file that holds students and exams and plan dates
+      should fill all three in one commit, or the halves fall out of step. */
+  ingest(payload: {
+    students?: Student[];
+    halaqat?: Halaqa[];
+    exams?: Exam[];
+    plans?: StudentPlan[];
+    curriculum?: { track: Exclude<Student['track'], null>; days: CurriculumDay[] }[];
+    sourceFile: string;
+  }) {
+    if (payload.students?.length || payload.halaqat?.length) {
+      store.merge(payload.students ?? [], payload.halaqat ?? [], payload.sourceFile);
+    }
+
+    const cur = load();
+    let next = { ...cur };
+
+    if (payload.curriculum?.length) {
+      let curriculum = next.curriculum;
+      for (const c of payload.curriculum) {
+        curriculum = [...curriculum.filter((d) => d.track !== c.track), ...c.days];
+      }
+      next = { ...next, curriculum };
+    }
+
+    if (payload.exams?.length) {
+      /* An exam is identified by who sat it, when, and of what kind. Re-uploading
+         the same log must not double every record. */
+      const key = (e: Exam) => `${e.studentId}|${e.takenOn}|${e.type}`;
+      const have = new Set(next.exams.map(key));
+      next = { ...next, exams: [...next.exams, ...payload.exams.filter((e) => !have.has(key(e)))] };
+    }
+
+    if (payload.plans?.length) {
+      const key = (p: StudentPlan) => `${p.studentId}|${p.track}|${p.level}`;
+      const have = new Set(next.plans.map(key));
+      const added = payload.plans.filter((p) => !have.has(key(p)));
+      /* The newest sheet a student was handed is the level he is on now. */
+      const latest = new Map<string, StudentPlan>();
+      for (const p of [...next.plans, ...added]) {
+        const prev = latest.get(p.studentId);
+        if (!prev || p.issuedAt > prev.issuedAt) latest.set(p.studentId, p);
+      }
+      next = {
+        ...next,
+        plans: [...next.plans, ...added],
+        students: next.students.map((st) => {
+          const p = latest.get(st.id);
+          return p ? { ...st, currentLevel: p.level, track: st.track ?? p.track } : st;
+        }),
+      };
+    }
+
+    commit({ ...next, importedAt: new Date().toISOString(), sourceFile: payload.sourceFile });
+  },
+
   replaceCurriculum(track: Student['track'], days: CurriculumDay[], sourceFile: string) {
     const cur = load();
     commit({

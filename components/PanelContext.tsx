@@ -8,6 +8,7 @@ import { StudentsPanel } from '@/components/StudentsPanel';
 import { PointsPanel } from '@/components/PointsPanel';
 import { ExamsPanel } from '@/components/ExamsPanel';
 import { FollowUpPanel } from '@/components/FollowUpPanel';
+import { ReportsPanel } from '@/components/ReportsPanel';
 import { useDB } from '@/lib/store';
 import { derive } from '@/lib/derive';
 import { followUpRows, followedRows, listCounts } from '@/lib/followup';
@@ -44,7 +45,10 @@ export function PanelContext({ onClose }: { onClose: () => void }) {
 
   if (path.startsWith('/admin/students')) return <StudentsPanel onClose={onClose} />;
   if (path.startsWith('/admin/exams')) return <ExamsPanel onClose={onClose} />;
-  if (path.startsWith('/admin/follow-up') || path.startsWith('/admin/reports')) {
+  /* Two sections, two panels. Sharing one made the follow-up lists appear
+     while printing and the report picker appear while following up. */
+  if (path.startsWith('/admin/reports')) return <ReportsPanel onClose={onClose} />;
+  if (path.startsWith('/admin/follow-up')) {
     return <FollowUpPanel onClose={onClose} />;
   }
   if (path.startsWith('/admin/points') || path.startsWith('/admin/store')) {
@@ -101,7 +105,6 @@ export function PanelContext({ onClose }: { onClose: () => void }) {
         )}
 
         <PanelGroup label="اختصارات">
-          <PanelItem onClick={() => router.push('/admin/students/import')}>رفع ملف</PanelItem>
           <PanelItem onClick={() => router.push('/admin/students')}>الطلاب والحلقات</PanelItem>
           <PanelItem onClick={() => router.push('/admin/points')}>شحن نقاط</PanelItem>
           <PanelItem onClick={() => router.push('/admin/points/codes')}>إصدار أكواد</PanelItem>

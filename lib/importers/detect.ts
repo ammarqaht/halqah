@@ -44,7 +44,20 @@ const norm = (s: unknown) => collapse(s).replace(/[أإآ]/g, 'ا').replace(/ة/
 /** The Ratel export puts a banner on row 1 and the real header on row 2 — and
     other files differ. Never assume an offset: find the row that carries the
     signature headers. SPEC.md §5.1 */
+/* The dashboard workbook holds lookup sheets — «البحث باسم الطالب»,
+   «البحث بالحلقة» — that show ONE student or ONE halaqa through formulas.
+   They carry the same headers as the real logs, so they classify perfectly and
+   import complete nonsense: reading them added fifteen students who do not
+   exist and five halaqat that were never taught. They are outputs, not
+   records, and their names say so. */
+/* No \b here: JavaScript's word boundary is defined over [A-Za-z0-9_], so it
+   never matches beside an Arabic letter and the whole pattern silently failed. */
+const LOOKUP_SHEET = /^\s*(ال)?بحث(\s|$)/;
+
 export function scanSheet(ws: XLSX.WorkSheet, sheetName: string): SheetScan {
+  if (LOOKUP_SHEET.test(sheetName)) {
+    return { sheet: sheetName, kind: 'UNKNOWN', headerRow: -1, headers: [], dataRows: 0 };
+  }
   const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, blankrows: false, defval: null });
   let best: SheetScan = { sheet: sheetName, kind: 'UNKNOWN', headerRow: -1, headers: [], dataRows: 0 };
   let bestScore = 0;

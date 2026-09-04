@@ -6,9 +6,8 @@ import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import {
-  UploadCloud, UserPlus, Search, Pencil, ArrowLeftRight, Inbox, X,
-  AlertTriangle, Users2,
-} from 'lucide-react';
+  UserPlus, Search, Pencil, ArrowLeftRight, Inbox, X,
+  AlertTriangle, Users2, Home } from 'lucide-react';
 import { TopBar } from '@/components/TopBar';
 import { Sheet, SheetHead } from '@/components/Sheet';
 import { Btn, Empty, Chip, INPUT } from '@/components/ui';
@@ -80,9 +79,9 @@ function StudentsScreen() {
         <div className="mx-auto max-w-column px-6 py-8">
           <Sheet className="rise">
             <Empty icon={Inbox} title="القائمة فارغة"
-              body="ارفع تقرير رتل أو قاعدة بيانات الطلاب. النظام يقرأ الأعمدة بنفسه، ويعرض معاينة كاملة قبل أن يحفظ شيئًا."
-              action={<Link href="/admin/students/import">
-                <Btn variant="primary" size="lg" icon={UploadCloud}>رفع ملف</Btn></Link>} />
+              body="القوائم تُبنى من ملفاتك، والرفع مكانه الصفحة الرئيسية وحدها — ترفع مرة واحدة هناك فتمتلئ هذه الشاشة وبقيّة الشاشات معها."
+              action={<Link href="/admin">
+                <Btn variant="primary" size="lg" icon={Home}>الصفحة الرئيسية</Btn></Link>} />
           </Sheet>
         </div>
       </>
@@ -96,7 +95,6 @@ function StudentsScreen() {
         panelOpen={panelOpen} onOpenPanel={() => setPanelOpen(true)}
         action={
           <div className="flex items-center gap-2">
-            <Link href="/admin/students/import"><Btn icon={UploadCloud}>رفع ملف</Btn></Link>
             <Btn variant="primary" icon={UserPlus} onClick={() => setEditStudent('new')}>إضافة طالب</Btn>
           </div>} />
 

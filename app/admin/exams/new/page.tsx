@@ -219,8 +219,8 @@ export default function RecordExam() {
         <div className="mx-auto max-w-column px-6 py-8">
           <Sheet className="rise">
             <Empty icon={ClipboardCheck} title="لا يوجد طلاب بعد"
-              body="الاختبار يُسجَّل على طالب. ارفع قاعدة بيانات الحلقات أولًا."
-              action={<Link href="/admin/students/import"><Btn variant="primary" size="lg">رفع ملف</Btn></Link>} />
+              body="الاختبار يُسجَّل على طالب. ارفع ملفاتك من الصفحة الرئيسية أولًا."
+              action={<Link href="/admin"><Btn variant="primary" size="lg">الصفحة الرئيسية</Btn></Link>} />
           </Sheet>
         </div>
       </>

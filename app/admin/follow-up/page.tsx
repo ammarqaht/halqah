@@ -195,9 +195,9 @@ function FollowUpScreen() {
         <div className="mx-auto max-w-column px-6 py-8">
           <Sheet className="rise">
             <Empty icon={Inbox} title="لا طلاب بعد"
-              body="شاشة المتابعة تبحث بالحلقة وبالطالب، وتعدّ لك أربعة كشوف جاهزة: الجاهزين للجمعية، والمتأخرين في مستواهم، ومن لم يُختبروا مؤخرًا، والمتفوقين. ابدأ برفع ملف الطلاب."
-              action={<Link href="/admin/students/import">
-                <Btn variant="primary" size="lg">رفع ملف</Btn></Link>} />
+              body="شاشة المتابعة تبحث بالحلقة وبالطالب، وتعدّ لك أربعة كشوف جاهزة: الجاهزين للجمعية، والمتأخرين في مستواهم، ومن لم يُختبروا مؤخرًا، والمتفوقين. ابدأ برفع ملفاتك من الصفحة الرئيسية."
+              action={<Link href="/admin">
+                <Btn variant="primary" size="lg">الصفحة الرئيسية</Btn></Link>} />
           </Sheet>
         </div>
       </>
