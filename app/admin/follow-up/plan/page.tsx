@@ -24,7 +24,7 @@ import { Num, juzPhrase } from '@/components/Num';
 import { usePanel } from '@/components/PanelState';
 import { store, useDB } from '@/lib/store';
 import {
-  resolvePlan, levelAvailable, dailyAmountFor, removeDay, insertDay, isCustomised,
+  resolvePlan, levelAvailable, dailyAmountFor, removeDay, insertDay, isCustomised, draftPlan,
   DEFAULT_DAY_COUNT, coverage, type PlanRow,
 } from '@/lib/curriculum';
 import { ajzaExact } from '@/lib/exams';
@@ -158,16 +158,19 @@ function StudentPlanEditor({ onToast }: { onToast: (s: string) => void }) {
   const availability = student?.track && levelNum
     ? levelAvailable(student.track, levelNum, db.curriculum) : null;
 
+  /* Look, do not write. This called `store.issuePlan` during render, so simply
+     clicking a name created a plan row and set that student's `currentLevel`
+     to whichever level was on screen — a student on 23 came back 40, and the
+     «طُبعت N خطة اليوم» counter climbed with every click. The stored plan is
+     used when one exists; otherwise a draft is built in memory, and printing
+     is what commits it. */
   const plan = useMemo(() => {
     if (!student?.track || !levelNum || !availability?.ok) return null;
-    return store.issuePlan({
-      studentId: student.id,
-      track: student.track as Exclude<typeof student.track, null>,
-      level: levelNum,
-      dailyAmount: dailyAmountFor(student.track),
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [student, levelNum, availability?.ok, db.plans.length]);
+    const track = student.track as Exclude<typeof student.track, null>;
+    return store.planFor(student.id, track, levelNum)
+      ?? draftPlan({ studentId: student.id, track, level: levelNum,
+                     dailyAmount: dailyAmountFor(track) });
+  }, [student, levelNum, availability?.ok, db.plans]);
 
   const overrides = useMemo(
     () => db.planOverrides.filter((o) => o.planId === plan?.id), [db.planOverrides, plan]);
@@ -175,10 +178,27 @@ function StudentPlanEditor({ onToast }: { onToast: (s: string) => void }) {
     () => (plan ? resolvePlan(plan, db.curriculum, overrides) : []), [plan, db.curriculum, overrides]);
   const customised = plan ? isCustomised(plan, overrides) : false;
 
+  /* The sheet on screen may be a draft that exists nowhere yet. A write has to
+     land on a real row, so the first edit materialises it — WITHOUT moving the
+     student onto that level, which is what printing means, not editing. */
+  const materialise = () => {
+    if (!plan || !student?.track) return null;
+    if (!plan.id.startsWith('draft-')) return plan.id;
+    return store.issuePlan({
+      studentId: student.id,
+      track: student.track as Exclude<typeof student.track, null>,
+      level: plan.level,
+      dailyAmount: plan.dailyAmount,
+      setLevel: false,
+    }).id;
+  };
+
   const saveRow = () => {
     if (!plan || !draft) return;
+    const planId = materialise();
+    if (!planId) return;
     const o: PlanDayOverride = {
-      planId: plan.id, dayNo: draft.dayNo, kind: draft.kind,
+      planId, dayNo: draft.dayNo, kind: draft.kind,
       fromSurah: draft.fromSurah.trim(), fromAyah: draft.fromAyah.trim(),
       toSurah: draft.toSurah.trim(), toAyah: draft.toAyah.trim(), note: draft.note.trim(),
     };
@@ -312,18 +332,22 @@ function StudentPlanEditor({ onToast }: { onToast: (s: string) => void }) {
                                 {i === 0 && (
                                   <>
                                     <button onClick={() => {
+                                      const planId = materialise();
+                                      if (!planId) return;
                                       const r2 = insertDay(plan, overrides, d.dayNo);
-                                      store.updatePlan(plan.id, { dayCount: r2.dayCount, examDays: r2.examDays });
-                                      store.replacePlanOverrides(plan.id, r2.overrides);
+                                      store.updatePlan(planId, { dayCount: r2.dayCount, examDays: r2.examDays });
+                                      store.replacePlanOverrides(planId, r2.overrides);
                                       onToast(`أُضيف يوم بعد اليوم ${d.dayNo}، وأُعيد ترقيم ما بعده.`);
                                     }} title="إضافة يوم بعده" aria-label={`إضافة يوم بعد اليوم ${d.dayNo}`}
                                       className="rounded p-1.5 text-ink-400 transition-colors hover:bg-brand-100 hover:text-brand-800">
                                       <Plus size={14} />
                                     </button>
                                     <button onClick={() => {
+                                      const planId = materialise();
+                                      if (!planId) return;
                                       const r2 = removeDay(plan, overrides, d.dayNo);
-                                      store.updatePlan(plan.id, { dayCount: r2.dayCount, examDays: r2.examDays });
-                                      store.replacePlanOverrides(plan.id, r2.overrides);
+                                      store.updatePlan(planId, { dayCount: r2.dayCount, examDays: r2.examDays });
+                                      store.replacePlanOverrides(planId, r2.overrides);
                                       onToast(`حُذف اليوم ${d.dayNo}، وأُعيد ترقيم ما بعده.`);
                                     }} title="حذف هذا اليوم" aria-label={`حذف اليوم ${d.dayNo}`}
                                       className="rounded p-1.5 text-ink-400 transition-colors hover:bg-risk-100 hover:text-risk-700">

@@ -69,6 +69,33 @@ const EMPTY_ROW = { fromSurah: '', fromAyah: '', toSurah: '', toAyah: '', note: 
  * beyond the curriculum are legitimate — «تزيد أيامًا على الأربعة والعشرين» —
  * and simply arrive empty for the supervisor to fill.
  */
+/**
+ * A plan to LOOK at, built in memory and stored nowhere.
+ *
+ * Previewing must not write. The screen used to call `store.issuePlan` while
+ * rendering, so opening a student's sheet created a plan row and overwrote his
+ * level with whatever level happened to be on screen. This is what a preview
+ * needs — the same shape, with the defaults §9 fixes — and printing is still
+ * what commits it.
+ */
+export function draftPlan(args: {
+  studentId: string; track: Exclude<Track, null>; level: number; dailyAmount: string;
+}): StudentPlan {
+  return {
+    id: `draft-${args.studentId}-${args.track}-${args.level}`,
+    studentId: args.studentId,
+    track: args.track,
+    level: args.level,
+    issuedAt: '',
+    issuedBy: '',
+    dayCount: DEFAULT_DAY_COUNT,
+    examDays: DEFAULT_EXAM_DAYS,
+    dailyAmount: args.dailyAmount,
+    printedCount: 0,
+    createdAt: '',
+  };
+}
+
 export function resolvePlan(
   plan: Pick<StudentPlan, 'id' | 'track' | 'level' | 'dayCount' | 'examDays'>,
   curriculum: CurriculumDay[],

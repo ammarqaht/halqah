@@ -646,16 +646,31 @@ export const store = {
   },
 
 
+  /** The plan already issued for that level, or null. Reads, never writes. */
+  planFor(studentId: string, track: Exclude<Student['track'], null>, level: number) {
+    return load().plans.find(
+      (p) => p.studentId === studentId && p.track === track && p.level === level) ?? null;
+  },
+
   /**
    * Issue a plan — or hand back the one already issued for that level.
    *
    * §9 is explicit that printing is what records the date: «الحفظ يقع تلقائيًا
    * مع الطباعة — لا تحتاج زر حفظ منفصلًا». So this creates the record and
    * `markPrinted` stamps it, and the screen calls them together.
+   *
+   * CALL IT ON PRINT, NEVER ON PREVIEW. It writes — a plan row and the
+   * student's `currentLevel` — and a screen that called it while merely
+   * rendering a preview rewrote the level of every student whose name was
+   * clicked: a student on 23 became 40 because 40 was the sheet on screen.
    */
   issuePlan(args: {
     studentId: string; track: Exclude<Student['track'], null>; level: number;
     dailyAmount: string; by?: string | null;
+    /** Handing a student a sheet moves him onto that level. Editing one does
+        not — the editor opens a sheet to change its wording, not to promote
+        anybody, so it passes false. */
+    setLevel?: boolean;
   }): StudentPlan {
     const cur = load();
     const existing = cur.plans.find(
@@ -679,11 +694,14 @@ export const store = {
     /* Issuing a sheet IS the act of putting a student on a level, so the two
        are written together. Reading `currentLevel` in fourteen places while
        nothing ever wrote it is why every student showed «بلا مستوى». */
+    const moves = args.setLevel !== false;
     commit({
       ...cur,
       plans: [...cur.plans, plan],
-      students: cur.students.map((st) =>
-        st.id === args.studentId ? { ...st, currentLevel: args.level } : st),
+      students: moves
+        ? cur.students.map((st) =>
+            st.id === args.studentId ? { ...st, currentLevel: args.level } : st)
+        : cur.students,
     });
     return plan;
   },

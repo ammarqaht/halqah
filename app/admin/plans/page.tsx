@@ -24,7 +24,7 @@ import { Combobox } from '@/components/Combobox';
 import { Num, juzPhrase } from '@/components/Num';
 import { usePanel } from '@/components/PanelState';
 import { store, useDB } from '@/lib/store';
-import { resolvePlan, levelAvailable, dailyAmountFor, isCustomised } from '@/lib/curriculum';
+import { resolvePlan, levelAvailable, dailyAmountFor, isCustomised, draftPlan } from '@/lib/curriculum';
 import { nextLevel, ajzaForLevel } from '@/lib/exams';
 import { PLAN_KIND_AR, TRACK_AR, type Track } from '@/lib/types';
 import { shortName } from '@/lib/normalise';
@@ -89,16 +89,19 @@ function PlansScreen() {
 
   /* The plan record exists as soon as there is something to preview; printing
      is what stamps it. Issuing is idempotent per (student, level). */
+  /* Look, do not write. This called `store.issuePlan` during render, so simply
+     clicking a name created a plan row and set that student's `currentLevel`
+     to whichever level was on screen — a student on 23 came back 40, and the
+     «طُبعت N خطة اليوم» counter climbed with every click. The stored plan is
+     used when one exists; otherwise a draft is built in memory, and printing
+     is what commits it. */
   const plan = useMemo(() => {
     if (!student?.track || !levelNum || !availability?.ok) return null;
-    return store.issuePlan({
-      studentId: student.id,
-      track: student.track as Exclude<typeof student.track, null>,
-      level: levelNum,
-      dailyAmount: dailyAmountFor(student.track),
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [student, levelNum, availability?.ok, db.plans.length]);
+    const track = student.track as Exclude<typeof student.track, null>;
+    return store.planFor(student.id, track, levelNum)
+      ?? draftPlan({ studentId: student.id, track, level: levelNum,
+                     dailyAmount: dailyAmountFor(track) });
+  }, [student, levelNum, availability?.ok, db.plans]);
 
   const overrides = useMemo(
     () => db.planOverrides.filter((o) => o.planId === plan?.id), [db.planOverrides, plan]);
@@ -140,9 +143,18 @@ function PlansScreen() {
         action={
           <div className="flex items-center gap-2">
             {plan && student && availability?.ok && (
-              <a href={`/print/plan/${plan.id}`} target="_blank" rel="noreferrer">
-                <Btn variant="primary" icon={Printer}>طباعة وحفظ التاريخ</Btn>
-              </a>
+              /* Printing is the act that commits — §9: «الحفظ يقع تلقائيًا مع
+                 الطباعة». The draft on screen has no stored id, so it is issued
+                 here and the print route opens on the row that now exists. */
+              <Btn variant="primary" icon={Printer} onClick={() => {
+                const issued = store.issuePlan({
+                  studentId: student.id,
+                  track: student.track as Exclude<typeof student.track, null>,
+                  level: plan.level,
+                  dailyAmount: plan.dailyAmount,
+                });
+                window.open(`/print/plan/${issued.id}`, '_blank', 'noopener');
+              }}>طباعة وحفظ التاريخ</Btn>
             )}
           </div>} />
 

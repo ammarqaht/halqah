@@ -12,6 +12,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { store } from './store';
 import type { Exam, Student } from './types';
+import { draftPlan } from './curriculum';
 
 const student = (over: Partial<Student> = {}): Student => ({
   id: 's1', fullName: 'عمر ناصر الزهراني', nationalId: '1080000000', nationalIdFlag: null,
@@ -119,5 +120,41 @@ describe('a re-import never disturbs what the ledger has paid', () => {
     store.replaceAll([student({ fullName: 'عمر ناصر الزهراني' })], [], 'ملف جديد.xlsx');
     expect(store.get().exams).toHaveLength(1);
     expect(balance('s1')).toBe(200);
+  });
+});
+
+describe('previewing a plan writes nothing', () => {
+  it('planFor never creates a row, and never touches currentLevel', () => {
+    store.reset();
+    const s: Student = { ...student(), id: 'st1', track: 'SILVER', currentLevel: 23 };
+    store.replaceAll([s], [], 'test.xlsx');
+
+    /* What the plans screen does on every keystroke and every name clicked. */
+    expect(store.planFor('st1', 'SILVER', 40)).toBeNull();
+    expect(store.get().plans).toHaveLength(0);
+    expect(store.get().students[0].currentLevel).toBe(23);
+
+    /* A draft is the same shape and is stored nowhere. */
+    const d = draftPlan({ studentId: 'st1', track: 'SILVER', level: 40, dailyAmount: 'نصف وجه' });
+    expect(d.level).toBe(40);
+    expect(store.get().plans).toHaveLength(0);
+    expect(store.get().students[0].currentLevel).toBe(23);
+
+    /* Printing is what commits — and only then does he move onto the level. */
+    const issued = store.issuePlan({
+      studentId: 'st1', track: 'SILVER', level: 40, dailyAmount: 'نصف وجه' });
+    expect(store.get().plans).toHaveLength(1);
+    expect(store.get().students[0].currentLevel).toBe(40);
+    expect(store.planFor('st1', 'SILVER', 40)?.id).toBe(issued.id);
+  });
+
+  it('editing a sheet does not promote the student', () => {
+    store.reset();
+    const s: Student = { ...student(), id: 'st2', track: 'SILVER', currentLevel: 23 };
+    store.replaceAll([s], [], 'test.xlsx');
+    store.issuePlan({
+      studentId: 'st2', track: 'SILVER', level: 40, dailyAmount: 'نصف وجه', setLevel: false });
+    expect(store.get().plans).toHaveLength(1);
+    expect(store.get().students[0].currentLevel).toBe(23);
   });
 });
