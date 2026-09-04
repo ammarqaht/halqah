@@ -21,7 +21,7 @@ import { TopBar } from '@/components/TopBar';
 import { Sheet, SheetHead } from '@/components/Sheet';
 import { Btn, Empty, Chip, Field, INPUT } from '@/components/ui';
 import { Combobox } from '@/components/Combobox';
-import { Num, juzWord } from '@/components/Num';
+import { Num, juzPhrase } from '@/components/Num';
 import { usePanel } from '@/components/PanelState';
 import { store, useDB } from '@/lib/store';
 import { resolvePlan, levelAvailable, dailyAmountFor, isCustomised } from '@/lib/curriculum';
@@ -189,7 +189,7 @@ function PlansScreen() {
               {levelNum && ajzaForLevel(student.track, levelNum) !== null && (
                 <span className="text-ink-600">يقابل{' '}
                   <span className="font-medium text-ink-900">
-                    <Num>{ajzaForLevel(student.track, levelNum)}</Num> {juzWord(ajzaForLevel(student.track, levelNum)!)}</span></span>
+                    {juzPhrase(ajzaForLevel(student.track, levelNum)!)}</span></span>
               )}
             </div>
           )}

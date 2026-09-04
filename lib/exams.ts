@@ -72,6 +72,19 @@ export const nextLevel = (level: number) => Math.max(1, level - 1);
  * `null` rather than a rounded lie — the difference matters, because §4.8 gates
  * association readiness on completing a WHOLE juz.
  */
+/**
+ * The same value, but WITHOUT rounding a silver even level away to null: it is
+ * genuinely two-and-a-half juz, and saying so beats «منتصف الجزء», which named
+ * the situation and never the quantity. `ajzaForLevel` stays exact-or-null
+ * because §4.8 gates association readiness on a WHOLE juz.
+ */
+export function ajzaExact(track: Track | null, level: number | null): number | null {
+  if (!track || level === null || level < 1) return null;
+  if (track === 'GOLDEN') return level <= 30 ? 31 - level : null;
+  if (track === 'SILVER') return level <= 60 ? (61 - level) / 2 : null;
+  return null;
+}
+
 export function ajzaForLevel(track: Track | null, level: number | null): number | null {
   if (!track || level === null || level < 1) return null;
   if (track === 'GOLDEN') return level <= 30 ? 31 - level : null;

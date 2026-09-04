@@ -44,4 +44,22 @@ export const studentWord = (n: number) => pluralNoun(n, 'طالب', 'طالبا�
 export const cardWord = (n: number) => pluralNoun(n, 'بطاقة', 'بطاقتان', 'بطاقات', 'بطاقة');
 export const pointWord = (n: number) => pluralNoun(n, 'نقطة', 'نقطتان', 'نقاط', 'نقطة');
 export const juzWord = (n: number) => pluralNoun(n, 'جزء', 'جزآن', 'أجزاء', 'جزءًا');
+
+/**
+ * The whole phrase, figure included: «جزء» · «جزآن» · «٣ أجزاء» · «١١ جزءًا».
+ * `juzWord` alone returns the NOUN — callers are meant to render the figure
+ * themselves, and the ones that forgot printed a bare «أجزاء» that named no
+ * quantity at all.
+ *
+ * Half a juz is a real value here, not a rounding: a silver EVEN level sits
+ * between two whole juz, and «منتصف الجزء» said which levels those were
+ * without ever saying which juz. `.5` is spelled out instead.
+ */
+export function juzPhrase(n: number): string {
+  const whole = Math.floor(n);
+  const half = n - whole >= 0.5;
+  if (!half) return whole === 1 || whole === 2 ? juzWord(whole) : `${whole} ${juzWord(whole)}`;
+  if (whole === 0) return 'نصف جزء';
+  return `${whole === 1 || whole === 2 ? juzWord(whole) : `${whole} ${juzWord(whole)}`} ونصف`;
+}
 export const orderWord = (n: number) => pluralNoun(n, 'طلب', 'طلبان', 'طلبات', 'طلبًا');

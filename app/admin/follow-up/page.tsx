@@ -282,7 +282,11 @@ function FollowUpScreen() {
                       <tr className="border-b border-ink-200 bg-page/50 text-cap text-ink-500">
                         {['الطالب',
                           ...(halaqaFilter ? [] : ['الحلقة']),
-                          'الصف', 'الحضور', 'حفظ اليوم', 'المستوى',
+                          /* Attendance and today's pages come from one Ratel
+                             report on one day. Follow-up asks who is behind
+                             ACROSS levels and exams, and a column of «غائب» and
+                             zero for everybody answered nothing. */
+                          'الصف', 'المستوى',
                           'تاريخ الإصدار', 'الأيام',
                           ...(list === 'ready' ? ['الجزء الجاهز'] : []),
                           ...(list === 'top' ? ['الرصيد'] : []),
@@ -306,15 +310,6 @@ function FollowUpScreen() {
                             <td className="px-3 py-3 text-panel text-ink-600">{teacherOf(r.student.halaqaId)}</td>
                           )}
                           <td className="px-3 py-3 text-panel text-ink-600">{r.student.grade || '—'}</td>
-                          <td className="px-3 py-3">
-                            {r.student.attended === undefined ? <span className="text-ink-400">—</span>
-                              : r.student.attended ? <Chip tone="ok">حاضر</Chip> : <Chip tone="risk">غائب</Chip>}
-                          </td>
-                          <td className="px-3 py-3">
-                            {r.student.hifzPages !== undefined
-                              ? <Num className="text-panel text-ink-700">{r.student.hifzPages}</Num>
-                              : <span className="text-ink-400">—</span>}
-                          </td>
                           <td className="px-3 py-3">
                             {r.student.track === 'TALQEEN'
                               ? <Chip tone="ink">تلقين</Chip>

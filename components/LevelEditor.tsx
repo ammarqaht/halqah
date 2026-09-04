@@ -9,8 +9,8 @@ import { Btn } from '@/components/ui';
 import { Num } from '@/components/Num';
 import { store } from '@/lib/store';
 import { levelsFor, TRACK_AR, type Track } from '@/lib/types';
-import { ajzaForLevel, isMidJuz } from '@/lib/exams';
-import { juzWord } from '@/components/Num';
+import { ajzaExact } from '@/lib/exams';
+import { juzPhrase } from '@/components/Num';
 
 export function LevelEditor({ studentId, track, level }:
   { studentId: string; track: Track | null; level: number | null }) {
@@ -24,8 +24,9 @@ export function LevelEditor({ studentId, track, level }:
   const options = [
     { value: '', label: '— بلا مستوى —' },
     ...levelsFor(track).map((n) => {
-      const a = ajzaForLevel(track, n);
-      return { value: String(n), label: `المستوى ${n}`, hint: a !== null ? juzWord(a) : 'منتصف الجزء' };
+      const a = ajzaExact(track, n);
+      return { value: String(n), label: `المستوى ${n}`,
+               hint: a !== null ? juzPhrase(a) : undefined };
     }),
   ];
 
@@ -47,7 +48,7 @@ export function LevelEditor({ studentId, track, level }:
     );
   }
 
-  const ajza = ajzaForLevel(track, level);
+  const ajza = ajzaExact(track, level);
 
   return (
     <span className="flex flex-wrap items-center gap-2">
@@ -55,8 +56,8 @@ export function LevelEditor({ studentId, track, level }:
         <>
           <Num className="text-lg2 font-medium text-ink-900">{level}</Num>
           {ajza !== null
-            ? <span className="text-panel text-ink-600">{juzWord(ajza)}</span>
-            : isMidJuz(track, level) && <span className="text-micro text-ink-500">منتصف الجزء</span>}
+            ? <span className="text-panel text-ink-600">{juzPhrase(ajza)}</span>
+            : null}
         </>
       ) : (
         <span className="text-panel text-ink-500">لم يُحدَّد بعد</span>

@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { BookOpen, CheckCircle2, XCircle } from 'lucide-react';
 import { Sheet, SheetHead } from '@/components/Sheet';
 import { Chip, Empty } from '@/components/ui';
-import { Num, juzWord } from '@/components/Num';
+import { Num, juzPhrase } from '@/components/Num';
 import { useDB } from '@/lib/store';
 import { useStudentId, StudentPicker } from '@/components/StudentGate';
 import { resolvePlan, dailyAmountFor } from '@/lib/curriculum';
@@ -52,7 +52,7 @@ export default function MyLevel() {
               <span className="font-display text-d1 text-brand-900"><Num>{lvl}</Num></span>
               <p className="text-body font-medium text-ink-900">
                 {me.track ? `المسار ${TRACK_AR[me.track]}` : ''}
-                {a !== null && ` · ${juzWord(a)}`}
+                {a !== null && ` · ${juzPhrase(a)}`}
               </p>
             </div>
           </Sheet>
@@ -80,7 +80,7 @@ export default function MyLevel() {
           <div>
             <p className="text-body font-medium text-ink-900">
               {me.track ? `المسار ${TRACK_AR[me.track]}` : ''}
-              {ajza !== null && ` · ${juzWord(ajza)}`}
+              {ajza !== null && ` · ${juzPhrase(ajza)}`}
             </p>
             <p className="mt-0.5 text-panel text-ink-600">
               المقرّر اليومي: {plan.dailyAmount || (me.track ? dailyAmountFor(me.track) : '—')}
@@ -139,7 +139,7 @@ export default function MyLevel() {
       {nextAjza !== null && (
         <Sheet className="mt-4">
           <SheetHead title="ما بعدي"
-            meta={`المستوى ${nextLevel(plan.level)} — ${juzWord(nextAjza)}`} />
+            meta={`المستوى ${nextLevel(plan.level)} — ${juzPhrase(nextAjza)}`} />
           <p className="text-panel text-ink-600">
             باجتياز الوسام الماسي في اليوم <Num>{plan.examDays.BADGE_DIAMOND}</Num> تنتقل إلى الجزء التالي.
           </p>

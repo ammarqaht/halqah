@@ -21,7 +21,7 @@ import { TopBar } from '@/components/TopBar';
 import { Sheet, SheetHead } from '@/components/Sheet';
 import { Btn, Empty, Chip, Modal, Field, INPUT } from '@/components/ui';
 import { Combobox } from '@/components/Combobox';
-import { Num, pointWord, plural, juzWord } from '@/components/Num';
+import { Num, pointWord, plural, juzPhrase } from '@/components/Num';
 import { usePanel } from '@/components/PanelState';
 import { store, useDB } from '@/lib/store';
 import { earnsPoints, examPoints, EXAM_TYPE_AR } from '@/lib/points';
@@ -187,7 +187,7 @@ function OnsiteScreen() {
                 <p className="mt-1 text-panel text-ink-600">
                   {EXAM_TYPE_AR[open.badge]} · المستوى <Num>{open.level ?? '—'}</Num>
                   {ajzaForLevel(student.track, open.level) !== null && (
-                    <> · <Num>{ajzaForLevel(student.track, open.level)}</Num>{' '}{juzWord(ajzaForLevel(student.track, open.level)!)}</>
+                    <> · {juzPhrase(ajzaForLevel(student.track, open.level)!)}</>
                   )} · {halaqaOf(student.id)}
                 </p>
               </div>

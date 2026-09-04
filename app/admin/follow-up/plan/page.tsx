@@ -20,14 +20,14 @@ import { TopBar } from '@/components/TopBar';
 import { Sheet, SheetHead } from '@/components/Sheet';
 import { Btn, Empty, Chip, Modal, Field, INPUT } from '@/components/ui';
 import { Combobox } from '@/components/Combobox';
-import { Num, juzWord } from '@/components/Num';
+import { Num, juzPhrase } from '@/components/Num';
 import { usePanel } from '@/components/PanelState';
 import { store, useDB } from '@/lib/store';
 import {
   resolvePlan, levelAvailable, dailyAmountFor, removeDay, insertDay, isCustomised,
   DEFAULT_DAY_COUNT, coverage, type PlanRow,
 } from '@/lib/curriculum';
-import { ajzaForLevel } from '@/lib/exams';
+import { ajzaExact } from '@/lib/exams';
 import {
   PLAN_KIND_AR, TRACK_AR, levelsFor,
   type CurriculumDay, type PlanDayOverride, type PlanKind, type Track,
@@ -418,8 +418,10 @@ function LevelCurriculumEditor({ onToast }: { onToast: (s: string) => void }) {
     return levelsFor(track).map((n) => ({
       value: String(n),
       label: `المستوى ${n}`,
+      /* «أجزاء» with no figure named no quantity; «منتصف الجزء» named a
+         situation and no quantity either. Both say the number now. */
       hint: have.has(n)
-        ? (ajzaForLevel(track, n) !== null ? juzWord(ajzaForLevel(track, n)!) : 'منتصف الجزء')
+        ? (ajzaExact(track, n) !== null ? juzPhrase(ajzaExact(track, n)!) : undefined)
         : 'لا منهج بعد',
     }));
   }, [track, trackCover]);

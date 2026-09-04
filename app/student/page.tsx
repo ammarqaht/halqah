@@ -5,7 +5,7 @@ import { useMemo } from 'react';
 import { Ticket, Store, TrendingUp, CheckCircle2, XCircle } from 'lucide-react';
 import { Sheet, SheetHead } from '@/components/Sheet';
 import { Btn, Chip, Empty } from '@/components/ui';
-import { Num, juzWord } from '@/components/Num';
+import { Num, juzPhrase } from '@/components/Num';
 import { useDB } from '@/lib/store';
 import { useStudentId, StudentPicker } from '@/components/StudentGate';
 import { balanceOf, earnsPoints, EXAM_TYPE_AR, type ExamType } from '@/lib/points';
@@ -67,7 +67,7 @@ export default function StudentHome() {
             meta={me.track ? `المسار ${TRACK_AR[me.track]}` : undefined} />
           <div className="flex items-baseline gap-3">
             <span className="font-display text-d1 text-ink-900"><Num>{level}</Num></span>
-            {ajza !== null && <Chip tone="brand">{juzWord(ajza)}</Chip>}
+            {ajza !== null && <Chip tone="brand">{juzPhrase(ajza)}</Chip>}
           </div>
           <div className="mt-4 h-2 overflow-hidden rounded-full bg-ink-100">
             <div className="h-full rounded-full bg-brand-600 transition-[width] duration-700 ease-brand"
