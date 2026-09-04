@@ -30,7 +30,7 @@ import {
   type PlanRow,
 } from '@/lib/curriculum';
 import { nextLevel, ajzaForLevel } from '@/lib/exams';
-import { PLAN_KIND_AR, TRACK_AR, type PlanDayOverride, type PlanKind } from '@/lib/types';
+import { PLAN_KIND_AR, TRACK_AR, type PlanDayOverride, type PlanKind, type Track } from '@/lib/types';
 import { shortName } from '@/lib/normalise';
 import { formatDate, relativeDay } from '@/lib/dates';
 import { cx } from '@/lib/cx';
@@ -43,6 +43,8 @@ function PlansScreen() {
   const sp = useSearchParams();
 
   const [studentId, setStudentId] = useState(sp.get('student') ?? '');
+  /* The panel narrows the list by track; «الكل» is an absent parameter. */
+  const trackFilter = (sp.get('track') as Track | null) ?? null;
   const [level, setLevel] = useState('');
   const [editing, setEditing] = useState<{ dayNo: number; kind: PlanKind } | null>(null);
   const [draft, setDraft] = useState<PlanRow | null>(null);
@@ -55,10 +57,17 @@ function PlansScreen() {
     return () => clearTimeout(t);
   }, [toast]);
 
-  /* Talqeen has no curriculum and no level at all — §13.1. Not offered. */
-  const eligible = useMemo(
+  /* Talqeen has no curriculum and no level at all — §13.1. Not offered.
+     A student with NO track is not offered either, but he is counted apart:
+     «لا مسار» is a gap in the file, not a decision, and lumping him in with
+     talqeen would hide it. */
+  const withTrack = useMemo(
     () => db.students.filter((s) => s.track && s.track !== 'TALQEEN'), [db.students]);
-  const talqeenCount = db.students.length - eligible.length;
+  const eligible = useMemo(
+    () => (trackFilter ? withTrack.filter((s) => s.track === trackFilter) : withTrack),
+    [withTrack, trackFilter]);
+  const talqeenCount = db.students.filter((s) => s.track === 'TALQEEN').length;
+  const untrackedCount = db.students.filter((s) => !s.track).length;
 
   const student = eligible.find((s) => s.id === studentId) ?? null;
   const halaqa = student?.halaqaId ? db.halaqat.find((h) => h.id === student.halaqaId) ?? null : null;
@@ -97,7 +106,8 @@ function PlansScreen() {
   const studentOptions = useMemo(() => eligible.map((s) => ({
     value: s.id,
     label: s.fullName,
-    hint: [s.halaqaId ? shortName(db.halaqat.find((h) => h.id === s.halaqaId)?.teacher ?? '') : 'بلا حلقة',
+    hint: [s.track ? TRACK_AR[s.track] : 'بلا مسار',
+           s.halaqaId ? shortName(db.halaqat.find((h) => h.id === s.halaqaId)?.teacher ?? '') : 'بلا حلقة',
            s.currentLevel != null ? `المستوى ${s.currentLevel}` : 'بلا مستوى'].join(' · '),
   })).sort((a, b) => a.label.localeCompare(b.label, 'ar')), [eligible, db.halaqat]);
 
@@ -151,9 +161,11 @@ function PlansScreen() {
             meta="اختر الطالب، فتظهر حلقته ومساره ومستواه التالي من نفسها" />
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="اسم الطالب"
-              hint={talqeenCount > 0
-                ? `${talqeenCount} من طلاب التلقين خارج القائمة — لا منهج لهم ولا مستوى`
-                : 'ابحث بالاسم'}>
+              hint={[
+                trackFilter ? `المعروض: مسار ${TRACK_AR[trackFilter]} فقط — بدّله من اللوحة` : null,
+                talqeenCount > 0 ? `${talqeenCount} من طلاب التلقين خارج القائمة — لا منهج لهم ولا مستوى` : null,
+                untrackedCount > 0 ? `${untrackedCount} بلا مسار في الملف` : null,
+              ].filter(Boolean).join(' · ') || 'ابحث بالاسم'}>
               <Combobox value={studentId} onChange={setStudentId} options={studentOptions}
                 placeholder="اختر الطالب" searchPlaceholder="ابحث بالاسم…"
                 emptyText="لا طالب بهذا الاسم" />
