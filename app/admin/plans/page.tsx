@@ -15,20 +15,20 @@ import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import {
-  FileText, Printer, AlertTriangle, Inbox, UploadCloud, Pencil,
+  FileText, Printer, AlertTriangle, Inbox, UploadCloud,
 } from 'lucide-react';
 import { TopBar } from '@/components/TopBar';
 import { Sheet, SheetHead } from '@/components/Sheet';
-import { Btn, Empty, Chip, Field, INPUT } from '@/components/ui';
+import { Btn, Empty, Field, INPUT } from '@/components/ui';
 import { Combobox } from '@/components/Combobox';
 import { Num, juzPhrase } from '@/components/Num';
 import { usePanel } from '@/components/PanelState';
 import { store, useDB } from '@/lib/store';
-import { resolvePlan, levelAvailable, dailyAmountFor, isCustomised, draftPlan } from '@/lib/curriculum';
+import { resolvePlan, levelAvailable, dailyAmountFor, draftPlan } from '@/lib/curriculum';
 import { nextLevel, ajzaForLevel } from '@/lib/exams';
 import { PLAN_KIND_AR, TRACK_AR, type Track } from '@/lib/types';
 import { shortName } from '@/lib/normalise';
-import { formatDate, relativeDay } from '@/lib/dates';
+import { formatDate } from '@/lib/dates';
 import { cx } from '@/lib/cx';
 
 const BADGE_AR = { BADGE_GOLDEN: 'الوسام الذهبي', BADGE_DIAMOND: 'الوسام الماسي' } as const;
@@ -108,7 +108,6 @@ function PlansScreen() {
   const days = useMemo(
     () => (plan ? resolvePlan(plan, db.curriculum, db.planOverrides) : []),
     [plan, db.curriculum, db.planOverrides]);
-  const customised = plan ? isCustomised(plan, overrides) : false;
 
   const studentOptions = useMemo(() => eligible.map((s) => ({
     value: s.id,
@@ -218,31 +217,6 @@ function PlansScreen() {
         {/* ── ٣ · المعاينة ─────────────────────────────────────────────── */}
         {plan && student && availability?.ok && (
           <>
-            <Sheet className="rise mb-4">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2.5">
-                    <h2 className="font-display text-t1 text-ink-900">
-                      معاينة المستوى <Num>{plan.level}</Num>
-                    </h2>
-                    {customised && <Chip tone="warn"><Pencil size={10} />مُعدَّلة</Chip>}
-                    {plan.printedCount > 0 && (
-                      <Chip tone="ink">طُبعت <Num>{plan.printedCount}</Num> مرة</Chip>
-                    )}
-                  </div>
-                  <p className="mt-1.5 text-panel text-ink-600">
-                    <Num>{plan.dayCount}</Num> يوم عمل ·
-                    الاختبار يوم <Num>{plan.examDays.BADGE_GOLDEN}</Num> و
-                    <Num>{plan.examDays.BADGE_DIAMOND}</Num>
-                    {plan.printedCount > 0 && <> · سُلِّمت {relativeDay(plan.issuedAt)}</>}
-                  </p>
-                </div>
-                <Link href={`/admin/plans/edit?student=${student.id}&level=${plan.level}`}>
-                  <Btn icon={Pencil}>تعديل هذه الخطة</Btn>
-                </Link>
-              </div>
-            </Sheet>
-
             <Sheet className="rise" pad={false}>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[46rem] border-collapse text-body">

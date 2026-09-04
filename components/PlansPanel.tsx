@@ -33,13 +33,12 @@ export function PlansPanel({ onClose }: { onClose: () => void }) {
     if (t) p.set('track', t); else p.delete('track');
     router.replace(`/admin/plans${p.toString() ? `?${p}` : ''}`, { scroll: false });
   };
-  const issuedToday = db.plans.filter(
-    (p) => p.issuedAt?.slice(0, 10) === new Date().toISOString().slice(0, 10)).length;
 
   return (
     <PanelShell title="الخطط" meta="عرضها، وطباعتها، وتعديلها" onClose={onClose}>
       <PanelGroup label="الشاشات">
         <PanelItem active={onPrint} onClick={() => router.push('/admin/plans')}>طباعة خطة لطالب</PanelItem>
+        <PanelItem active={onEdit} onClick={() => router.push('/admin/plans/edit')}>تعديل الخطة</PanelItem>
         <PanelItem active={onCurriculum} onClick={() => router.push('/admin/plans/curriculum')}>منهج الحفظ</PanelItem>
       </PanelGroup>
 
@@ -81,15 +80,7 @@ export function PlansPanel({ onClose }: { onClose: () => void }) {
         ))}
       </PanelGroup>
 
-
-
-      <PanelGroup label="اليوم">
-        <p className="px-1.5 text-panel leading-relaxed text-ink-500">
-          {issuedToday > 0
-            ? <>طُبعت <Num className="font-medium text-ink-800">{issuedToday}</Num> خطة اليوم.</>
-            : 'لم تُطبع خطة اليوم بعد.'}
-        </p>
-      </PanelGroup>
+      
     </PanelShell>
   );
 }
