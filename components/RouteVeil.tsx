@@ -1,6 +1,7 @@
 'use client';
-/* Navigation feedback. The mark with a turning ring, fixed at the top centre —
-   present and in the same place every time, and never covering the work. */
+/* Navigation feedback. The mark holds the centre while the work behind it goes
+   soft, and both settle back the moment the screen is ready — present, in the
+   same place every time, and never taking a click. */
 import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { LoadingMark } from '@/components/LoadingMark';
