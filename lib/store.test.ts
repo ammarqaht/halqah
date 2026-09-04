@@ -144,17 +144,30 @@ describe('previewing a plan writes nothing', () => {
     const issued = store.issuePlan({
       studentId: 'st1', track: 'SILVER', level: 40, dailyAmount: 'نصف وجه' });
     expect(store.get().plans).toHaveLength(1);
-    expect(store.get().students[0].currentLevel).toBe(40);
     expect(store.planFor('st1', 'SILVER', 40)?.id).toBe(issued.id);
+    store.markPrinted(issued.id);
+    expect(store.get().students[0].currentLevel).toBe(40);
   });
 
-  it('editing a sheet does not promote the student', () => {
+  it('creating the row does not promote — printing does', () => {
     store.reset();
     const s: Student = { ...student(), id: 'st2', track: 'SILVER', currentLevel: 23 };
     store.replaceAll([s], [], 'test.xlsx');
-    store.issuePlan({
-      studentId: 'st2', track: 'SILVER', level: 40, dailyAmount: 'نصف وجه', setLevel: false });
+
+    /* Materialising a sheet to edit it must leave him where he was. */
+    const p = store.issuePlan({
+      studentId: 'st2', track: 'SILVER', level: 40, dailyAmount: 'نصف وجه' });
     expect(store.get().plans).toHaveLength(1);
     expect(store.get().students[0].currentLevel).toBe(23);
+
+    /* Handing him the paper is what moves him. */
+    store.markPrinted(p.id);
+    expect(store.get().students[0].currentLevel).toBe(40);
+    expect(store.get().plans[0].printedCount).toBe(1);
+
+    /* And a reprint of an already-issued sheet still puts him there. */
+    store.setLevel('st2', 12);
+    store.markPrinted(p.id);
+    expect(store.get().students[0].currentLevel).toBe(40);
   });
 });

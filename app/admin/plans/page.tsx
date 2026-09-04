@@ -237,7 +237,7 @@ function PlansScreen() {
                     {plan.printedCount > 0 && <> · سُلِّمت {relativeDay(plan.issuedAt)}</>}
                   </p>
                 </div>
-                <Link href={`/admin/follow-up/plan?student=${student.id}&level=${plan.level}`}>
+                <Link href={`/admin/plans/edit?student=${student.id}&level=${plan.level}`}>
                   <Btn icon={Pencil}>تعديل هذه الخطة</Btn>
                 </Link>
               </div>
@@ -287,7 +287,7 @@ function PlansScreen() {
             </Sheet>
 
             <p className="mt-4 text-panel text-ink-500">
-              هذه الشاشة للعرض والطباعة. التعديل — لطالب واحد أو لكل من يأخذ المستوى — في «تعديل الخطة» بصفحة المتابعة.
+              هذه الشاشة للعرض والطباعة. التعديل — لطالب واحد أو لكل من يأخذ المستوى — في شاشة «تعديل الخطة».
             </p>
           </>
         )}

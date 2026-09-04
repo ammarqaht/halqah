@@ -6,9 +6,10 @@
      · كل من يأخذ المستوى — the master curriculum itself
 
    They were on two different screens before, and the second one is the
-   dangerous one, so it now sits beside the first with the reach stated on
-   screen and a confirmation before it saves. Printing stays on «الخطط»:
-   nothing here prints, and nothing there edits. */
+   dangerous one, so it sits beside the first with the reach stated on screen
+   and a confirmation before it saves. Both live under «الخطط», next to the
+   screen that prints them — but on their own page: that one prints and never
+   edits, this one edits and never prints. */
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -51,7 +52,7 @@ function PlanEditorScreen() {
   const set = (k: string, v: string) => {
     const p = new URLSearchParams(sp.toString());
     if (v) p.set(k, v); else p.delete(k);
-    router.replace(`/admin/follow-up/plan?${p}`, { scroll: false });
+    router.replace(`/admin/plans/edit?${p}`, { scroll: false });
   };
 
   const [toast, setToast] = useState<string | null>(null);
@@ -64,7 +65,7 @@ function PlanEditorScreen() {
   if (!db.students.length) {
     return (
       <>
-        <TopBar title="تعديل الخطة" crumbs={['المتابعة']} panelOpen={panelOpen}
+        <TopBar title="تعديل الخطة" crumbs={['الخطط']} panelOpen={panelOpen}
           onOpenPanel={() => setPanelOpen(true)} />
         <div className="mx-auto max-w-column px-6 py-8">
           <Sheet className="rise">
@@ -79,7 +80,7 @@ function PlanEditorScreen() {
 
   return (
     <>
-      <TopBar title="تعديل الخطة" crumbs={['المتابعة']} panelOpen={panelOpen}
+      <TopBar title="تعديل الخطة" crumbs={['الخطط']} panelOpen={panelOpen}
         onOpenPanel={() => setPanelOpen(true)}
         action={<Link href="/admin/plans"><Btn icon={Printer}>طباعة خطة</Btn></Link>} />
 
@@ -133,7 +134,7 @@ function StudentPlanEditor({ onToast }: { onToast: (s: string) => void }) {
   const set = (k: string, v: string) => {
     const p = new URLSearchParams(sp.toString());
     if (v) p.set(k, v); else p.delete(k);
-    router.replace(`/admin/follow-up/plan?${p}`, { scroll: false });
+    router.replace(`/admin/plans/edit?${p}`, { scroll: false });
   };
 
   const [editing, setEditing] = useState<{ dayNo: number; kind: PlanKind } | null>(null);
@@ -179,8 +180,8 @@ function StudentPlanEditor({ onToast }: { onToast: (s: string) => void }) {
   const customised = plan ? isCustomised(plan, overrides) : false;
 
   /* The sheet on screen may be a draft that exists nowhere yet. A write has to
-     land on a real row, so the first edit materialises it — WITHOUT moving the
-     student onto that level, which is what printing means, not editing. */
+     land on a real row, so the first edit materialises it. Creating the row
+     does not move the student onto the level — printing does. */
   const materialise = () => {
     if (!plan || !student?.track) return null;
     if (!plan.id.startsWith('draft-')) return plan.id;
@@ -189,7 +190,6 @@ function StudentPlanEditor({ onToast }: { onToast: (s: string) => void }) {
       track: student.track as Exclude<typeof student.track, null>,
       level: plan.level,
       dailyAmount: plan.dailyAmount,
-      setLevel: false,
     }).id;
   };
 
@@ -423,7 +423,7 @@ function LevelCurriculumEditor({ onToast }: { onToast: (s: string) => void }) {
   const set = (k: string, v: string) => {
     const p = new URLSearchParams(sp.toString());
     if (v) p.set(k, v); else p.delete(k);
-    router.replace(`/admin/follow-up/plan?${p}`, { scroll: false });
+    router.replace(`/admin/plans/edit?${p}`, { scroll: false });
   };
 
   const track = (sp.get('track') as Track) || 'SILVER';

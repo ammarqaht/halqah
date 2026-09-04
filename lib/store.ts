@@ -659,18 +659,13 @@ export const store = {
    * مع الطباعة — لا تحتاج زر حفظ منفصلًا». So this creates the record and
    * `markPrinted` stamps it, and the screen calls them together.
    *
-   * CALL IT ON PRINT, NEVER ON PREVIEW. It writes — a plan row and the
-   * student's `currentLevel` — and a screen that called it while merely
-   * rendering a preview rewrote the level of every student whose name was
-   * clicked: a student on 23 became 40 because 40 was the sheet on screen.
+   * CALL IT ON PRINT OR ON A REAL EDIT, NEVER ON PREVIEW. It writes a plan
+   * row, and a screen that called it while merely rendering created one for
+   * every name that was clicked. The student's level moves in `markPrinted`.
    */
   issuePlan(args: {
     studentId: string; track: Exclude<Student['track'], null>; level: number;
     dailyAmount: string; by?: string | null;
-    /** Handing a student a sheet moves him onto that level. Editing one does
-        not — the editor opens a sheet to change its wording, not to promote
-        anybody, so it passes false. */
-    setLevel?: boolean;
   }): StudentPlan {
     const cur = load();
     const existing = cur.plans.find(
@@ -691,18 +686,11 @@ export const store = {
       printedCount: 0,
       createdAt: now,
     };
-    /* Issuing a sheet IS the act of putting a student on a level, so the two
-       are written together. Reading `currentLevel` in fourteen places while
-       nothing ever wrote it is why every student showed «بلا مستوى». */
-    const moves = args.setLevel !== false;
-    commit({
-      ...cur,
-      plans: [...cur.plans, plan],
-      students: moves
-        ? cur.students.map((st) =>
-            st.id === args.studentId ? { ...st, currentLevel: args.level } : st)
-        : cur.students,
-    });
+    /* Creating the row does NOT move the student. `markPrinted` does, because
+       printing is the act §9 names: «الحفظ يقع تلقائيًا مع الطباعة». Promoting
+       here instead meant an already-issued sheet promoted nobody on reprint,
+       and an edit promoted somebody who was never handed a thing. */
+    commit({ ...cur, plans: [...cur.plans, plan] });
     return plan;
   },
 
@@ -722,9 +710,21 @@ export const store = {
    */
   markPrinted(planId: string) {
     const cur = load();
-    commit({ ...cur, plans: cur.plans.map((p) => (p.id === planId
-      ? { ...p, printedCount: p.printedCount + 1, issuedAt: p.printedCount === 0 ? new Date().toISOString() : p.issuedAt }
-      : p)) });
+    const plan = cur.plans.find((p) => p.id === planId);
+    if (!plan) return;
+    /* Printing the sheet is the moment the student is put on that level — the
+       supervisor has the paper in his hand. Previewing does not do it, and
+       editing does not do it; this does, on every print, including a reprint
+       of a sheet issued earlier. */
+    commit({
+      ...cur,
+      plans: cur.plans.map((p) => (p.id === planId
+        ? { ...p, printedCount: p.printedCount + 1,
+            issuedAt: p.printedCount === 0 ? new Date().toISOString() : p.issuedAt }
+        : p)),
+      students: cur.students.map((st) =>
+        st.id === plan.studentId ? { ...st, currentLevel: plan.level } : st),
+    });
   },
 
   updatePlan(planId: string, patch: Partial<StudentPlan>) {

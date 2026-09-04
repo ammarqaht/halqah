@@ -1,8 +1,8 @@
 'use client';
-/* الخطط — viewing and printing only. Editing a sheet, whether for one student
-   or for everyone on a level, lives under المتابعة: this screen prints and
-   never edits, that one edits and never prints, and neither can be mistaken
-   for the other. */
+/* الخطط — everything to do with a memorisation sheet, on three screens that
+   each do one thing: one prints, one edits, one holds the uploaded curriculum.
+   They sit together because they are one job, and apart because printing a
+   sheet and rewriting it are not the same act. */
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { PanelShell, PanelGroup, PanelItem } from '@/components/Panel';
 import { Num } from '@/components/Num';
@@ -17,6 +17,7 @@ export function PlansPanel({ onClose }: { onClose: () => void }) {
   const sp = useSearchParams();
 
   const onPrint = path === '/admin/plans';
+  const onEdit = path.startsWith('/admin/plans/edit');
   const onCurriculum = path.startsWith('/admin/plans/curriculum');
 
   const cover = coverage(db.curriculum);
@@ -36,11 +37,20 @@ export function PlansPanel({ onClose }: { onClose: () => void }) {
     (p) => p.issuedAt?.slice(0, 10) === new Date().toISOString().slice(0, 10)).length;
 
   return (
-    <PanelShell title="الخطط" meta="عرض الخطط وطباعتها" onClose={onClose}>
+    <PanelShell title="الخطط" meta="عرضها، وطباعتها، وتعديلها" onClose={onClose}>
       <PanelGroup label="الشاشات">
         <PanelItem active={onPrint} onClick={() => router.push('/admin/plans')}>طباعة خطة لطالب</PanelItem>
         <PanelItem active={onCurriculum} onClick={() => router.push('/admin/plans/curriculum')}>منهج الحفظ</PanelItem>
       </PanelGroup>
+
+      {onEdit && (
+        <PanelGroup label="نطاق التعديل">
+          <PanelItem active={sp.get('scope') !== 'level'}
+            onClick={() => router.push('/admin/plans/edit?scope=student')}>خطة طالب معيّن</PanelItem>
+          <PanelItem active={sp.get('scope') === 'level'}
+            onClick={() => router.push('/admin/plans/edit?scope=level')}>كل من يأخذ المستوى</PanelItem>
+        </PanelGroup>
+      )}
 
       {onPrint && (
         <PanelGroup label="مسار الطالب">
@@ -61,7 +71,7 @@ export function PlansPanel({ onClose }: { onClose: () => void }) {
             لا منهج محفوظ بعد. ارفع ملف «منهج الحفظ» من الصفحة الرئيسية.
           </p>
         ) : cover.map((c) => (
-          <button key={c.track} onClick={() => router.push(`/admin/follow-up/plan?scope=level&track=${c.track}`)}
+          <button key={c.track} onClick={() => router.push(`/admin/plans/edit?scope=level&track=${c.track}`)}
             className="flex w-full items-baseline justify-between rounded-lg px-1.5 py-1.5 text-start transition-colors hover:bg-ink-100">
             <span className="text-panel text-ink-700">{TRACK_AR[c.track]}</span>
             <span className="text-micro text-ink-500">
@@ -71,9 +81,7 @@ export function PlansPanel({ onClose }: { onClose: () => void }) {
         ))}
       </PanelGroup>
 
-      <PanelGroup label="التعديل">
-        <PanelItem onClick={() => router.push('/admin/follow-up/plan')}>تعديل الخطة</PanelItem>
-      </PanelGroup>
+
 
       <PanelGroup label="اليوم">
         <p className="px-1.5 text-panel leading-relaxed text-ink-500">
