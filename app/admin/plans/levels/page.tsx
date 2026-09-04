@@ -119,7 +119,6 @@ function LevelEditorScreen() {
         onOpenPanel={() => setPanelOpen(true)}
         action={
           <div className="flex items-center gap-2">
-            <Link href="/admin/plans"><Btn>طباعة خطة لطالب</Btn></Link>
             <Btn variant="primary" icon={Save} disabled={!dirty} onClick={() => setConfirm(true)}>
               حفظ المنهج
             </Btn>
