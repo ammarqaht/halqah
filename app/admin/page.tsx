@@ -39,8 +39,6 @@ export default function OverviewPage() {
     );
   }
 
-  const maxN = Math.max(...d.byHalaqa.map((h) => h.n), 1);
-
   return (
     <>
       <TopBar title="الرئيسية" crumbs={['حلقات جامع محمد العبدالكريم']} panelOpen={panelOpen}
@@ -95,13 +93,7 @@ export default function OverviewPage() {
                   <tr key={h.id} className="border-b border-ink-150 last:border-0 transition-colors hover:bg-brand-50">
                     <td className="px-2 py-3 font-medium text-ink-900">{h.teacher}</td>
                     <td className="px-2 py-3">
-                      <div className="flex items-center gap-2">
-                        <span className="w-6 text-panel"><Num>{h.n}</Num></span>
-                        <span className="h-1.5 w-16 overflow-hidden rounded-full bg-ink-100">
-                          <span className="block h-full rounded-full bg-brand-400 transition-[width] duration-700 ease-brand"
-                            style={{ width: `${(h.n / maxN) * 100}%` }} />
-                        </span>
-                      </div>
+                      <span className="text-panel text-ink-700"><Num>{h.n}</Num></span>
                     </td>
                     <td className="px-2 py-3">
                       <div className="flex gap-1">
