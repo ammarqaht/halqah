@@ -125,7 +125,9 @@ export function parseExams(
      association's own categories — «تلقين», «أجزاء» — which describe what was
      examined, not a different kind of exam. Reading them as types turned 58
      association results into mock exams. */
-  kind: 'QIYAS' | 'EXAMS' = 'EXAMS',
+  /* The tajweed log's «نوع الاختبار» is the RULE examined, so it becomes the
+     topic rather than the type — every row in that sheet is a tajweed exam. */
+  kind: 'QIYAS' | 'EXAMS' | 'TAJWEED' = 'EXAMS',
 ): ExamParse {
   const grid = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[sheetName],
     { header: 1, blankrows: false, defval: null });
@@ -136,8 +138,11 @@ export function parseExams(
   const byId = new Map<string, Student>();
   const byName = new Map<string, Student>();
   for (const s of students) {
-    if (s.nationalId) byId.set(s.nationalId, s);
-    byName.set(foldArabic(s.fullName), s);
+    /* First match wins: the pool is ordered so that the id this batch commits
+       comes before the one the store is about to replace. */
+    if (s.nationalId && !byId.has(s.nationalId)) byId.set(s.nationalId, s);
+    const n = foldArabic(s.fullName);
+    if (!byName.has(n)) byName.set(n, s);
   }
 
   const rows: ExamRow[] = [];
@@ -154,7 +159,10 @@ export function parseExams(
     const { id: rawId } = normaliseNationalId(cell(r, 'nationalId'));
     const student = (rawId && byId.get(rawId)) || byName.get(foldArabic(rawName)) || null;
 
-    const type: ExamType = kind === 'QIYAS' ? 'ASSOCIATION' : examTypeFrom(cell(r, 'type'));
+    const type: ExamType = kind === 'QIYAS' ? 'ASSOCIATION'
+      : kind === 'TAJWEED' ? 'TAJWEED'
+      : examTypeFrom(cell(r, 'type'));
+    const topic = kind === 'TAJWEED' ? collapse(cell(r, 'type')) : '';
     const result = collapse(cell(r, 'result'));
     const passedCell = cell(r, 'passed');
     const score = num(cell(r, 'score'));
@@ -182,8 +190,9 @@ export function parseExams(
         track: student?.track ?? null,
         type,
         takenOn,
-        level: num(cell(r, 'level')),
-        ajza: ajzaFrom(cell(r, 'ajza')),
+        /* A tajweed sitting is examined on a rule, not on a level. */
+        level: kind === 'TAJWEED' ? null : num(cell(r, 'level')),
+        ajza: kind === 'TAJWEED' ? null : ajzaFrom(cell(r, 'ajza')),
         errors: num(cell(r, 'errors')),
         warnings: num(cell(r, 'warnings')),
         tajweedErrors: num(cell(r, 'tajweed')),
@@ -193,7 +202,7 @@ export function parseExams(
         pointsPaid: collapse(cell(r, 'pointsPaid')) === 'true',
         note: reason,
         examiner: collapse(cell(r, 'examiner')),
-        tajweedTopic: null,
+        tajweedTopics: topic ? [topic] : [],
         source: kind === 'QIYAS' ? 'QIYAS_IMPORT' : 'MANUAL',
         createdAt: new Date().toISOString(),
       },

@@ -132,9 +132,17 @@ export function levelAvailable(
   const rows = curriculum.filter((d) => d.track === track && d.level === level);
   if (rows.length === 0) {
     const trackAr = track === 'GOLDEN' ? 'الذهبي' : 'الفضي';
+    /* Naming the range that IS there turns «غير موجود» from a dead end into an
+       instruction: the client's own «منهج الحفظ» carries silver 40–60 only, and
+       without saying so the message reads like a fault in the system. */
+    const have = [...new Set(curriculum.filter((d) => d.track === track).map((d) => d.level))]
+      .sort((a, b) => a - b);
+    const span = have.length === 0 ? 'ولا مستوى واحد من هذا المسار مرفوع بعد.'
+      : `المرفوع من هذا المسار: المستويات ${have[0]}–${have[have.length - 1]}`
+        + `${have.length === have[have.length - 1] - have[0] + 1 ? '' : ' (بفجوات)'}.`;
     return {
       ok: false,
-      reason: `المستوى ${level} في المسار ${trackAr} غير موجود في ملف المنهج المرفوع. `
+      reason: `المستوى ${level} في المسار ${trackAr} غير موجود في ملف المنهج المرفوع. ${span} `
         + 'ارفع الصفحات الناقصة من «منهج الحفظ» ثم أعد المحاولة — لن تُطبع ورقة فارغة.',
     };
   }

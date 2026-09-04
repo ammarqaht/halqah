@@ -12,7 +12,7 @@ import { parseCurriculumSheet, CURRICULUM_SHEETS, type CurriculumParse } from '.
 
 export type SheetOutcome =
   | { kind: 'ROSTER' | 'RATEL';  scan: SheetScan; roster: ParseResult }
-  | { kind: 'QIYAS' | 'EXAMS';   scan: SheetScan; exams: ExamParse }
+  | { kind: 'QIYAS' | 'EXAMS' | 'TAJWEED'; scan: SheetScan; exams: ExamParse }
   | { kind: 'PLAN_LOG';          scan: SheetScan; planLog: PlanLogParse }
   | { kind: 'CURRICULUM';        scan: SheetScan; curriculum: CurriculumParse; track: Track }
   | { kind: 'UNSUPPORTED';       scan: SheetScan };
@@ -42,7 +42,7 @@ export type WorkbookRead = {
 /* Sheets are read in this order so that later ones can match against students
    the earlier ones established. A roster must exist before an exam log can be
    attached to anybody. */
-const ORDER: FileKind[] = ['ROSTER', 'RATEL', 'CURRICULUM', 'PLAN_LOG', 'EXAMS', 'QIYAS', 'UNKNOWN'];
+const ORDER: FileKind[] = ['ROSTER', 'RATEL', 'CURRICULUM', 'PLAN_LOG', 'EXAMS', 'TAJWEED', 'QIYAS', 'UNKNOWN'];
 
 export function readWorkbook(
   wb: XLSX.WorkBook,
@@ -62,7 +62,9 @@ export function readWorkbook(
 
   /* Grows as we go: a roster sheet read first lets the exam sheet after it
      find its students, even on the very first upload. */
-  const pool = () => [...knownStudents, ...students];
+  /* Fresh rows come FIRST so that a name in both wins with the id this batch
+     will actually commit — and a student only the store knows is still found. */
+  const pool = () => [...students, ...knownStudents];
 
   for (const scan of scans) {
     switch (scan.kind) {
@@ -71,7 +73,12 @@ export function readWorkbook(
         const r = parseRoster(wb, scan.sheet);
         out.push({ kind: scan.kind, scan, roster: r });
         for (const row of r.rows) {
-          if (!students.some((s) => s.dedupeKey === row.student.dedupeKey)) students.push(row.student);
+          if (students.some((s) => s.dedupeKey === row.student.dedupeKey)) continue;
+          /* A student the store already holds keeps his id. The parse minted a
+             fresh one, and the exam and plan sheets read after this would then
+             point at an id the merge is about to discard. */
+          const kept = knownStudents.find((s) => s.dedupeKey === row.student.dedupeKey);
+          students.push(kept ? { ...row.student, id: kept.id } : row.student);
         }
         for (const h of r.halaqat) if (!halaqat.some((x) => x.name === h.name)) halaqat.push(h);
         flagged += r.rows.filter((x) => x.issues.length).length;
@@ -79,6 +86,7 @@ export function readWorkbook(
         break;
       }
       case 'QIYAS':
+      case 'TAJWEED':
       case 'EXAMS': {
         const e = parseExams(wb, scan.sheet, pool(), scan.headerRow, scan.kind);
         out.push({ kind: scan.kind, scan, exams: e });

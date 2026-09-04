@@ -77,8 +77,9 @@ function InternalCell({ exam }: { exam: FollowUpRow['lastInternal'] }) {
   if (!exam) return <span className="text-ink-400">—</span>;
   const rows: [string, React.ReactNode][] = [
     ['التاريخ', <Num key="d">{formatDate(exam.takenOn)}</Num>],
-    ...(exam.type === 'TAJWEED' && exam.tajweedTopic
-      ? [['الموضوع', exam.tajweedTopic] as [string, React.ReactNode]] : []),
+    ...(exam.type === 'TAJWEED' && exam.tajweedTopics.length
+      ? [[exam.tajweedTopics.length > 1 ? 'المواضيع' : 'الموضوع',
+          exam.tajweedTopics.join('، ')] as [string, React.ReactNode]] : []),
     ...(exam.level != null
       ? [['المستوى', <Num key="l">{exam.level}</Num>] as [string, React.ReactNode]] : []),
     ['الدرجة', <Num key="s">{`${exam.score ?? '—'} / ${scoreMax(exam.type)}`}</Num>],

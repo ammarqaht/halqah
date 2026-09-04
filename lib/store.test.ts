@@ -24,7 +24,7 @@ const exam = (over: Partial<Exam> = {}): Exam => ({
   type: 'BADGE_DIAMOND', takenOn: '2026-08-31', level: 29, ajza: 2,
   errors: 3, warnings: 4, tajweedErrors: 2, score: 90, passed: true,
   pointsAwarded: 200, pointsPaid: true, note: '', examiner: '',
-  tajweedTopic: null, source: 'MANUAL', createdAt: '2026-08-31T10:00:00Z', ...over,
+  tajweedTopics: [], source: 'MANUAL', createdAt: '2026-08-31T10:00:00Z', ...over,
 });
 
 const ledgerFor = (id: string) => store.get().txns.filter((t) => t.refId === id);

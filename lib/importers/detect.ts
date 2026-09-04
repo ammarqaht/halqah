@@ -4,10 +4,11 @@
 import * as XLSX from 'xlsx';
 import { collapse } from '@/lib/normalise';
 
-export type FileKind = 'RATEL' | 'QIYAS' | 'EXAMS' | 'PLAN_LOG' | 'CURRICULUM' | 'ROSTER' | 'UNKNOWN';
+export type FileKind = 'RATEL' | 'QIYAS' | 'EXAMS' | 'TAJWEED' | 'PLAN_LOG' | 'CURRICULUM' | 'ROSTER' | 'UNKNOWN';
 
 export const KIND_AR: Record<FileKind, string> = {
   RATEL: 'تقرير رتل', QIYAS: 'نتائج قياس', EXAMS: 'سجل الاختبارات',
+  TAJWEED: 'سجل اختبارات التجويد',
   PLAN_LOG: 'سجل متابعة الخطط', CURRICULUM: 'منهج الحفظ',
   ROSTER: 'قاعدة بيانات الطلاب', UNKNOWN: 'غير معروف',
 };
@@ -16,6 +17,7 @@ export const KIND_TARGET: Record<FileKind, string> = {
   RATEL: 'الطلاب · الحضور · أوجه الحفظ والمراجعة',
   QIYAS: 'سجل اختبارات الجمعية',
   EXAMS: 'سجل الأوسمة واختبارات التجويد',
+  TAJWEED: 'اختبارات التجويد ومواضيعها',
   PLAN_LOG: 'تواريخ تسليم المستويات',
   CURRICULUM: 'المنهج المرجعي',
   ROSTER: 'الطلاب والحلقات',
@@ -29,6 +31,13 @@ const SIGNATURES: { kind: FileKind; need: string[]; exclude?: string[]; weight?:
   /* «نوع الاختبار» is what separates an exam log from a plan log — both carry
      الطالب/المسار/المستوى/المعلم, so the plan log must explicitly NOT have it. */
   { kind: 'EXAMS',      need: ['نوع الاختبار', 'الدرجة النهائية'], weight: 4 },
+  /* The tajweed log looks like the exam log and is not: its «نوع الاختبار»
+     holds the RULE examined («النون الساكنة والتنوين»), it scores out of ten in
+     «درجة الاختبار» rather than «الدرجة النهائية», and it carries no level and
+     no juz count at all. Classified as EXAMS it matched nothing and was
+     dropped — forty-seven sittings that the file did record. */
+  { kind: 'TAJWEED',    need: ['اسم الطالب', 'نوع الاختبار', 'درجة الاختبار'],
+                        exclude: ['الدرجة النهائية', 'عدد الاخطاء'], weight: 5 },
   { kind: 'PLAN_LOG',   need: ['اسم الطالب', 'المسار', 'المستوى', 'معلم الحلقة'],
                         exclude: ['نوع الاختبار', 'الدرجة النهائية', 'عدد الاخطاء'], weight: 2 },
   { kind: 'CURRICULUM', need: ['المستوى', 'اليوم', 'المقرر', 'من سورة'], weight: 4 },

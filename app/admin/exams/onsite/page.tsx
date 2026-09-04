@@ -148,7 +148,7 @@ function OnsiteScreen() {
         pointsPaid: suggestedPoints > 0,
         note: '',
         examiner: '',
-        tajweedTopic: null,
+        tajweedTopics: [],
         source: 'ONSITE',
         createdAt: new Date().toISOString(),
       },

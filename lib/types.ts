@@ -201,7 +201,9 @@ export type Exam = {
   pointsPaid: boolean;
   note: string;
   examiner: string;
-  tajweedTopic: string | null;
+  /* A tajweed sitting covers as many rules as the examiner chose to test;
+     one exam, several topics. Empty on every other kind of exam. */
+  tajweedTopics: string[];
   source: ExamSource;
   createdAt: string;
 };

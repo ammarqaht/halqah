@@ -16,7 +16,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-  ClipboardCheck, AlertTriangle, ArrowRight, Check, Coins, FileText, Plus,
+  ClipboardCheck, AlertTriangle, ArrowRight, Check, Coins, FileText, Plus, X,
 } from 'lucide-react';
 import { TopBar } from '@/components/TopBar';
 import { Sheet, SheetHead } from '@/components/Sheet';
@@ -78,7 +78,7 @@ export default function RecordExam() {
   const [passOverride, setPassOverride] = useState<boolean | null>(null);
   const [pointsOverride, setPointsOverride] = useState<string | null>(null);
   const [pointsPaid, setPointsPaid] = useState(true);
-  const [topic, setTopic] = useState('');
+  const [topics, setTopics] = useState<string[]>([]);
   const [note, setNote] = useState('');
   const [examiner, setExaminer] = useState('');
   const [saved, setSaved] = useState<Saved | null>(null);
@@ -158,19 +158,24 @@ export default function RecordExam() {
      the record is worthless without them: the level is what tells us later which
      levels he has been examined on, and the juz count is what §4.8 gates
      association readiness on. So they are required, not merely suggested. */
-  const levelValid = levelNum !== null && levelNum >= LEVEL_MIN && levelNum <= LEVEL_MAX;
-  const ajzaValid = ajza !== '' && Number(ajza) > 0;
+  /* …but a tajweed sitting is examined on a RULE, not on a level or a number
+     of ajza — the file records neither. Demanding them turned a two-field form
+     into a four-field one and invented data the sheet never carried. */
+  const levelled = type !== 'TAJWEED';
+  const levelValid = !levelled
+    || (levelNum !== null && levelNum >= LEVEL_MIN && levelNum <= LEVEL_MAX);
+  const ajzaValid = !levelled || (ajza !== '' && Number(ajza) > 0);
   const scoreValid = score !== null && score >= 0 && score <= scoreMax(type);
 
   const valid = !!student && !blocked && takenOn !== ''
-    && (type !== 'TAJWEED' || topic.trim() !== '')
+    && (type !== 'TAJWEED' || topics.length > 0)
     && levelValid && ajzaValid && scoreValid;
 
   /** What is still missing, named — a disabled button with no reason is a wall. */
   const missing = !student ? 'اختر الطالب'
+    : type === 'TAJWEED' && topics.length === 0 ? 'اختر موضوع التجويد — أو أكثر'
     : !levelValid ? `المستوى مطلوب، بين ${LEVEL_MIN} و${LEVEL_MAX}`
     : !ajzaValid ? 'عدد الأجزاء مطلوب'
-    : type === 'TAJWEED' && topic.trim() === '' ? 'اختر موضوع التجويد'
     : !scoreValid ? `الدرجة مطلوبة، ولا تتجاوز ${scoreMax(type)}`
     : null;
 
@@ -178,7 +183,7 @@ export default function RecordExam() {
     setStudentId(''); setType('BADGE_GOLDEN'); setTakenOn(isoDate(new Date()));
     setLevel(''); setAjza(''); setErrors(''); setWarnings(''); setTajweedErrors('');
     setScoreOverride(null); setPassOverride(null); setPointsOverride(null);
-    setPointsPaid(true); setTopic(''); setNote(''); setExaminer(''); setSaved(null);
+    setPointsPaid(true); setTopics([]); setNote(''); setExaminer(''); setSaved(null);
   };
 
   const save = () => {
@@ -190,8 +195,8 @@ export default function RecordExam() {
       track: student.track,
       type,
       takenOn,
-      level: levelNum,
-      ajza: ajza === '' ? null : Number(ajza),
+      level: levelled ? levelNum : null,
+      ajza: levelled && ajza !== '' ? Number(ajza) : null,
       errors: type === 'TAJWEED' ? null : counts.errors,
       warnings: type === 'TAJWEED' ? null : counts.warnings,
       tajweedErrors: type === 'TAJWEED' ? null : counts.tajweedErrors,
@@ -201,7 +206,7 @@ export default function RecordExam() {
       pointsPaid: pointsPaid && points > 0,
       note: note.trim(),
       examiner: examiner.trim(),
-      tajweedTopic: type === 'TAJWEED' ? topic.trim() : null,
+      tajweedTopics: type === 'TAJWEED' ? topics : [],
       source: 'MANUAL',
       createdAt: new Date().toISOString(),
     };
@@ -378,23 +383,22 @@ export default function RecordExam() {
                 </p>
               )}
               {type === 'TAJWEED' && (
-                <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                  <Field label="موضوع التجويد" hint="تُضيف مواضيع جديدة من الإعدادات">
-                    <Combobox value={topic} onChange={setTopic} options={topicOptions}
-                      creatable createLabel="موضوع جديد"
-                      placeholder="اختر الموضوع" emptyText="لا مواضيع بعد" />
+                <div className="mt-4">
+                  <Field label="مواضيع التجويد · مطلوب"
+                    hint="اختر ما اختُبر عليه — أكثر من موضوع في الجلسة الواحدة. اكتب اسمًا جديدًا لإضافته.">
+                    <TopicPicker chosen={topics} onChange={setTopics} options={topicOptions} />
                   </Field>
                 </div>
               )}
             </Sheet>
 
             <Sheet className="rise mb-4">
-              <SheetHead title="المستوى والدرجة"
+              <SheetHead title={levelled ? 'المستوى والدرجة' : 'الدرجة'}
                 meta={type === 'TAJWEED'
-                  ? 'اختبار التجويد يُسجَّل بدرجة من ١٠ كما في ملفكم'
+                  ? 'اختبار التجويد يُسجَّل بدرجة من ١٠ كما في ملفكم — بلا مستوى ولا أجزاء'
                   : 'الدرجة تُحسب من العدّادات، وتبقى قابلة للتعديل'} />
 
-              <div className="grid gap-4 sm:grid-cols-2">
+              {levelled && <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="المستوى · مطلوب"
                   hint={`من قاعدة البيانات — بين ${LEVEL_MIN} و${LEVEL_MAX}`}>
                   <input className={cx(INPUT, !levelValid && level !== '' && 'border-risk-500')}
@@ -409,11 +413,11 @@ export default function RecordExam() {
                     inputMode="numeric" value={ajza}
                     onChange={(e) => setAjza(clampDigits(e.target.value, 30))} />
                 </Field>
-              </div>
+              </div>}
 
               {/* The track's own ceiling is tighter than 60. A warning, not a
                   block: he may be entering history from a file we cannot judge. */}
-              {levelValid && student.track && levelNum !== null
+              {levelled && levelValid && student.track && levelNum !== null
                 && levelNum > (TRACK_MAX_LEVEL[student.track] ?? LEVEL_MAX) && (
                 <p className="mt-3 rounded-lg bg-warn-100 px-3.5 py-2.5 text-panel text-warn-700">
                   المسار {student.track === 'GOLDEN' ? 'الذهبي' : 'الفضي'} ينتهي عند المستوى{' '}
@@ -421,7 +425,7 @@ export default function RecordExam() {
                 </p>
               )}
 
-              {isMidJuz(student.track, levelNum) && (
+              {levelled && isMidJuz(student.track, levelNum) && (
                 <p className="mt-3 rounded-lg bg-info-100 px-3.5 py-2.5 text-panel text-info-700">
                   المستوى <Num className="font-medium">{levelNum}</Num> في المسار الفضي يقع في منتصف جزء،
                   فلا يقابله عدد أجزاء صحيح — اكتب العدد الذي اختُبر عليه.
@@ -539,5 +543,56 @@ export default function RecordExam() {
         )}
       </div>
     </>
+  );
+}
+
+/* ── tajweed topics ───────────────────────────────────────────────────────
+   One sitting, several rules. A single-choice box forced the examiner either
+   to record only one of them or to open the form again for the same student on
+   the same day — and the second reading is a different exam, which it was not.
+   Chosen topics stay visible as removable chips; a name not on the list is
+   added by typing it, because the list of rules is the examiner's, not ours. */
+function TopicPicker({ chosen, onChange, options }: {
+  chosen: string[];
+  onChange: (v: string[]) => void;
+  options: { value: string; label: string }[];
+}) {
+  const [pick, setPick] = useState('');
+  const add = (name: string) => {
+    const n = name.trim();
+    if (!n || chosen.includes(n)) { setPick(''); return; }
+    /* A topic typed here is a topic the halaqa uses, so it joins the list for
+       next time rather than living inside this one exam. */
+    if (!options.some((o) => o.value === n)) {
+      store.upsertTajweedTopic({ id: uid(), name: n, active: true });
+    }
+    onChange([...chosen, n]);
+    setPick('');
+  };
+
+  const remaining = options.filter((o) => !chosen.includes(o.value));
+
+  return (
+    <div>
+      <Combobox value={pick} onChange={add} options={remaining}
+        creatable createLabel="موضوع جديد"
+        placeholder={chosen.length ? 'أضف موضوعًا آخر' : 'اختر الموضوع'}
+        searchPlaceholder="ابحث أو اكتب موضوعًا جديدًا…"
+        emptyText={options.length ? 'اختير كل المواضيع' : 'لا مواضيع بعد — اكتب اسم الموضوع'} />
+
+      {chosen.length > 0 && (
+        <ul className="mt-2.5 flex flex-wrap gap-2">
+          {chosen.map((t) => (
+            <li key={t}>
+              <button type="button" onClick={() => onChange(chosen.filter((x) => x !== t))}
+                className="group flex items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 py-1.5 pe-2 ps-3 text-panel text-brand-800 transition-colors hover:border-risk-200 hover:bg-risk-100 hover:text-risk-700">
+                {t}
+                <X size={13} className="opacity-60 transition-opacity group-hover:opacity-100" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }

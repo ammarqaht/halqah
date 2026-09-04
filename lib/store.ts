@@ -56,12 +56,23 @@ let db: DB = EMPTY;
 let loaded = false;
 const subs = new Set<() => void>();
 
+/* Exams written before tajweed exams could carry several topics hold a single
+   `tajweedTopic`. Read it forward rather than dropping what was recorded. */
+function migrate(d: DB): DB {
+  const exams = d.exams.map((e) => {
+    if (Array.isArray((e as { tajweedTopics?: unknown }).tajweedTopics)) return e;
+    const old = (e as unknown as { tajweedTopic?: string | null }).tajweedTopic;
+    return { ...e, tajweedTopics: old ? [old] : [] };
+  });
+  return { ...d, exams };
+}
+
 function load(): DB {
   if (loaded) return db;
   loaded = true;
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) db = { ...EMPTY, ...JSON.parse(raw) };
+    if (raw) db = migrate({ ...EMPTY, ...JSON.parse(raw) });
   } catch { /* private mode — stay in memory */ }
   return db;
 }
@@ -477,7 +488,7 @@ export const store = {
         delta,
         kind: delta > 0 ? 'EXAM' : 'CORRECTION',
         reason: delta > 0
-          ? `اجتياز — ${exam.type === 'TAJWEED' && exam.tajweedTopic ? exam.tajweedTopic : EXAM_LABEL(exam.type)}`
+          ? `اجتياز — ${exam.type === 'TAJWEED' && exam.tajweedTopics.length ? exam.tajweedTopics.join('، ') : EXAM_LABEL(exam.type)}`
           : `تعديل نقاط اختبار — ${EXAM_LABEL(exam.type)}`,
         refType: 'exam',
         refId: exam.id,
@@ -519,12 +530,30 @@ export const store = {
     curriculum?: { track: Exclude<Student['track'], null>; days: CurriculumDay[] }[];
     sourceFile: string;
   }) {
+    /* Every parse mints fresh student ids, and merge() keeps the id the store
+       already had — so the exams and plans in this same payload point at ids
+       that stop existing the moment the merge lands. That is why a student the
+       file plainly gives a level to came out «بلا مستوى»: his plan was there,
+       attached to nobody. Resolve the incoming ids to the surviving ones FIRST,
+       then everything downstream lands on the right person. */
+    const before = load();
+    const keyOf = (st: Student) => st.dedupeKey || st.nationalId || st.fullName;
+    const survivor = new Map(before.students.map((st) => [keyOf(st), st.id]));
+    const remap = new Map<string, string>();
+    for (const st of payload.students ?? []) {
+      const kept = survivor.get(keyOf(st));
+      if (kept && kept !== st.id) remap.set(st.id, kept);
+    }
+    const resolve = (id: string | null) => (id && remap.get(id)) || id;
+
     if (payload.students?.length || payload.halaqat?.length) {
       store.merge(payload.students ?? [], payload.halaqat ?? [], payload.sourceFile);
     }
 
     const cur = load();
     let next = { ...cur };
+    const exams = (payload.exams ?? []).map((e) => ({ ...e, studentId: resolve(e.studentId)! }));
+    const plans = (payload.plans ?? []).map((p) => ({ ...p, studentId: resolve(p.studentId)! }));
 
     if (payload.curriculum?.length) {
       let curriculum = next.curriculum;
@@ -535,17 +564,45 @@ export const store = {
     }
 
     if (payload.exams?.length) {
+      /* A topic the file examined on is a topic the halaqa uses. Registering it
+         here is what puts it in the picker next time, instead of making the
+         supervisor retype a rule his own sheet already names. */
+      const known = new Set(next.tajweedTopics.map((t) => t.name));
+      const fresh = [...new Set(exams.flatMap((e) => e.tajweedTopics))]
+        .filter((n) => n && !known.has(n))
+        .map((name) => ({ id: `tt-${name}`, name, active: true }));
+      if (fresh.length) next = { ...next, tajweedTopics: [...next.tajweedTopics, ...fresh] };
+    }
+
+    if (payload.exams?.length) {
       /* An exam is identified by who sat it, when, and of what kind. Re-uploading
          the same log must not double every record. */
       const key = (e: Exam) => `${e.studentId}|${e.takenOn}|${e.type}`;
       const have = new Set(next.exams.map(key));
-      next = { ...next, exams: [...next.exams, ...payload.exams.filter((e) => !have.has(key(e)))] };
+      next = { ...next, exams: [...next.exams, ...exams.filter((e) => !have.has(key(e)))] };
+    }
+
+    /* A student who was never handed a printed sheet can still have been
+       EXAMINED on a level, and the exam log records it. Reading it is the
+       difference between «بلا مستوى» and the level his own file names — the
+       plan below still wins wherever both exist, because a sheet issued is a
+       later statement than an exam sat. */
+    if (next.exams.length) {
+      const latestExam = new Map<string, { level: number; on: string }>();
+      for (const e of next.exams) {
+        if (!e.studentId || e.level === null) continue;
+        const prev = latestExam.get(e.studentId);
+        if (!prev || e.takenOn > prev.on) latestExam.set(e.studentId, { level: e.level, on: e.takenOn });
+      }
+      next = { ...next, students: next.students.map((st) => (
+        st.currentLevel != null || !latestExam.has(st.id)
+          ? st : { ...st, currentLevel: latestExam.get(st.id)!.level })) };
     }
 
     if (payload.plans?.length) {
       const key = (p: StudentPlan) => `${p.studentId}|${p.track}|${p.level}`;
       const have = new Set(next.plans.map(key));
-      const added = payload.plans.filter((p) => !have.has(key(p)));
+      const added = plans.filter((p) => !have.has(key(p)));
       /* The newest sheet a student was handed is the level he is on now. */
       const latest = new Map<string, StudentPlan>();
       for (const p of [...next.plans, ...added]) {

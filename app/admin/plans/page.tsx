@@ -171,8 +171,12 @@ function PlansScreen() {
                 emptyText="لا طالب بهذا الاسم" />
             </Field>
             <Field label="المستوى المطلوب طباعته"
+              /* The levels COUNT DOWN — 60 is the start of the silver track and
+                 1 is its end (§4.2: الفضي ٥٩=جزء، ٥٧=جزآن…). Reading «40 → 39»
+                 as a bug is the natural reading, so the screen says which way
+                 they run instead of leaving it to be guessed. */
               hint={suggested != null
-                ? `مستواه الحالي ${student?.currentLevel} — والتالي ${suggested}`
+                ? `مستواه الحالي ${student?.currentLevel} — والتالي ${suggested}، فالمستويات تتنازل`
                 : 'لا مستوى محفوظ لهذا الطالب، فاكتبه'}>
               <input className={INPUT} inputMode="numeric" value={level}
                 onChange={(e) => setLevel(e.target.value.replace(/[^\d]/g, '').slice(0, 2))} />

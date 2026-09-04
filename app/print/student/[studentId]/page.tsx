@@ -133,7 +133,7 @@ export default function StudentReport({ params }: { params: Promise<{ studentId:
                     <td className={PCELL}><Num>{toArabicDigits(formatDate(e.takenOn))}</Num></td>
                     <td className={PCELL}>
                       {EXAM_TYPE_AR[e.type as ExamType] ?? e.type}
-                      {e.tajweedTopic ? ` — ${e.tajweedTopic}` : ''}
+                      {e.tajweedTopics.length ? ` — ${e.tajweedTopics.join('، ')}` : ''}
                     </td>
                     <td className={PCELL}>{e.level != null ? <Num>{toArabicDigits(e.level)}</Num> : '—'}</td>
                     <td className={PCELL}>{e.ajza != null ? <Num>{toArabicDigits(e.ajza)}</Num> : '—'}</td>

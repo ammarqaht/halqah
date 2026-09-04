@@ -61,7 +61,13 @@ export function parsePlanLog(
   take(true); take(false);
 
   const cell = (r: unknown[], k: string) => (idx[k] === undefined ? null : r[idx[k]]);
-  const byName = new Map(students.map((s) => [foldArabic(s.fullName), s]));
+  /* First match wins — `new Map(...)` would let a later duplicate overwrite an
+     earlier one, and the pool is ordered so the earlier id is the right one. */
+  const byName = new Map<string, typeof students[number]>();
+  for (const s of students) {
+    const n = foldArabic(s.fullName);
+    if (!byName.has(n)) byName.set(n, s);
+  }
 
   const rows: PlanLogRow[] = [];
   let skipped = 0;

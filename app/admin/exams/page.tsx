@@ -200,9 +200,9 @@ function ExamsScreen() {
                         <Chip tone={EXAM_TYPE_TONE[e.type as ExamType] ?? 'ink'}>
                           {EXAM_TYPE_AR[e.type as ExamType] ?? e.type}
                         </Chip>
-                        {e.tajweedTopic && (
+                        {e.tajweedTopics.length > 0 && (
                           <span className="mt-0.5 block max-w-[10rem] truncate text-micro text-ink-500"
-                            title={e.tajweedTopic}>{e.tajweedTopic}</span>
+                            title={e.tajweedTopics.join('، ')}>{e.tajweedTopics.join('، ')}</span>
                         )}
                       </td>
                       <td className="px-3 py-3"><Num className="text-panel text-ink-700">{e.level ?? '—'}</Num></td>
