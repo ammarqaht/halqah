@@ -17,7 +17,9 @@ export function FollowUpPanel({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const path = usePathname();
   const sp = useSearchParams();
-  const onFollowUp = path.startsWith('/admin/follow-up');
+  const onPlanEditor = path.startsWith('/admin/follow-up/plan');
+  const onFollowUp = path.startsWith('/admin/follow-up') && !onPlanEditor;
+  const scope = sp.get('scope');
 
   const set = (key: string, val: string | null) => {
     const next = new URLSearchParams(sp.toString());
@@ -51,7 +53,26 @@ export function FollowUpPanel({ onClose }: { onClose: () => void }) {
         : 'لا طلاب بعد'}
       onClose={onClose}>
 
-      
+      {/* Editing a plan is follow-up work — you edit a sheet BECAUSE the
+          follow-up said the student needs a different one. Printing stays on
+          «الخطط»; this is where the sheet is changed. */}
+      <PanelGroup label="الشاشات">
+        <PanelItem active={onFollowUp} onClick={() => router.push('/admin/follow-up')}>
+          متابعة الطلاب
+        </PanelItem>
+        <PanelItem active={onPlanEditor} onClick={() => router.push('/admin/follow-up/plan')}>
+          تعديل الخطة
+        </PanelItem>
+      </PanelGroup>
+
+      {onPlanEditor && (
+        <PanelGroup label="نطاق التعديل">
+          <PanelItem active={scope !== 'level'}
+            onClick={() => router.push('/admin/follow-up/plan?scope=student')}>خطة طالب معيّن</PanelItem>
+          <PanelItem active={scope === 'level'}
+            onClick={() => router.push('/admin/follow-up/plan?scope=level')}>كل من يأخذ المستوى</PanelItem>
+        </PanelGroup>
+      )}
 
       {onFollowUp && rows.length > 0 && (
         <>

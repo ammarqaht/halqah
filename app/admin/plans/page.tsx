@@ -15,22 +15,18 @@ import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import {
-  FileText, Printer, RotateCcw, Plus, Trash2, AlertTriangle, Inbox, UploadCloud,
-  Pencil, Check, X, Award,
+  FileText, Printer, AlertTriangle, Inbox, UploadCloud, Pencil,
 } from 'lucide-react';
 import { TopBar } from '@/components/TopBar';
 import { Sheet, SheetHead } from '@/components/Sheet';
-import { Btn, Empty, Chip, Modal, Field, INPUT } from '@/components/ui';
+import { Btn, Empty, Chip, Field, INPUT } from '@/components/ui';
 import { Combobox } from '@/components/Combobox';
 import { Num, juzWord } from '@/components/Num';
 import { usePanel } from '@/components/PanelState';
 import { store, useDB } from '@/lib/store';
-import {
-  resolvePlan, levelAvailable, dailyAmountFor, removeDay, insertDay, isCustomised,
-  type PlanRow,
-} from '@/lib/curriculum';
+import { resolvePlan, levelAvailable, dailyAmountFor, isCustomised } from '@/lib/curriculum';
 import { nextLevel, ajzaForLevel } from '@/lib/exams';
-import { PLAN_KIND_AR, TRACK_AR, type PlanDayOverride, type PlanKind, type Track } from '@/lib/types';
+import { PLAN_KIND_AR, TRACK_AR, type Track } from '@/lib/types';
 import { shortName } from '@/lib/normalise';
 import { formatDate, relativeDay } from '@/lib/dates';
 import { cx } from '@/lib/cx';
@@ -46,9 +42,6 @@ function PlansScreen() {
   /* The panel narrows the list by track; «الكل» is an absent parameter. */
   const trackFilter = (sp.get('track') as Track | null) ?? null;
   const [level, setLevel] = useState('');
-  const [editing, setEditing] = useState<{ dayNo: number; kind: PlanKind } | null>(null);
-  const [draft, setDraft] = useState<PlanRow | null>(null);
-  const [confirmLevelWide, setConfirmLevelWide] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
@@ -72,11 +65,22 @@ function PlansScreen() {
   const student = eligible.find((s) => s.id === studentId) ?? null;
   const halaqa = student?.halaqaId ? db.halaqat.find((h) => h.id === student.halaqaId) ?? null : null;
 
-  /* «النظام يعرف مستوى الطالب الحالي … فيجهّز له المستوى التالي مباشرة» */
-  const suggested = student?.currentLevel != null ? nextLevel(student.currentLevel) : null;
+  /* «النظام يعرف مستوى الطالب الحالي … فيجهّز له المستوى التالي مباشرة» —
+     but only if that level is one the uploaded curriculum actually holds. The
+     client's «منهج الحفظ» carries silver 40–60 only, so proposing the next
+     level dropped every silver student on 40 straight onto an error and no
+     sheet at all. Propose the next level, fall back to the one he is on, and
+     say which of the two is on screen. */
+  const has = (n: number | null) => n !== null && student?.track
+    && db.curriculum.some((d) => d.track === student.track && d.level === n);
+  const next = student?.currentLevel != null ? nextLevel(student.currentLevel) : null;
+  const suggested = has(next) ? next
+    : has(student?.currentLevel ?? null) ? student!.currentLevel
+    : next;
+  const fellBack = suggested !== null && next !== null && suggested !== next;
+
   useEffect(() => {
     setLevel(suggested != null ? String(suggested) : '');
-    setEditing(null);
   }, [suggested, studentId]);
 
   const levelNum = level === '' ? null : Number(level);
@@ -111,17 +115,6 @@ function PlansScreen() {
            s.currentLevel != null ? `المستوى ${s.currentLevel}` : 'بلا مستوى'].join(' · '),
   })).sort((a, b) => a.label.localeCompare(b.label, 'ar')), [eligible, db.halaqat]);
 
-  const saveRow = () => {
-    if (!plan || !draft) return;
-    const o: PlanDayOverride = {
-      planId: plan.id, dayNo: draft.dayNo, kind: draft.kind,
-      fromSurah: draft.fromSurah.trim(), fromAyah: draft.fromAyah.trim(),
-      toSurah: draft.toSurah.trim(), toAyah: draft.toAyah.trim(), note: draft.note.trim(),
-    };
-    store.setPlanOverride(o);
-    setEditing(null); setDraft(null);
-  };
-
   /* ── empty states ───────────────────────────────────────────────────── */
   if (!db.curriculum.length) {
     return (
@@ -146,7 +139,7 @@ function PlansScreen() {
         panelOpen={panelOpen} onOpenPanel={() => setPanelOpen(true)}
         action={
           <div className="flex items-center gap-2">
-            {plan && availability?.ok && (
+            {plan && student && availability?.ok && (
               <a href={`/print/plan/${plan.id}`} target="_blank" rel="noreferrer">
                 <Btn variant="primary" icon={Printer}>طباعة وحفظ التاريخ</Btn>
               </a>
@@ -175,9 +168,11 @@ function PlansScreen() {
                  1 is its end (§4.2: الفضي ٥٩=جزء، ٥٧=جزآن…). Reading «40 → 39»
                  as a bug is the natural reading, so the screen says which way
                  they run instead of leaving it to be guessed. */
-              hint={suggested != null
-                ? `مستواه الحالي ${student?.currentLevel} — والتالي ${suggested}، فالمستويات تتنازل`
-                : 'لا مستوى محفوظ لهذا الطالب، فاكتبه'}>
+              hint={suggested == null
+                ? 'لا مستوى محفوظ لهذا الطالب، فاكتبه'
+                : fellBack
+                ? `مستواه الحالي ${student?.currentLevel}، والتالي ${next} لا منهج له — فالمعروض مستواه الحالي`
+                : `مستواه الحالي ${student?.currentLevel} — والتالي ${suggested}، فالمستويات تتنازل`}>
               <input className={INPUT} inputMode="numeric" value={level}
                 onChange={(e) => setLevel(e.target.value.replace(/[^\d]/g, '').slice(0, 2))} />
             </Field>
@@ -209,7 +204,7 @@ function PlansScreen() {
         </Sheet>
 
         {/* ── ٣ · المعاينة ─────────────────────────────────────────────── */}
-        {plan && availability?.ok && (
+        {plan && student && availability?.ok && (
           <>
             <Sheet className="rise mb-4">
               <div className="flex flex-wrap items-start justify-between gap-4">
@@ -230,17 +225,9 @@ function PlansScreen() {
                     {plan.printedCount > 0 && <> · سُلِّمت {relativeDay(plan.issuedAt)}</>}
                   </p>
                 </div>
-                {customised && (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Btn icon={Award} onClick={() => setConfirmLevelWide(true)}>
-                      تطبيق على كل من يأخذ المستوى
-                    </Btn>
-                    <Btn icon={RotateCcw} onClick={() => {
-                      store.restorePlan(plan.id);
-                      setToast('أُعيدت الخطة إلى المنهج الأصلي.');
-                    }}>إرجاع إلى الأصل</Btn>
-                  </div>
-                )}
+                <Link href={`/admin/follow-up/plan?student=${student.id}&level=${plan.level}`}>
+                  <Btn icon={Pencil}>تعديل هذه الخطة</Btn>
+                </Link>
               </div>
             </Sheet>
 
@@ -263,77 +250,24 @@ function PlansScreen() {
                           </td>
                           <td className="px-3 py-2.5" />
                         </tr>
-                      ) : d.rows.map((r, i) => {
-                        const on = editing?.dayNo === d.dayNo && editing?.kind === r.kind;
-                        return (
-                          <tr key={`${d.dayNo}-${r.kind}`}
-                            className={cx('border-b border-ink-150 transition-colors',
-                              on ? 'bg-brand-50' : r.overridden ? 'bg-warn-100/40' : 'hover:bg-page')}>
-                            {i === 0 ? (
-                              <td className="px-3 py-2.5 align-top font-medium text-ink-900" rowSpan={3}>
-                                <Num>{d.dayNo}</Num>
-                              </td>
-                            ) : null}
-                            <td className="px-3 py-2.5 text-panel text-ink-600">{PLAN_KIND_AR[r.kind]}</td>
-                            {on && draft ? (
-                              <>
-                                {(['fromSurah', 'fromAyah', 'toSurah', 'toAyah', 'note'] as const).map((f) => (
-                                  <td key={f} className="px-1.5 py-1.5">
-                                    <input className={cx(INPUT, 'h-8 px-2 text-panel')}
-                                      value={draft[f]}
-                                      onChange={(e) => setDraft({ ...draft, [f]: e.target.value })} />
-                                  </td>
-                                ))}
-                                <td className="whitespace-nowrap px-2 py-1.5">
-                                  <button onClick={saveRow} title="حفظ" aria-label="حفظ السطر"
-                                    className="rounded p-1.5 text-ok-700 hover:bg-ok-100"><Check size={15} /></button>
-                                  <button onClick={() => { setEditing(null); setDraft(null); }}
-                                    title="إلغاء" aria-label="إلغاء التعديل"
-                                    className="rounded p-1.5 text-ink-400 hover:bg-ink-100"><X size={15} /></button>
-                                </td>
-                              </>
-                            ) : (
-                              <>
-                                <td className="px-3 py-2.5 text-panel text-ink-800">{r.fromSurah || '—'}</td>
-                                <td className="px-3 py-2.5 text-panel"><Num>{r.fromAyah || '—'}</Num></td>
-                                <td className="px-3 py-2.5 text-panel text-ink-800">{r.toSurah || '—'}</td>
-                                <td className="px-3 py-2.5 text-panel"><Num>{r.toAyah || '—'}</Num></td>
-                                <td className="max-w-[10rem] truncate px-3 py-2.5 text-panel text-ink-500"
-                                  title={r.note}>{r.note || '—'}</td>
-                                <td className="whitespace-nowrap px-2 py-2.5 text-end">
-                                  <button onClick={() => { setEditing({ dayNo: d.dayNo, kind: r.kind }); setDraft(r); }}
-                                    title="تعديل هذا السطر" aria-label={`تعديل ${PLAN_KIND_AR[r.kind]} ليوم ${d.dayNo}`}
-                                    className="rounded p-1.5 text-ink-400 transition-colors hover:bg-ink-100 hover:text-ink-900">
-                                    <Pencil size={14} />
-                                  </button>
-                                  {i === 0 && (
-                                    <>
-                                      <button onClick={() => {
-                                        const r2 = insertDay(plan, overrides, d.dayNo);
-                                        store.updatePlan(plan.id, { dayCount: r2.dayCount, examDays: r2.examDays });
-                                        store.replacePlanOverrides(plan.id, r2.overrides);
-                                        setToast(`أُضيف يوم بعد اليوم ${d.dayNo}، وأُعيد ترقيم ما بعده.`);
-                                      }} title="إضافة يوم بعده" aria-label={`إضافة يوم بعد اليوم ${d.dayNo}`}
-                                        className="rounded p-1.5 text-ink-400 transition-colors hover:bg-brand-100 hover:text-brand-800">
-                                        <Plus size={14} />
-                                      </button>
-                                      <button onClick={() => {
-                                        const r2 = removeDay(plan, overrides, d.dayNo);
-                                        store.updatePlan(plan.id, { dayCount: r2.dayCount, examDays: r2.examDays });
-                                        store.replacePlanOverrides(plan.id, r2.overrides);
-                                        setToast(`حُذف اليوم ${d.dayNo}، وأُعيد ترقيم ما بعده.`);
-                                      }} title="حذف هذا اليوم" aria-label={`حذف اليوم ${d.dayNo}`}
-                                        className="rounded p-1.5 text-ink-400 transition-colors hover:bg-risk-100 hover:text-risk-700">
-                                        <Trash2 size={14} />
-                                      </button>
-                                    </>
-                                  )}
-                                </td>
-                              </>
-                            )}
-                          </tr>
-                        );
-                      })
+                      ) : d.rows.map((r, i) => (
+                        <tr key={`${d.dayNo}-${r.kind}`}
+                          className={cx('border-b border-ink-150 transition-colors',
+                            r.overridden ? 'bg-warn-100/40' : 'hover:bg-page')}>
+                          {i === 0 ? (
+                            <td className="px-3 py-2.5 align-top font-medium text-ink-900" rowSpan={3}>
+                              <Num>{d.dayNo}</Num>
+                            </td>
+                          ) : null}
+                          <td className="px-3 py-2.5 text-panel text-ink-600">{PLAN_KIND_AR[r.kind]}</td>
+                          <td className="px-3 py-2.5 text-panel text-ink-800">{r.fromSurah || '—'}</td>
+                          <td className="px-3 py-2.5 text-panel"><Num>{r.fromAyah || '—'}</Num></td>
+                          <td className="px-3 py-2.5 text-panel text-ink-800">{r.toSurah || '—'}</td>
+                          <td className="px-3 py-2.5 text-panel"><Num>{r.toAyah || '—'}</Num></td>
+                          <td className="max-w-[10rem] truncate px-3 py-2.5 text-panel text-ink-500"
+                            title={r.note}>{r.note || '—'}</td>
+                        </tr>
+                      ))
                     ))}
                   </tbody>
                 </table>
@@ -341,7 +275,7 @@ function PlansScreen() {
             </Sheet>
 
             <p className="mt-4 text-panel text-ink-500">
-              التعديل يُحفظ لهذا الطالب وحده، والمنهج الأصلي لا يُمَسّ — ولذلك يعمل زرّ الإرجاع دائمًا.
+              هذه الشاشة للعرض والطباعة. التعديل — لطالب واحد أو لكل من يأخذ المستوى — في «تعديل الخطة» بصفحة المتابعة.
             </p>
           </>
         )}
@@ -361,29 +295,6 @@ function PlansScreen() {
         </div>
       )}
 
-      {/* «يحتاج تأكيدًا إضافيًا لأنه يمسّ طلابًا آخرين» — §9 */}
-      <Modal open={confirmLevelWide} onClose={() => setConfirmLevelWide(false)}
-        title="تطبيق التعديل على كل من يأخذ هذا المستوى"
-        footer={
-          <>
-            <Btn onClick={() => setConfirmLevelWide(false)}>تراجع</Btn>
-            <Btn variant="danger" onClick={() => {
-              if (plan) { store.applyPlanToLevel(plan.id); setToast('حُدِّث منهج المستوى لكل من يأخذه.'); }
-              setConfirmLevelWide(false);
-            }}>تأكيد التطبيق</Btn>
-          </>
-        }>
-        <div className="space-y-3">
-          <p className="text-base2 text-ink-700">
-            سيُحدَّث منهج المستوى <Num className="font-medium">{plan?.level}</Num> في المسار{' '}
-            <span className="font-medium">{plan ? TRACK_AR[plan.track] : ''}</span> نفسه، فتظهر
-            تعديلاتك لكل طالب يأخذ هذا المستوى بعد الآن.
-          </p>
-          <p className="rounded-lg bg-warn-100 px-3.5 py-3 text-panel text-warn-700">
-            هذا يمسّ طلابًا آخرين، ولذلك يحتاج تأكيدًا إضافيًا. الخطط المطبوعة سابقًا لا تتغيّر.
-          </p>
-        </div>
-      </Modal>
     </>
   );
 }
