@@ -190,6 +190,29 @@ export function coverage(curriculum: CurriculumDay[]) {
   });
 }
 
+/**
+ * The days of a level that are not filled in.
+ *
+ * A day is incomplete when any of its three lines has no «من سورة» — that is
+ * the one field a line cannot be read without, and the client's own uploaded
+ * sheets have gaps in exactly that shape. A level printed with a gap hands a
+ * student a blank row, so the editor names the days rather than waiting for the
+ * paper to say it.
+ */
+export function incompleteDays(
+  days: CurriculumDay[], dayCount: number,
+): { day: number; missing: PlanKind[] }[] {
+  const out: { day: number; missing: PlanKind[] }[] = [];
+  for (let day = 1; day <= dayCount; day++) {
+    const missing = PLAN_KIND_ORDER.filter((kind) => {
+      const row = days.find((d) => d.dayNo === day && d.kind === kind);
+      return !row || !String(row.fromSurah ?? '').trim();
+    });
+    if (missing.length) out.push({ day, missing });
+  }
+  return out;
+}
+
 /* ── Editing — §9, «تعديل الخطة وإضافة السور» ─────────────────────────────── */
 
 /**

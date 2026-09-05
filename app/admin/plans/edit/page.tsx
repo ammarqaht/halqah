@@ -21,11 +21,13 @@ import { TopBar } from '@/components/TopBar';
 import { Sheet, SheetHead } from '@/components/Sheet';
 import { Btn, Empty, Chip, Modal, Field, INPUT } from '@/components/ui';
 import { Combobox } from '@/components/Combobox';
+import { Grid, GridCell } from '@/components/Grid';
 import { Num, juzPhrase } from '@/components/Num';
 import { usePanel } from '@/components/PanelState';
 import { store, useDB } from '@/lib/store';
 import {
   resolvePlan, levelAvailable, dailyAmountFor, removeDay, insertDay, isCustomised, draftPlan,
+  incompleteDays,
   DEFAULT_DAY_COUNT, coverage, type PlanRow,
 } from '@/lib/curriculum';
 import { ajzaExact } from '@/lib/exams';
@@ -484,6 +486,20 @@ function LevelCurriculumEditor({ onToast }: { onToast: (s: string) => void }) {
   const affected = levelNum === null ? 0
     : db.students.filter((s) => s.track === track && s.currentLevel === levelNum).length;
 
+  /* Which days are not filled in. A gap prints as a blank row on a student's
+     sheet, so it is named here rather than discovered on the paper. */
+  const gaps = useMemo(
+    () => (levelNum === null ? [] : incompleteDays(draft, dayCount)), [draft, dayCount, levelNum]);
+
+  /* Jumping to a gap puts the caret in the first field it is missing, which is
+     «من سورة» — the column the grid completes. */
+  const goToGap = (day: number, kind: PlanKind) => {
+    const r = (day - 1) * KINDS.length + KINDS.indexOf(kind);
+    const el = document.querySelector<HTMLInputElement>(`[data-cell="${r}:0"]`);
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(() => { el?.focus(); el?.select(); }, 320);
+  };
+
   return (
     <>
       <Sheet className="rise mb-4">
@@ -522,10 +538,39 @@ function LevelCurriculumEditor({ onToast }: { onToast: (s: string) => void }) {
 
       {levelNum !== null && draft.length > 0 && (
         <>
+          {gaps.length > 0 && (
+            <div className="rise mb-3 rounded-xl border border-warn-200 bg-warn-100 p-4">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle size={17} className="mt-0.5 shrink-0 text-warn-700" />
+                <div className="min-w-0">
+                  <p className="text-base2 font-medium text-warn-700">
+                    <Num>{gaps.length}</Num> {gaps.length === 1 ? 'يوم ناقص' : gaps.length === 2 ? 'يومان ناقصان' : 'أيام ناقصة'} في هذا المستوى
+                  </p>
+                  <p className="mt-1 text-panel text-warn-700/85">
+                    اليوم الناقص يُطبع سطرًا فارغًا في ورقة الطالب. اضغط رقم اليوم لتنتقل إليه ويُملأ.
+                  </p>
+                  <div className="mt-2.5 flex flex-wrap gap-1.5">
+                    {gaps.map((g) => (
+                      <button key={g.day} onClick={() => goToGap(g.day, g.missing[0])}
+                        title={`ينقصه: ${g.missing.map((k) => PLAN_KIND_AR[k]).join('، ')}`}
+                        className="rounded-lg border border-warn-200 bg-paper px-2.5 py-1 text-panel text-warn-700 transition-colors hover:border-warn-700 hover:bg-warn-100">
+                        اليوم <Num>{g.day}</Num>
+                        {g.missing.length < KINDS.length && (
+                          <span className="text-micro text-ink-500"> · <Num>{g.missing.length}</Num></span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="rise mb-3 flex flex-wrap items-center justify-between gap-3">
             <p className="text-panel text-ink-600">
               <Num className="font-medium text-ink-900">{dayCount}</Num> يوم عمل ·{' '}
               <Num className="font-medium text-ink-900">{draft.length}</Num> سطرًا
+              {gaps.length === 0 && <span className="text-ok-700"> · مكتمل</span>}
             </p>
             <Btn variant="primary" icon={Save} disabled={!dirty} onClick={() => setConfirm(true)}>
               حفظ المنهج
@@ -534,6 +579,7 @@ function LevelCurriculumEditor({ onToast }: { onToast: (s: string) => void }) {
 
           <Sheet className="rise" pad={false}>
             <div className="overflow-x-auto">
+              <Grid rows={dayCount * KINDS.length} cols={FIELDS.length}>
               <table className="w-full min-w-[46rem] border-collapse text-body">
                 <thead>
                   <tr className="border-b border-ink-200 bg-page">
@@ -547,6 +593,12 @@ function LevelCurriculumEditor({ onToast }: { onToast: (s: string) => void }) {
                     KINDS.map((kind, i) => {
                       const row = draft.find((d) => d.dayNo === dayNo && d.kind === kind);
                       if (!row) return null;
+                      /* One flat index across the whole sheet: the grid walks
+                         off the end of a row onto the next, the way Tab does. */
+                      const r = (dayNo - 1) * KINDS.length + i;
+                      const above = r === 0 ? undefined
+                        : draft.find((d) => d.dayNo === (i === 0 ? dayNo - 1 : dayNo)
+                                         && d.kind === KINDS[(i + KINDS.length - 1) % KINDS.length]);
                       return (
                         <tr key={`${dayNo}-${kind}`} className="border-b border-ink-150">
                           {i === 0 ? (
@@ -555,10 +607,14 @@ function LevelCurriculumEditor({ onToast }: { onToast: (s: string) => void }) {
                             </td>
                           ) : null}
                           <td className="px-3 py-2.5 text-panel text-ink-600">{PLAN_KIND_AR[kind]}</td>
-                          {FIELDS.map((f) => (
+                          {FIELDS.map((f, c) => (
                             <td key={f} className="px-1.5 py-1.5">
-                              <input className={cx(INPUT, 'h-8 px-2 text-panel')} value={row[f] ?? ''}
-                                onChange={(e) => edit(dayNo, kind, f, e.target.value)} />
+                              <GridCell row={r} col={c} value={row[f] ?? ''}
+                                onChange={(v) => edit(dayNo, kind, f, v)}
+                                kind={f === 'fromSurah' || f === 'toSurah' ? 'surah'
+                                    : f === 'fromAyah' || f === 'toAyah' ? 'ayah' : 'text'}
+                                fillDown={above?.[f] ?? undefined}
+                                ariaLabel={`${HEADS[c + 2]} — ${PLAN_KIND_AR[kind]} ليوم ${dayNo}`} />
                             </td>
                           ))}
                         </tr>
@@ -567,6 +623,7 @@ function LevelCurriculumEditor({ onToast }: { onToast: (s: string) => void }) {
                   ))}
                 </tbody>
               </table>
+              </Grid>
             </div>
           </Sheet>
         </>

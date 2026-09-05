@@ -5,9 +5,11 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_DAY_COUNT, DEFAULT_EXAM_DAYS, dailyAmountFor, resolvePlan,
   levelAvailable, coverage, removeDay, insertDay, matchesCurriculum, isCustomised,
+  incompleteDays,
 } from './curriculum';
 import { normaliseAyah, normaliseSurah, parseCurriculumSheet } from './importers/curriculum';
-import type { CurriculumDay, PlanDayOverride, StudentPlan } from './types';
+import type { CurriculumDay, PlanDayOverride, PlanKind, StudentPlan } from './types';
+import { PLAN_KIND_ORDER } from './types';
 
 const day = (level: number, dayNo: number, kind: CurriculumDay['kind'], over: Partial<CurriculumDay> = {}): CurriculumDay => ({
   track: 'GOLDEN', level, dayNo, kind,
@@ -227,5 +229,30 @@ describe('parsing «منهج الحفظ» — §5.4', () => {
     expect(p.issues).toHaveLength(1);
     expect(p.issues[0].message).toContain('المستوى 30');
     expect(p.issues[0].message).toContain('٢٤');
+  });
+});
+
+describe('naming the days a level has not filled in', () => {
+  const line = (dayNo: number, kind: PlanKind, fromSurah: string): CurriculumDay => ({
+    track: 'SILVER', level: 40, dayNo, kind,
+    fromSurah, fromAyah: '1', toSurah: fromSurah, toAyah: 'آخر', note: '',
+  });
+
+  it('counts a day incomplete when any line has no «من سورة»', () => {
+    const days = [
+      ...PLAN_KIND_ORDER.map((k) => line(1, k, 'العنكبوت')),   // complete
+      line(2, 'MURAJAA_KUBRA', 'الروم'), line(2, 'DARS', ''),   // two lines short
+    ];
+    const gaps = incompleteDays(days, 3);
+    expect(gaps.map((g) => g.day)).toEqual([2, 3]);
+    /* Day 2 is missing the small revision entirely and the lesson's surah. */
+    expect(gaps[0].missing).toEqual(['MURAJAA_SUGHRA', 'DARS']);
+    /* Day 3 has no rows at all, so all three are missing. */
+    expect(gaps[1].missing).toHaveLength(3);
+  });
+
+  it('a level with every line filled has no gaps', () => {
+    const days = [1, 2].flatMap((n) => PLAN_KIND_ORDER.map((k) => line(n, k, 'الملك')));
+    expect(incompleteDays(days, 2)).toEqual([]);
   });
 });
