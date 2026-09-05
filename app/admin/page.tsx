@@ -62,19 +62,6 @@ export default function OverviewPage() {
             sub="أرقام هوية قصيرة أو مكرّرة" />
         </div>
 
-        <div className="mb-4 grid gap-4 md:grid-cols-3">
-          {[
-            { t: 'المسارات', d: d.tracks, c: ['bg-sage-500', 'bg-info-500', 'bg-warn-500'] },
-            { t: 'المراحل', d: d.stages, c: ['bg-brand-700', 'bg-brand-400', 'bg-sage-500', 'bg-ink-300'] },
-            { t: 'الجنسية', d: d.nationalities, c: ['bg-brand-700', 'bg-ink-300'] },
-          ].filter((b) => Object.keys(b.d).length).map((b, i) => (
-            <Sheet key={b.t} className="rise">
-              <h3 className="mb-4 text-xs2 font-medium text-ink-600">{b.t}</h3>
-              <Split data={b.d} colors={b.c} />
-            </Sheet>
-          ))}
-        </div>
-
         <Sheet className="rise mb-4">
           <SheetHead title="تقدّم الحلقات"
             meta="متوسّط أوجه الحفظ والمراجعة لكل طالب، من آخر ملف مرفوع"
@@ -118,6 +105,19 @@ export default function OverviewPage() {
             </table>
           </div>
         </Sheet>
+
+        <div className="mb-4 grid gap-4 md:grid-cols-3">
+          {[
+            { t: 'المسارات', d: d.tracks, c: ['bg-sage-500', 'bg-info-500', 'bg-warn-500'] },
+            { t: 'المراحل', d: d.stages, c: ['bg-brand-700', 'bg-brand-400', 'bg-sage-500', 'bg-ink-300'] },
+            { t: 'الجنسية', d: d.nationalities, c: ['bg-brand-700', 'bg-ink-300'] },
+          ].filter((b) => Object.keys(b.d).length).map((b, i) => (
+            <Sheet key={b.t} className="rise">
+              <h3 className="mb-4 text-xs2 font-medium text-ink-600">{b.t}</h3>
+              <Split data={b.d} colors={b.c} />
+            </Sheet>
+          ))}
+        </div>
 
         <div className="rise grid grid-cols-2 gap-3 lg:grid-cols-5">
           {[
