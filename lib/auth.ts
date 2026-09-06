@@ -7,7 +7,19 @@ import bcrypt from 'bcryptjs';
 import { db } from '@/lib/db';
 
 const COOKIE = 'halqah_session';
-const DAYS = 7;
+
+/**
+ * How long a session survives with NOTHING happening.
+ *
+ * The token itself expires after this, and the cookie with it — so an idle
+ * timeout enforced only in the browser (a redirect anyone can skip by pressing
+ * Back) is not what this is. The server stops accepting the cookie.
+ *
+ * Every request the supervisor makes while working re-issues it, so the clock
+ * measures idleness rather than session length: he is never signed out
+ * mid-sentence, and a laptop left open on the mosque desk is signed out.
+ */
+export const IDLE_MINUTES = 5;
 
 function secret() {
   const s = process.env.AUTH_SECRET;
@@ -28,7 +40,7 @@ export async function createSession(user: { id: string; fullName: string }) {
     .setSubject(user.id)
     .setAudience('admin')
     .setIssuedAt()
-    .setExpirationTime(`${DAYS}d`)
+    .setExpirationTime(`${IDLE_MINUTES}m`)
     .sign(secret());
 
   (await cookies()).set(COOKIE, token, {
@@ -36,7 +48,7 @@ export async function createSession(user: { id: string; fullName: string }) {
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
-    maxAge: DAYS * 24 * 60 * 60,
+    maxAge: IDLE_MINUTES * 60,
   });
 }
 
