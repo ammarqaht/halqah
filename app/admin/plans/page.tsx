@@ -24,7 +24,7 @@ import { Combobox } from '@/components/Combobox';
 import { Num, juzPhrase } from '@/components/Num';
 import { usePanel } from '@/components/PanelState';
 import { store, useDB } from '@/lib/store';
-import { resolvePlan, levelAvailable, dailyAmountFor, draftPlan } from '@/lib/curriculum';
+import { resolvePlan, levelAvailable, dailyAmountFor, draftPlan, dayCountFor } from '@/lib/curriculum';
 import { nextLevel, ajzaForLevel } from '@/lib/exams';
 import { PLAN_KIND_AR, TRACK_AR, type Track } from '@/lib/types';
 import { shortName } from '@/lib/normalise';
@@ -100,14 +100,13 @@ function PlansScreen() {
     const track = student.track as Exclude<typeof student.track, null>;
     return store.planFor(student.id, track, levelNum)
       ?? draftPlan({ studentId: student.id, track, level: levelNum,
-                     dailyAmount: dailyAmountFor(track) });
-  }, [student, levelNum, availability?.ok, db.plans]);
+                     dailyAmount: dailyAmountFor(track),
+                     dayCount: dayCountFor(track, levelNum, db.curriculum) });
+  }, [student, levelNum, availability?.ok, db.plans, db.curriculum]);
 
-  const overrides = useMemo(
-    () => db.planOverrides.filter((o) => o.planId === plan?.id), [db.planOverrides, plan]);
   const days = useMemo(
-    () => (plan ? resolvePlan(plan, db.curriculum, db.planOverrides) : []),
-    [plan, db.curriculum, db.planOverrides]);
+    () => (plan ? resolvePlan(plan, db.curriculum) : []),
+    [plan, db.curriculum]);
 
   const studentOptions = useMemo(() => eligible.map((s) => ({
     value: s.id,
@@ -238,8 +237,7 @@ function PlansScreen() {
                         </tr>
                       ) : d.rows.map((r, i) => (
                         <tr key={`${d.dayNo}-${r.kind}`}
-                          className={cx('border-b border-ink-150 transition-colors',
-                            r.overridden ? 'bg-warn-100/40' : 'hover:bg-page')}>
+                          className="border-b border-ink-150 transition-colors hover:bg-page">
                           {i === 0 ? (
                             <td className="px-3 py-2.5 align-top font-medium text-ink-900" rowSpan={3}>
                               <Num>{d.dayNo}</Num>

@@ -16,7 +16,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-  ClipboardCheck, AlertTriangle, ArrowRight, Check, Coins, FileText, Plus, X,
+  ClipboardCheck, AlertTriangle, ArrowRight, Check, Coins, FileText, Plus, Trash2, X,
 } from 'lucide-react';
 import { TopBar } from '@/components/TopBar';
 import { Sheet, SheetHead } from '@/components/Sheet';
@@ -31,6 +31,7 @@ import {
   suggestionAfter,
 } from '@/lib/exams';
 import { type Exam } from '@/lib/types';
+import { SURAHS } from '@/lib/surahs';
 import { shortName } from '@/lib/normalise';
 import { isoDate } from '@/lib/dates';
 import { cx } from '@/lib/cx';
@@ -58,6 +59,27 @@ function clampDigits(raw: string, max: number, opts: { decimal?: boolean } = {})
 
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 
+/* ── the questions he asked ────────────────────────────────────────────────
+   The sheet he fills at the desk: one line per question, and the two counters
+   that decide the score are counted per question rather than tallied in his
+   head. The totals below add them up, so «إجمالي الأخطاء» is a sum he can see
+   the working of instead of a number he arrived at with a pen.
+
+   Five blank lines to start — the usual sitting — and «إضافة سؤال» for a
+   longer one. A line nobody typed anything into is not a question and is
+   dropped on save rather than stored as an empty row. */
+type QRow = {
+  id: string; surah: string; ayahFrom: string;
+  errors: string; warnings: string; note: string;
+};
+
+const STARTING_ROWS = 5;
+const blankRow = (): QRow =>
+  ({ id: uid(), surah: '', ayahFrom: '', errors: '', warnings: '', note: '' });
+const freshRows = () => Array.from({ length: STARTING_ROWS }, blankRow);
+const isBlankRow = (q: QRow) =>
+  !q.surah.trim() && !q.ayahFrom.trim() && q.errors === '' && q.warnings === '' && !q.note.trim();
+
 type Saved = { exam: Exam; studentName: string; nextLevel: number | null };
 
 export default function RecordExam() {
@@ -70,8 +92,10 @@ export default function RecordExam() {
   const [takenOn, setTakenOn] = useState(isoDate(new Date()));
   const [level, setLevel] = useState('');
   const [ajza, setAjza] = useState('');
-  const [errors, setErrors] = useState('');
-  const [warnings, setWarnings] = useState('');
+  const [questions, setQuestions] = useState<QRow[]>(freshRows);
+  /** Null while a total is following the questions; a string once he types. */
+  const [errorsOverride, setErrorsOverride] = useState<string | null>(null);
+  const [warningsOverride, setWarningsOverride] = useState<string | null>(null);
   const [tajweedErrors, setTajweedErrors] = useState('');
   /** Null while the score is following the counters; a number once he types. */
   const [scoreOverride, setScoreOverride] = useState<string | null>(null);
@@ -104,6 +128,34 @@ export default function RecordExam() {
   useEffect(() => {
     setAjza(suggestedAjza !== null ? String(suggestedAjza) : '');
   }, [suggestedAjza]);
+
+  /* ── the questions, and the totals they add up to ─────────────────────────
+     A row he typed nothing into is not a question. Everything below counts
+     `asked`, so five untouched lines cost nothing and change nothing. */
+  const asked = useMemo(() => questions.filter((q) => !isBlankRow(q)), [questions]);
+  const askedTotals = useMemo(() => asked.reduce(
+    (a, q) => ({
+      errors: a.errors + (Number(q.errors) || 0),
+      warnings: a.warnings + (Number(q.warnings) || 0),
+    }),
+    { errors: 0, warnings: 0 }), [asked]);
+
+  /* Editing any question re-syncs the totals: touching a row is the clearest
+     statement that the sum is what he means, so it takes the override back. */
+  const patchQuestion = (id: string, p: Partial<QRow>) => {
+    setQuestions((rows) => rows.map((q) => (q.id === id ? { ...q, ...p } : q)));
+    setErrorsOverride(null); setWarningsOverride(null); setScoreOverride(null);
+  };
+  const dropQuestion = (id: string) => {
+    setQuestions((rows) => (rows.length > 1 ? rows.filter((q) => q.id !== id) : rows));
+    setErrorsOverride(null); setWarningsOverride(null); setScoreOverride(null);
+  };
+
+  /* The totals follow the questions and stay typable — §11, «النظام يقترح،
+     وأنت تقرّر». That matters for a sitting recorded later from a paper that
+     kept only the two totals and not the questions behind them. */
+  const errors = errorsOverride ?? (asked.length ? String(askedTotals.errors) : '');
+  const warnings = warningsOverride ?? (asked.length ? String(askedTotals.warnings) : '');
 
   const counts = {
     errors: Number(errors) || 0,
@@ -154,6 +206,25 @@ export default function RecordExam() {
   const topicOptions = db.tajweedTopics.filter((t) => t.active)
     .map((t) => ({ value: t.name, label: t.name }));
 
+  /* «يقترح النظام السور الداخلة في مستواه لتختار منها بدل الكتابة» — the
+     level's own surahs first and marked as such, then the rest of the mushaf,
+     because an examiner may well ask outside the level to test retention. */
+  const surahOptions = useMemo(() => {
+    const inLevel = new Set<string>();
+    if (student?.track && levelNum !== null) {
+      for (const d of db.curriculum) {
+        if (d.track !== student.track || d.level !== levelNum) continue;
+        if (d.fromSurah) inLevel.add(d.fromSurah);
+        if (d.toSurah) inLevel.add(d.toSurah);
+      }
+    }
+    return [
+      ...[...inLevel].map((n) => ({ value: n, label: n, hint: 'في مستواه' })),
+      ...SURAHS.map((s) => s.name).filter((n) => !inLevel.has(n))
+        .map((n) => ({ value: n, label: n })),
+    ];
+  }, [db.curriculum, student, levelNum]);
+
   /* Level and juz come straight from the database when a student is chosen, and
      the record is worthless without them: the level is what tells us later which
      levels he has been examined on, and the juz count is what §4.8 gates
@@ -181,7 +252,8 @@ export default function RecordExam() {
 
   const reset = () => {
     setStudentId(''); setType('BADGE_GOLDEN'); setTakenOn(isoDate(new Date()));
-    setLevel(''); setAjza(''); setErrors(''); setWarnings(''); setTajweedErrors('');
+    setLevel(''); setAjza(''); setQuestions(freshRows()); setTajweedErrors('');
+    setErrorsOverride(null); setWarningsOverride(null);
     setScoreOverride(null); setPassOverride(null); setPointsOverride(null);
     setPointsPaid(true); setTopics([]); setNote(''); setExaminer(''); setSaved(null);
   };
@@ -211,6 +283,17 @@ export default function RecordExam() {
       createdAt: new Date().toISOString(),
     };
     store.saveExam(exam);
+    /* The questions belong to the exam, so they are written with it and under
+       its id. Blank rows never become records — an empty line is a line he did
+       not use, not a question with no answer. A tajweed sitting has none. */
+    store.setQuestions(exam.id, type === 'TAJWEED' ? [] : asked.map((q, i) => ({
+      id: q.id, examId: exam.id, seq: i + 1,
+      surah: q.surah.trim(), ayahFrom: q.ayahFrom.trim(), ayahTo: '',
+      errors: Number(q.errors) || 0,
+      warnings: Number(q.warnings) || 0,
+      tajweedErrors: 0,
+      note: q.note.trim(),
+    })));
     const after = suggestionAfter(exam, exam.level);
     setSaved({ exam, studentName: student.fullName, nextLevel: after?.printLevel ?? null });
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -396,7 +479,7 @@ export default function RecordExam() {
               <SheetHead title={levelled ? 'المستوى والدرجة' : 'الدرجة'}
                 meta={type === 'TAJWEED'
                   ? 'اختبار التجويد يُسجَّل بدرجة من ١٠ كما في ملفكم — بلا مستوى ولا أجزاء'
-                  : 'الدرجة تُحسب من العدّادات، وتبقى قابلة للتعديل'} />
+                  : 'الأسئلة تُجمَع في الإجماليّين، والإجماليّان يحسبان الدرجة — وكلها قابلة للتعديل'} />
 
               {levelled && <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="المستوى · مطلوب"
@@ -432,14 +515,89 @@ export default function RecordExam() {
                 </p>
               )}
 
+              {/* ── الأسئلة ─────────────────────────────────────────────────
+                  One line per question, and the two counters that decide the
+                  score counted where they happened. The totals underneath are
+                  their sum, so the arithmetic is on screen rather than in his
+                  head — and the questions are kept, so next time he can avoid
+                  «أن تُعيد عليه المواضع نفسها». */}
               {type !== 'TAJWEED' && (
-                <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                <div className="mt-5">
+                  <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+                    <span className="text-xs2 font-medium text-ink-600">أسئلة الاختبار</span>
+                    <span className="text-micro text-ink-500">
+                      {asked.length === 0
+                        ? 'اترك الأسطر فارغة إن كنت تسجّل الإجمالي وحده'
+                        : <><Num className="font-medium text-ink-800">{asked.length}</Num> سؤالًا مُدخلًا</>}
+                    </span>
+                  </div>
+
+                  <div className="overflow-x-auto rounded-xl border border-ink-200">
+                    <table className="w-full min-w-[42rem] border-collapse text-body">
+                      <thead>
+                        <tr className="border-b border-ink-200 bg-page/50 text-cap text-ink-500">
+                          {['#', 'السورة', 'من آية', 'الأخطاء', 'التنبيهات', 'ملاحظة', ''].map((h) => (
+                            <th key={h} className="px-2.5 py-2.5 text-start font-medium">{h}</th>))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {questions.map((q, i) => (
+                          <tr key={q.id} className="border-b border-ink-150 last:border-0">
+                            <td className="px-2.5 py-2 text-panel text-ink-500"><Num>{i + 1}</Num></td>
+                            <td className="min-w-[10rem] px-1.5 py-1.5">
+                              <Combobox value={q.surah} onChange={(v) => patchQuestion(q.id, { surah: v })}
+                                options={surahOptions} creatable createLabel="سورة"
+                                placeholder="السورة" searchPlaceholder="اكتب اسم السورة…" />
+                            </td>
+                            {([
+                              ['ayahFrom', 'الآية'],
+                              ['errors', '0'],
+                              ['warnings', '0'],
+                            ] as const).map(([f, ph]) => (
+                              <td key={f} className="w-24 px-1.5 py-1.5">
+                                <input className={cx(INPUT, 'h-9 px-2 text-panel')} inputMode="numeric"
+                                  value={q[f]} placeholder={ph}
+                                  onChange={(e) => patchQuestion(q.id, { [f]: e.target.value.replace(/[^\d]/g, '') })} />
+                              </td>
+                            ))}
+                            <td className="min-w-[10rem] px-1.5 py-1.5">
+                              <input className={cx(INPUT, 'h-9 px-2 text-panel')} value={q.note}
+                                placeholder="…"
+                                onChange={(e) => patchQuestion(q.id, { note: e.target.value })} />
+                            </td>
+                            <td className="px-1.5 py-1.5 text-end">
+                              {questions.length > 1 && (
+                                <button type="button" onClick={() => dropQuestion(q.id)}
+                                  title="حذف السؤال" aria-label={`حذف السؤال ${i + 1}`}
+                                  className="rounded p-1.5 text-ink-400 transition-colors hover:bg-risk-100 hover:text-risk-700">
+                                  <Trash2 size={15} />
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <button type="button" onClick={() => setQuestions((r) => [...r, blankRow()])}
+                    className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-ink-300 px-3 py-2.5 text-panel text-ink-600 transition-colors hover:border-brand-400 hover:bg-brand-50 hover:text-brand-800">
+                    <Plus size={16} strokeWidth={2.2} /> إضافة سؤال
+                  </button>
+                </div>
+              )}
+
+              {type !== 'TAJWEED' && (
+                <div className="mt-5 grid gap-4 sm:grid-cols-3">
                   {([
-                    ['عدد الأخطاء', errors, setErrors, '٢ درجة لكل خطأ'],
-                    ['التنبيهات', warnings, setWarnings, 'نصف درجة لكل تنبيه'],
-                    ['الأخطاء التجويدية', tajweedErrors, setTajweedErrors, 'درجة واحدة لكل خطأ'],
-                  ] as const).map(([label, val, set, hint]) => (
-                    <Field key={label} label={label} hint={hint}>
+                    ['إجمالي الأخطاء', errors, setErrorsOverride, '٢ درجة لكل خطأ', true],
+                    ['إجمالي التنبيهات', warnings, setWarningsOverride, 'نصف درجة لكل تنبيه', true],
+                    ['الأخطاء التجويدية', tajweedErrors, setTajweedErrors, 'درجة واحدة لكل خطأ', false],
+                  ] as const).map(([label, val, set, hint, summed]) => (
+                    <Field key={label} label={label}
+                      hint={summed && asked.length > 0
+                        ? `مجموع الأسئلة — اكتب فوقه لتتجاوزه · ${hint}`
+                        : hint}>
                       <input className={INPUT} inputMode="numeric" value={val} placeholder="0"
                         onChange={(e) => { set(e.target.value.replace(/[^\d]/g, '')); setScoreOverride(null); }} />
                     </Field>

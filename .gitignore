@@ -26,3 +26,6 @@ yarn-error.log*
 # client data — real student records never enter version control
 *.xlsx
 *.xls
+
+# local tooling — the dev-server launch config, not part of the app
+.claude/

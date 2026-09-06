@@ -15,8 +15,10 @@ export type Halaqa = {
   teacher: string;
   mosque: string;
   timeSlot: string;    // العصر · المغرب …
-  /** A halaqa normally runs one track. Set here, it can be applied to every
-      student in it at once instead of one by one. */
+  /** A DEFAULT ONLY — what a student newly added to this halaqa starts on.
+      The track belongs to the student, not to the teacher: one halaqa may
+      legitimately hold golden, silver and talqeen students side by side.
+      Nothing here is ever pushed onto a roster that already exists. */
   track?: Track | null;
   notes?: string;
 };
@@ -215,11 +217,14 @@ export const SEED_TAJWEED_TOPIC = 'النون الساكنة والتنوين';
 
 /* ── Curriculum & plans — SPEC.md §3.2/§3.3, PDF §9 (إد-٥-أ) ──────────────────
    The curriculum is reference data, loaded once from «منهج الحفظ.xlsx» and
-   rarely touched. A student's plan is a THIN layer over it: the plan records
-   which level was issued and when, and only the days that differ from the
-   curriculum are stored. That is what makes «لا يُفقد الأصل أبدًا» true —
-   deleting the overrides restores the original, because the original was never
-   overwritten. */
+   edited per LEVEL. A plan is a THIN layer over it: it records which level was
+   issued to whom and when, and nothing about the days themselves.
+
+   There is no per-student edit. A level's sheet is one sheet, the same for
+   everyone who takes it, so there is exactly one place a day can be changed —
+   «تعديل خطة كاملة للطلاب كلهم». Changing it there reaches every student who
+   takes that level from then on; sheets already printed are paper and do not
+   change. */
 
 export type PlanKind = 'DARS' | 'MURAJAA_SUGHRA' | 'MURAJAA_KUBRA';
 
@@ -260,26 +265,14 @@ export type StudentPlan = {
       «تأخّر في مستواه» alert measures from. */
   issuedAt: string;
   issuedBy: string | null;
-  /** How many working days this student's sheet runs to. 24 unless edited. */
+  /** How many working days the sheet runs to — taken from the level's own
+      curriculum when the plan is made, 24 when that level says nothing. */
   dayCount: number;
   examDays: ExamDayMap;
-  /** Half a page for Silver, a page for Golden — overridable per student
-      «لطالب يحتاج تخفيفًا أو زيادة عن مقرّر مساره المعتاد». */
+  /** Half a page for Silver, a page for Golden. */
   dailyAmount: string;
   printedCount: number;
   createdAt: string;
-};
-
-/** Only the rows that DIFFER from the curriculum. One per (day, kind). */
-export type PlanDayOverride = {
-  planId: string;
-  dayNo: number;
-  kind: PlanKind;
-  fromSurah: string;
-  fromAyah: string;
-  toSurah: string;
-  toAyah: string;
-  note: string;
 };
 
 /* ── On-site exam — SPEC.md §3.4, PDF §9 (إد-٥-ج) ─────────────────────────────

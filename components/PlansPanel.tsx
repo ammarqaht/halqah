@@ -42,14 +42,8 @@ export function PlansPanel({ onClose }: { onClose: () => void }) {
         <PanelItem active={onCurriculum} onClick={() => router.push('/admin/plans/curriculum')}>منهج الحفظ</PanelItem>
       </PanelGroup>
 
-      {onEdit && (
-        <PanelGroup label="نطاق التعديل">
-          <PanelItem active={sp.get('scope') !== 'level'}
-            onClick={() => router.push('/admin/plans/edit?scope=student')}>خطة طالب معيّن</PanelItem>
-          <PanelItem active={sp.get('scope') === 'level'}
-            onClick={() => router.push('/admin/plans/edit?scope=level')}>كل من يأخذ المستوى</PanelItem>
-        </PanelGroup>
-      )}
+      {/* No «نطاق التعديل» group: there is one scope now — the level, for
+          everyone who takes it. A per-student sheet no longer exists. */}
 
       {onPrint && (
         <PanelGroup label="مسار الطالب">
@@ -70,7 +64,7 @@ export function PlansPanel({ onClose }: { onClose: () => void }) {
             لا منهج محفوظ بعد. ارفع ملف «منهج الحفظ» من الصفحة الرئيسية.
           </p>
         ) : cover.map((c) => (
-          <button key={c.track} onClick={() => router.push(`/admin/plans/edit?scope=level&track=${c.track}`)}
+          <button key={c.track} onClick={() => router.push(`/admin/plans/edit?track=${c.track}`)}
             className="flex w-full items-baseline justify-between rounded-lg px-1.5 py-1.5 text-start transition-colors hover:bg-ink-100">
             <span className="text-panel text-ink-700">{TRACK_AR[c.track]}</span>
             <span className="text-micro text-ink-500">

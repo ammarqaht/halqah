@@ -129,10 +129,23 @@ halaqat
   teacher_id     → teachers.id
   mosque         text not null          -- «جامع محمد العبدالكريم حي أحد»
   time_slot      text not null          -- «العصر» | «المغرب» …
+  track          track_enum NULL        -- DEFAULT ONLY — see the note below
   notes          text
   active         bool default true
   index (mosque, time_slot), index (teacher_id)
+```
 
+> **A halaqa does not have a track — its students do.** `halaqat.track` is a
+> *default*: the value a newly added student in that circle starts on, which the
+> supervisor is free to change on the student. It is never written across a
+> roster, and one halaqa may hold golden, silver and talqeen students at once.
+> The track is edited **only** from the student's own card (§6.2), and every
+> screen that needs one — plans, exams, points — reads `students.track`.
+> Changing a student's track clears a `current_level` the new track does not
+> contain (silver runs 60→1, golden 30→1, talqeen has none); the supervisor
+> picks the real level, the system does not guess it.
+
+```
 students
   id
   full_name      text not null
@@ -217,20 +230,16 @@ student_plans
   id, student_id, track, level
   issued_at    timestamptz not null    -- «متى أعطيته الورقة» — feeds the "late" alert
   issued_by    → admin_users.id
-  is_customised bool default false
+  day_count    int not null            -- taken from the level's own curriculum
   printed_count int default 0
   index (student_id, issued_at desc)
-
-student_plan_days            -- only rows that differ from curriculum_days
-  id, student_plan_id, day_no, kind, from_surah, from_ayah, to_surah, to_ayah, note
-  unique (student_plan_id, day_no, kind)
 ```
 
-**Resolution rule:** a plan renders as `curriculum_days` LEFT JOIN `student_plan_days` — the override wins per (day, kind). This is what makes "لا يُفقد الأصل أبدًا" true: deleting the override rows restores the original.
+**Resolution rule:** a plan renders as `curriculum_days` for its (track, level), and nothing else. There is **no `student_plan_days` table and no override layer** — a plan records who was issued which level and when, never a copy of the days.
 
-Editing scope (`إد-٥-أ` in the PDF):
-- *This student only* (default) → write `student_plan_days`.
-- *Everyone on this level* → write `curriculum_days`, require a second confirmation, and write an `audit_log` row.
+**Editing scope (`إد-٥-أ` in the PDF): one scope, the level.** «تعديل خطة كاملة للطلاب كلهم» — a level's sheet is one sheet, so a day is edited once, on `curriculum_days`, behind a second confirmation and an `audit_log` row, and it reaches everyone who takes that level from then on. Sheets already printed are paper and do not change.
+
+There is deliberately **no per-student edit.** It is the one thing that could give two students on level 26 two different papers, and with it went the whole override layer: `setPlanOverride`, `restorePlan`, `applyPlanToLevel`, `removeDay`/`insertDay` and the `overridden` flag on a rendered row. Days are added and removed by editing the level, and `dayCountFor(track, level, curriculum)` is how a plan learns the new length — a level extended to 26 days hands out 26 rather than silently printing the first 24.
 
 ### 3.4 Exams
 
@@ -419,7 +428,7 @@ Silver even levels sit mid-juz and have no whole-juz value — return `null`, do
 day 12 → BADGE_GOLDEN   (half the level)
 day 24 → BADGE_DIAMOND  (the whole level; passing it advances to the next juz)
 ```
-Both are movable per plan (`student_plan_days`), but these are the defaults and they come straight from the curriculum file.
+These are the defaults and they come straight from the curriculum file. They are **not** movable per student — nothing is; a level's badge days are the level's.
 
 ### 4.4 Score from error counters
 ```ts
@@ -632,19 +641,24 @@ the rail carries seven destinations rather than eight.
 - `+ إضافة حلقة`, and a pencil on each row to edit one.
 - Every halaqa with its student count; selecting one filters the work area.
 - `بلا حلقة` appears only when such students exist.
-- A `المرحلة` group.
-- Track and status filters were **removed** at the client's request: a halaqa is
-  normally one track, and every student is active, so both groups were noise.
+- A `المسار` group and a `المرحلة` group.
+- The status filter stays **removed** at the client's request: every student is
+  active, so the group was noise. `المسار` is **back**: a halaqa is no longer
+  tied to a track, so golden and silver sit side by side in one circle and this
+  is how either is reached — inside a halaqa or across all of them.
 
 **Work area**
 - With no halaqa selected: the full roster.
 - With one selected: the page becomes **that halaqa's file** — a header card with
-  the teacher, the track(s) present as chips beside the name, the time slot,
-  the student count and an edit button; then its students.
+  the teacher, the track(s) present as counted chips beside the name, the time
+  slot, the student count and an edit button; then its students. The chips are
+  counted over the halaqa's whole roster, not the filtered rows: the card
+  describes the circle, and must not shrink when a track filter is on.
 
 **Roster columns** — الطالب · رقم الهوية · المسار · الحلقة · الصف · الجنسية ·
 جوال ولي الأمر. Two rules keep it readable:
-- Inside a halaqa, **المسار and الحلقة are dropped** — they repeat on every row.
+- Inside a halaqa, **الحلقة is dropped** — it repeats on every row. **المسار
+  stays**: it is the student's own, and its rows no longer all carry the same one.
 - **الحالة has no column.** A column identical on 102 rows carries nothing; the
   exception does, so a non-active student wears a chip beside their name.
 - Teacher names render **first + last** in lists (`shortName`), full on hover.
@@ -803,12 +817,26 @@ pick-list grouped by halaqa. Cancelling refunds points and restores stock.
 ### 6.7 `إد-٥-أ` Plans — `/admin/plans`
 Search student → track/halaqa/**next level** resolve automatically (the supervisor does **not** pick the level; §إد-٥-أ) → preview → **print, which saves `issued_at` in the same action**.
 
-Editing before print (§إد-٥-أ, "تعديل الخطة وإضافة السور"): edit any day's ranges, add surahs, add/remove days (renumber automatically), move the exam days, change the daily amount, per-day note. Save *for this student* (default) or *for the whole level* (extra confirm + audit). "Restore original" button always present.
+`/admin/plans` **prints and never edits.** Editing lives at `/admin/plans/edit`, on the level (§إد-٥-أ, "تعديل الخطة وإضافة السور"): edit any day's ranges, add surahs, fill the gaps the screen names, per-day note. **One scope — the whole level, for every student who takes it** — behind a confirmation that states how many students are on that level right now. There is no *for this student only* save and no "restore original" button, because there is nothing per-student to restore: the level's curriculum is the sheet.
 
 Bulk print for multiple students into one document.
 
 ### 6.8 `إد-٥-ب` Record exam — `/admin/exams/new`  ✅ built (Qiyas import pending)
 Form per §3.4. Student search auto-fills track/halaqa/teacher. `ajza` suggested from level via §4.2. `passed` suggested from score via §4.5. Points suggested from §4.6 — awarding writes the `point_transactions` row **in the same transaction** as the exam.
+
+- **A questions table, like the on-site sheet (§6.9).** One row per question —
+  السورة (the level's own surahs first, then the rest of the mushaf, free text
+  allowed) · من آية · الأخطاء · التنبيهات · ملاحظة. **Five blank rows to start**
+  and «إضافة سؤال» for a longer sitting; a row nobody typed into is not a
+  question and is never stored. Saved as `exam_questions` under the exam's id,
+  so next time he can avoid «أن تُعيد عليه المواضع نفسها».
+- **The totals are the sum of the questions.** «إجمالي الأخطاء» and «إجمالي
+  التنبيهات» add up their columns and feed §4.4's score — the arithmetic is on
+  screen instead of in his head. Both stay typable, because a sitting recorded
+  later from a paper that kept only the totals still has to be recordable; and
+  editing any question row takes the override back, so touching a question
+  always re-syncs the total. «الأخطاء التجويدية» is typed, not per question.
+- A tajweed sitting has no questions and no counters — it is scored out of 10.
 Qiyas import lives at `/admin/exams/import` — **not yet built.** The column
 shape is documented in §5.2 and could be written blind, but it cannot be
 verified without a real Qiyas export, which is client data and stays outside

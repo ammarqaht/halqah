@@ -5,10 +5,11 @@
 import { useSyncExternalStore } from 'react';
 import type {
   Student, Halaqa, PointTxn, PointCodeBatch, PointCode, TxnKind, Gift, Order,
-  Exam, TajweedTopic, CurriculumDay, StudentPlan, PlanDayOverride,
+  Exam, TajweedTopic, CurriculumDay, StudentPlan,
   ExamBooking, ExamQuestion,
 } from './types';
 import { SEED_TAJWEED_TOPIC } from './types';
+import { dayCountFor, DEFAULT_EXAM_DAYS } from './curriculum';
 import {
   earnsPoints, generateCodes, codeState, purchaseBlock, EXAM_TYPE_AR,
   type PurchaseBlock, type ExamType,
@@ -31,9 +32,9 @@ export type DB = {
   examQuestions: ExamQuestion[];
   /** Reference data, loaded once from «منهج الحفظ.xlsx» and rarely touched. */
   curriculum: CurriculumDay[];
+  /** Who was issued which level, and when. The days themselves live in the
+      curriculum — a plan never carries its own copy of them (SPEC.md §3.3). */
   plans: StudentPlan[];
-  /** Only the rows that DIFFER from the curriculum — SPEC.md §3.3. */
-  planOverrides: PlanDayOverride[];
   /** Admin-managed; seeded with the one topic the client records today. */
   tajweedTopics: TajweedTopic[];
   importedAt: string | null;
@@ -42,7 +43,7 @@ export type DB = {
 
 const EMPTY: DB = {
   students: [], halaqat: [], txns: [], batches: [], codes: [], gifts: [], orders: [], exams: [], bookings: [], examQuestions: [],
-  curriculum: [], plans: [], planOverrides: [],
+  curriculum: [], plans: [],
   tajweedTopics: [{ id: 'tt1', name: SEED_TAJWEED_TOPIC, active: true }],
   importedAt: null, sourceFile: null,
 };
@@ -64,7 +65,11 @@ function migrate(d: DB): DB {
     const old = (e as unknown as { tajweedTopic?: string | null }).tajweedTopic;
     return { ...e, tajweedTopics: old ? [old] : [] };
   });
-  return { ...d, exams };
+  /* Stores written while plans still carried per-student overrides keep a
+     `planOverrides` array the schema no longer has. Drop it rather than let it
+     ride along invisibly — the level's curriculum is the whole sheet now. */
+  const { planOverrides: _dropped, ...rest } = d as DB & { planOverrides?: unknown };
+  return { ...rest, exams };
 }
 
 function load(): DB {
@@ -169,11 +174,10 @@ export const store = {
     const students = i >= 0 ? cur.students.map((x) => (x.id === s.id ? s : x)) : [...cur.students, s];
     commit({ ...cur, students });
   },
-  /** A halaqa runs one track, so it can be set once and carried to its members. */
-  setTrackForHalaqa(halaqaId: string, track: Student['track']) {
-    const cur = load();
-    commit({ ...cur, students: cur.students.map((s) => (s.halaqaId === halaqaId ? { ...s, track } : s)) });
-  },
+  /* There is deliberately no setTrackForHalaqa. The track is the student's own
+     — a halaqa may hold golden, silver and talqeen at once — so it is changed
+     one student at a time and never swept across a roster. */
+
   /** Moving a student carries all their history — nothing resets. SPEC.md §6.3 */
   moveStudents(ids: string[], halaqaId: string | null) {
     const cur = load();
@@ -680,8 +684,11 @@ export const store = {
       level: args.level,
       issuedAt: now,
       issuedBy: args.by ?? 'المشرف',
-      dayCount: 24,
-      examDays: { BADGE_GOLDEN: 12, BADGE_DIAMOND: 24 },
+      /* The level's own curriculum says how long its sheet is — it is the only
+         place days are added or removed now, so a level extended to 26 hands
+         out 26 rather than silently printing the first 24. */
+      dayCount: dayCountFor(args.track, args.level, cur.curriculum),
+      examDays: { ...DEFAULT_EXAM_DAYS },
       dailyAmount: args.dailyAmount,
       printedCount: 0,
       createdAt: now,
@@ -732,72 +739,10 @@ export const store = {
     commit({ ...cur, plans: cur.plans.map((p) => (p.id === planId ? { ...p, ...patch, id: p.id } : p)) });
   },
 
-  /** One row of one day, for THIS student only — the default scope in §9. */
-  setPlanOverride(o: PlanDayOverride) {
-    const cur = load();
-    const rest = cur.planOverrides.filter(
-      (x) => !(x.planId === o.planId && x.dayNo === o.dayNo && x.kind === o.kind));
-    commit({ ...cur, planOverrides: [...rest, o] });
-  },
-
-  /** Wholesale replacement after a day is inserted or removed and everything
-      below it is renumbered. */
-  replacePlanOverrides(planId: string, overrides: PlanDayOverride[]) {
-    const cur = load();
-    commit({ ...cur,
-      planOverrides: [...cur.planOverrides.filter((o) => o.planId !== planId), ...overrides] });
-  },
-
-  /**
-   * «زرّ إرجاع إلى المنهج الأصلي» — and it is a genuine restore rather than a
-   * re-copy, because the curriculum was never written over in the first place.
-   */
-  restorePlan(planId: string) {
-    const cur = load();
-    commit({
-      ...cur,
-      planOverrides: cur.planOverrides.filter((o) => o.planId !== planId),
-      plans: cur.plans.map((p) => (p.id === planId
-        ? { ...p, dayCount: 24, examDays: { BADGE_GOLDEN: 12, BADGE_DIAMOND: 24 } } : p)),
-    });
-  },
-
-  /**
-   * «لكل من يأخذ هذا المستوى» — the second save scope, which needs an extra
-   * confirmation because it touches other students. It writes the curriculum
-   * itself, and then the plan's own overrides for those rows become redundant
-   * and are dropped, so the student is not pinned to a stale copy of what he
-   * just promoted.
-   */
-  applyPlanToLevel(planId: string) {
-    const cur = load();
-    const plan = cur.plans.find((p) => p.id === planId);
-    if (!plan) return;
-    const mine = cur.planOverrides.filter((o) => o.planId === planId);
-    if (!mine.length) return;
-
-    const key = (dayNo: number, kind: string) => `${dayNo}:${kind}`;
-    const patch = new Map(mine.map((o) => [key(o.dayNo, o.kind), o]));
-
-    const curriculum = cur.curriculum.map((d) => {
-      if (d.track !== plan.track || d.level !== plan.level) return d;
-      const o = patch.get(key(d.dayNo, d.kind));
-      if (!o) return d;
-      patch.delete(key(d.dayNo, d.kind));
-      return { ...d, fromSurah: o.fromSurah, fromAyah: o.fromAyah,
-               toSurah: o.toSurah, toAyah: o.toAyah, note: o.note };
-    });
-    /* Rows he added beyond the curriculum become curriculum rows of their own. */
-    for (const o of patch.values()) {
-      curriculum.push({
-        track: plan.track, level: plan.level, dayNo: o.dayNo, kind: o.kind,
-        fromSurah: o.fromSurah, fromAyah: o.fromAyah,
-        toSurah: o.toSurah, toAyah: o.toAyah, note: o.note,
-      });
-    }
-    commit({ ...cur, curriculum,
-      planOverrides: cur.planOverrides.filter((o) => o.planId !== planId) });
-  },
+  /* There is deliberately no setPlanOverride / restorePlan / applyPlanToLevel.
+     A day is edited once, on its level, and reaches everyone who takes that
+     level — `setCurriculumLevel` is the only writer of plan content. Nothing
+     here can give two students on one level two different sheets. */
 
 
   /* ── On-site exam — SPEC.md §6.9, approved PDF §9 (إد-٥-ج) ──────────────────

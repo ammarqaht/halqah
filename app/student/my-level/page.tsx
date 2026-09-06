@@ -24,8 +24,8 @@ export default function MyLevel() {
     .sort((a, b) => b.issuedAt.localeCompare(a.issuedAt))[0] ?? null, [db.plans, id]);
 
   const days = useMemo(
-    () => (plan ? resolvePlan(plan, db.curriculum, db.planOverrides) : []),
-    [plan, db.curriculum, db.planOverrides]);
+    () => (plan ? resolvePlan(plan, db.curriculum) : []),
+    [plan, db.curriculum]);
 
   /* Which day of the sheet he is on: counted from the day it was printed. */
   const todayNo = useMemo(() => {

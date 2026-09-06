@@ -59,8 +59,8 @@ export default function PlanSheet({ params }: { params: Promise<{ planId: string
   const halaqa = student?.halaqaId ? db.halaqat.find((h) => h.id === student.halaqaId) ?? null : null;
 
   const days = useMemo(
-    () => (plan ? resolvePlan(plan, db.curriculum, db.planOverrides) : []),
-    [plan, db.curriculum, db.planOverrides]);
+    () => (plan ? resolvePlan(plan, db.curriculum) : []),
+    [plan, db.curriculum]);
 
   /* Opening the sheet IS the save. Guarded with a ref so React's development
      double-invoke does not count one print as two. */

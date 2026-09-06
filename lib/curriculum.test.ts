@@ -4,11 +4,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_DAY_COUNT, DEFAULT_EXAM_DAYS, dailyAmountFor, resolvePlan,
-  levelAvailable, coverage, removeDay, insertDay, matchesCurriculum, isCustomised,
-  incompleteDays,
+  levelAvailable, coverage, dayCountFor, incompleteDays,
 } from './curriculum';
 import { normaliseAyah, normaliseSurah, parseCurriculumSheet } from './importers/curriculum';
-import type { CurriculumDay, PlanDayOverride, PlanKind, StudentPlan } from './types';
+import type { CurriculumDay, PlanKind, StudentPlan } from './types';
 import { PLAN_KIND_ORDER } from './types';
 
 const day = (level: number, dayNo: number, kind: CurriculumDay['kind'], over: Partial<CurriculumDay> = {}): CurriculumDay => ({
@@ -35,11 +34,6 @@ const plan = (over: Partial<StudentPlan> = {}): StudentPlan => ({
   dailyAmount: 'وجه', printedCount: 0, createdAt: '2026-09-01T10:00:00Z', ...over,
 });
 
-const override = (dayNo: number, kind: PlanDayOverride['kind'], over: Partial<PlanDayOverride> = {}): PlanDayOverride => ({
-  planId: 'p1', dayNo, kind,
-  fromSurah: 'النساء', fromAyah: '1', toSurah: 'النساء', toAyah: 'آخر', note: '', ...over,
-});
-
 describe('the daily amount — §1 glossary', () => {
   it('is a page for Golden and half a page for Silver', () => {
     expect(dailyAmountFor('GOLDEN')).toBe('وجه');
@@ -54,63 +48,43 @@ describe('resolving a plan — §3.3', () => {
   const cur = fullLevel();
 
   it('runs 24 days by default', () => {
-    expect(resolvePlan(plan(), cur, [])).toHaveLength(24);
+    expect(resolvePlan(plan(), cur)).toHaveLength(24);
   });
 
   /* «يظهران في الورقة بصفّهما وخانة تاريخ … لا بمقرّر حفظ» */
   it('gives days 12 and 24 to the badges, with no recitation rows', () => {
-    const days = resolvePlan(plan(), cur, []);
+    const days = resolvePlan(plan(), cur);
     expect(days[11]).toMatchObject({ dayNo: 12, examBadge: 'BADGE_GOLDEN', rows: [] });
     expect(days[23]).toMatchObject({ dayNo: 24, examBadge: 'BADGE_DIAMOND', rows: [] });
   });
 
   it('prints the three lines in sheet order — م.ك then م.ص then درس', () => {
-    const d = resolvePlan(plan(), cur, [])[0];
+    const d = resolvePlan(plan(), cur)[0];
     expect(d.rows.map((r) => r.kind)).toEqual(['MURAJAA_KUBRA', 'MURAJAA_SUGHRA', 'DARS']);
   });
 
-  it('takes its content from the curriculum when nothing was edited', () => {
-    const d = resolvePlan(plan(), cur, [])[2];        // day 3
+  it('takes its content from the curriculum of its level', () => {
+    const d = resolvePlan(plan(), cur)[2];        // day 3
     expect(d.rows[0]).toMatchObject({ fromSurah: 'البقرة', fromAyah: '3', toAyah: '8' });
-    expect(d.rows.every((r) => r.overridden === false)).toBe(true);
   });
 
-  /* The whole point of the join: the override wins, and only for its own row. */
-  it('lets an override win for its (day, kind) and leaves the rest alone', () => {
-    const days = resolvePlan(plan(), cur, [override(3, 'DARS')]);
-    const d3 = days[2];
-    const dars = d3.rows.find((r) => r.kind === 'DARS')!;
-    const msug = d3.rows.find((r) => r.kind === 'MURAJAA_SUGHRA')!;
-    expect(dars).toMatchObject({ fromSurah: 'النساء', toAyah: 'آخر', overridden: true });
-    expect(msug).toMatchObject({ fromSurah: 'البقرة', overridden: false });
-  });
-
-  it('ignores overrides belonging to another plan', () => {
-    const foreign = { ...override(3, 'DARS'), planId: 'p2' };
-    const dars = resolvePlan(plan(), cur, [foreign])[2].rows.find((r) => r.kind === 'DARS')!;
-    expect(dars.overridden).toBe(false);
-  });
-
-  /* «لا يُفقد الأصل أبدًا … زرّ إرجاع إلى المنهج الأصلي» — restoring is just
-     dropping the overrides, because the curriculum was never written over. */
-  it('restores the original exactly when the overrides are dropped', () => {
-    const edited = resolvePlan(plan(), cur, [override(3, 'DARS'), override(7, 'MURAJAA_KUBRA')]);
-    const restored = resolvePlan(plan(), cur, []);
-    expect(edited).not.toEqual(restored);
-    expect(restored).toEqual(resolvePlan(plan(), cur, []));
-    expect(restored[2].rows.find((r) => r.kind === 'DARS')!.fromSurah).toBe('البقرة');
+  /* The rule the per-student editor used to break: one level, one sheet. */
+  it('gives two students on the same level the identical sheet', () => {
+    const a = resolvePlan(plan({ id: 'p1', studentId: 's1' }), cur);
+    const b = resolvePlan(plan({ id: 'p2', studentId: 's2' }), cur);
+    expect(a).toEqual(b);
   });
 
   /* «تزيد أيامًا على الأربعة والعشرين» — a day past the curriculum is valid and
      arrives empty for him to fill, not missing. */
   it('gives an added day empty rows rather than dropping it', () => {
-    const days = resolvePlan(plan({ dayCount: 26 }), cur, []);
+    const days = resolvePlan(plan({ dayCount: 26 }), cur);
     expect(days).toHaveLength(26);
     expect(days[24].rows.map((r) => r.fromSurah)).toEqual(['', '', '']);
   });
 
   it('follows the badges when they are moved', () => {
-    const days = resolvePlan(plan({ examDays: { BADGE_GOLDEN: 10, BADGE_DIAMOND: 20 } }), cur, []);
+    const days = resolvePlan(plan({ examDays: { BADGE_GOLDEN: 10, BADGE_DIAMOND: 20 } }), cur);
     expect(days[9].examBadge).toBe('BADGE_GOLDEN');
     expect(days[19].examBadge).toBe('BADGE_DIAMOND');
     expect(days[11].examBadge).toBeNull();          // day 12 is ordinary again
@@ -139,50 +113,21 @@ describe('a level the uploaded file does not cover — §9(f)', () => {
   });
 });
 
-describe('adding and removing days — «فيعيد النظام ترقيمها من نفسه»', () => {
-  it('renumbers what follows a removed day', () => {
-    const r = removeDay(plan(), [override(5, 'DARS'), override(20, 'DARS')], 10);
-    expect(r.dayCount).toBe(23);
-    expect(r.overrides.map((o) => o.dayNo)).toEqual([5, 19]);
+describe('how long the sheet of a level is — the curriculum decides', () => {
+  it('reads the day count off the level itself', () => {
+    expect(dayCountFor('GOLDEN', 26, fullLevel(26))).toBe(23);
   });
 
-  /* The badge must ride along, or it ends up marking a different day's work. */
-  it('carries the badges down with everything else', () => {
-    const r = removeDay(plan(), [], 5);
-    expect(r.examDays).toEqual({ BADGE_GOLDEN: 11, BADGE_DIAMOND: 23 });
+  /* A level extended past 24 must hand out every day of it — there is no
+     per-student adjustment left to catch the shortfall. */
+  it('follows a level that runs past twenty-four days', () => {
+    const cur = [...fullLevel(26), day(26, 26, 'DARS')];
+    expect(dayCountFor('GOLDEN', 26, cur)).toBe(26);
   });
 
-  it('drops the removed day\'s own overrides', () => {
-    const r = removeDay(plan(), [override(10, 'DARS'), override(10, 'MURAJAA_KUBRA')], 10);
-    expect(r.overrides).toHaveLength(0);
-  });
-
-  it('pushes everything below an inserted day down', () => {
-    const r = insertDay(plan(), [override(15, 'DARS')], 12);
-    expect(r.dayCount).toBe(25);
-    expect(r.overrides[0].dayNo).toBe(16);
-    expect(r.examDays).toEqual({ BADGE_GOLDEN: 12, BADGE_DIAMOND: 25 });
-  });
-
-  it('never shrinks below a single day', () => {
-    expect(removeDay(plan({ dayCount: 1 }), [], 1).dayCount).toBe(1);
-  });
-});
-
-describe('knowing when a sheet still matches the curriculum', () => {
-  const cur = fullLevel();
-
-  it('spots an override that no longer changes anything', () => {
-    const same = override(3, 'DARS', { fromSurah: 'البقرة', fromAyah: '3', toSurah: 'البقرة', toAyah: '8' });
-    expect(matchesCurriculum(same, 'GOLDEN', 26, cur)).toBe(true);
-    expect(matchesCurriculum(override(3, 'DARS'), 'GOLDEN', 26, cur)).toBe(false);
-  });
-
-  it('calls a plan customised when anything at all was changed', () => {
-    expect(isCustomised(plan(), [])).toBe(false);
-    expect(isCustomised(plan(), [override(3, 'DARS')])).toBe(true);
-    expect(isCustomised(plan({ dayCount: 25 }), [])).toBe(true);
-    expect(isCustomised(plan({ examDays: { BADGE_GOLDEN: 11, BADGE_DIAMOND: 24 } }), [])).toBe(true);
+  /* Zero would print a sheet with no days on it at all. */
+  it('falls back to the default when the level has nothing uploaded', () => {
+    expect(dayCountFor('SILVER', 39, fullLevel(26))).toBe(DEFAULT_DAY_COUNT);
   });
 });
 

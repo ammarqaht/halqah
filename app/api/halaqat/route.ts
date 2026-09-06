@@ -19,6 +19,8 @@ export async function POST(req: Request) {
     teacher: String(h.teacher).trim(),
     mosque: h.mosque || 'جامع محمد العبدالكريم — حي أُحد',
     timeSlot: h.timeSlot || 'العصر',
+    /* A default for the next student added here, nothing more. The track lives
+       on the student, so this is never written across the halaqa's roster. */
     track: h.track || null,
     notes: h.notes || null,
   };
@@ -27,11 +29,6 @@ export async function POST(req: Request) {
     const saved = await db.halaqa.upsert({
       where: { id: data.id }, create: data, update: { ...data, id: undefined },
     });
-
-    /* A halaqa runs one track, so it can be carried to its members at once. */
-    if (h.applyTrackToStudents && data.track) {
-      await db.student.updateMany({ where: { halaqaId: saved.id }, data: { track: data.track } });
-    }
 
     await db.auditLog.create({
       data: { actorId: session.sub, action: 'UPSERT_HALAQA', entity: 'halaqa',

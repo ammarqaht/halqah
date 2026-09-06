@@ -56,13 +56,19 @@ function StudentsScreen() {
     });
   }, [db.students, halaqaFilter, sp, q]);
 
-  /* Which tracks actually appear in the selected halaqa — normally exactly one. */
+  /* Which tracks actually appear in the selected halaqa. A halaqa is not tied
+     to one: its students each carry their own, so this may well be several.
+     Counted over ALL its students, not `rows` — the header card describes the
+     halaqa, and must not shrink when a track filter is on. */
   const halaqaTracks = useMemo(() => {
     if (!halaqa) return [] as [string, number][];
     const m = new Map<string, number>();
-    for (const s of rows) if (s.track) m.set(s.track, (m.get(s.track) ?? 0) + 1);
-    return [...m.entries()];
-  }, [halaqa, rows]);
+    for (const s of db.students) {
+      if (s.halaqaId === halaqa.id && s.track) m.set(s.track, (m.get(s.track) ?? 0) + 1);
+    }
+    return (['GOLDEN', 'SILVER', 'TALQEEN'] as const)
+      .filter((t) => m.has(t)).map((t) => [t as string, m.get(t)!] as [string, number]);
+  }, [halaqa, db.students]);
 
   const halaqaName = (id: string | null) => {
     const t = id ? db.halaqat.find((h) => h.id === id)?.teacher : null;
@@ -108,11 +114,11 @@ function StudentsScreen() {
                 <p className="text-micro uppercase tracking-[.12em] text-brand-800">حلقة</p>
                 <div className="mt-1 flex flex-wrap items-center gap-2.5">
                   <h2 className="font-display text-t1 text-ink-900">{halaqa.teacher}</h2>
-                  {/* a halaqa is normally one track — show it here instead of on every row */}
+                  {/* the mix the halaqa actually holds, counted — never a single
+                      label, since its students may sit on different tracks */}
                   {halaqaTracks.map(([t, n]) => (
                     <Chip key={t} tone={TRACK_TONE[t as keyof typeof TRACK_TONE]}>
-                      {TRACK_AR[t as keyof typeof TRACK_AR]}
-                      {halaqaTracks.length > 1 && <> <Num>{n}</Num></>}
+                      {TRACK_AR[t as keyof typeof TRACK_AR]} <Num>{n}</Num>
                     </Chip>
                   ))}
                 </div>
@@ -166,7 +172,7 @@ function StudentsScreen() {
             <Empty icon={Users2} title="لا نتائج" body="جرّب توسيع التصفية أو مسح البحث." />
           ) : (
             <div className="overflow-x-auto">
-              <table className={cx('w-full border-collapse text-body', halaqa ? 'min-w-[44rem]' : 'min-w-[56rem]')}>
+              <table className={cx('w-full border-collapse text-body', halaqa ? 'min-w-[48rem]' : 'min-w-[56rem]')}>
                 <thead>
                   <tr className="border-b border-ink-200 bg-page/50 text-cap text-ink-500">
                     <th className="w-10 px-3 py-3">
@@ -175,8 +181,8 @@ function StudentsScreen() {
                         onChange={(e) => setSel(e.target.checked ? new Set(rows.map((r) => r.id)) : new Set())}
                         className="h-4 w-4 rounded-sm border-ink-300 accent-brand-800" />
                     </th>
-                    {['الطالب', 'رقم الهوية',
-                      ...(halaqa ? [] : ['المسار', 'الحلقة']),
+                    {['الطالب', 'رقم الهوية', 'المسار',
+                      ...(halaqa ? [] : ['الحلقة']),
                       'المستوى', 'الصف', 'الجنسية', 'جوال ولي الأمر', ''].map((h) => (
                       <th key={h} className="px-3 py-3 text-start font-medium">{h}</th>))}
                   </tr>
@@ -203,16 +209,16 @@ function StudentsScreen() {
                           </Chip>)}
                       </td>
                       <td className="px-3 py-3"><Num className="text-panel text-ink-700">{s.nationalId ?? '—'}</Num></td>
+                      {/* the track is the student's own, so it stays even inside
+                          a halaqa — its rows no longer all carry the same one */}
+                      <td className="px-3 py-3">
+                        {s.track ? <Chip tone={TRACK_TONE[s.track]}>{TRACK_AR[s.track]}</Chip> : <span className="text-ink-400">—</span>}
+                      </td>
                       {!halaqa && (
-                        <>
-                          <td className="px-3 py-3">
-                            {s.track ? <Chip tone={TRACK_TONE[s.track]}>{TRACK_AR[s.track]}</Chip> : <span className="text-ink-400">—</span>}
-                          </td>
-                          <td className="px-3 py-3 text-panel text-ink-600"
-                              title={db.halaqat.find((h) => h.id === s.halaqaId)?.teacher}>
-                            {halaqaName(s.halaqaId)}
-                          </td>
-                        </>
+                        <td className="px-3 py-3 text-panel text-ink-600"
+                            title={db.halaqat.find((h) => h.id === s.halaqaId)?.teacher}>
+                          {halaqaName(s.halaqaId)}
+                        </td>
                       )}
                       <td className="px-3 py-3">
                         {s.currentLevel != null

@@ -3,13 +3,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { Modal, Btn, Field, INPUT } from '@/components/ui';
 import { Combobox } from '@/components/Combobox';
 import { store, useDB } from '@/lib/store';
-import { ALL_GRADES, BASE_NATIONALITIES, GRADES_BY_STAGE, STAGES, TRACK_AR, levelsFor, type Student } from '@/lib/types';
+import { ALL_GRADES, BASE_NATIONALITIES, GRADES_BY_STAGE, STAGES, TRACK_AR, levelsFor, type Student, type Track } from '@/lib/types';
 import { normalisePhone, normaliseNationalId, shortName } from '@/lib/normalise';
 import { Num } from '@/components/Num';
 
-const blank = (halaqaId: string | null): Student => ({
+const blank = (halaqaId: string | null, track: Track | null = null): Student => ({
   id: Math.random().toString(36).slice(2, 10),
-  fullName: '', nationalId: null, nationalIdFlag: null, track: null,
+  fullName: '', nationalId: null, nationalIdFlag: null, track,
   halaqaId, grade: '', stage: '', nationality: '', guardianPhone: '',
   status: 'ACTIVE', currentLevel: null,
 });
@@ -17,8 +17,17 @@ const blank = (halaqaId: string | null): Student => ({
 export function StudentDialog({ open, student, defaultHalaqa, onClose }:
   { open: boolean; student: Student | null; defaultHalaqa: string | null; onClose: () => void }) {
   const db = useDB();
+  /* Opened from inside a halaqa, a new student starts on that halaqa's default
+     track — a suggestion to save typing, and one the supervisor overrides in
+     the field below whenever this boy is not on it. */
+  const defaultTrack = defaultHalaqa
+    ? db.halaqat.find((h) => h.id === defaultHalaqa)?.track ?? null : null;
   const [f, setF] = useState<Student>(() => blank(defaultHalaqa));
-  useEffect(() => { if (open) setF(student ? { ...student } : blank(defaultHalaqa)); }, [open, student, defaultHalaqa]);
+  /* Deliberately not keyed on defaultTrack: it follows defaultHalaqa, and
+     re-running on it would reset a track the supervisor has just chosen. */
+  useEffect(() => {
+    if (open) setF(student ? { ...student } : blank(defaultHalaqa, defaultTrack));
+  }, [open, student, defaultHalaqa]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Nationalities already in the data, plus the known list. Whatever the
      supervisor types once is offered from then on. */
@@ -52,19 +61,38 @@ export function StudentDialog({ open, student, defaultHalaqa, onClose }:
     ...db.halaqat.map((h) => ({
       value: h.id,
       label: shortName(h.teacher),
-      hint: h.track ? TRACK_AR[h.track] : h.timeSlot,
+      hint: h.timeSlot,
     })),
   ], [db.halaqat]);
 
-  const halaqa = db.halaqat.find((h) => h.id === f.halaqaId) ?? null;
+  /* The track is the student's own. Two students in one halaqa may sit on
+     different ones, so it is chosen here and nowhere else. */
+  const track = f.track;
+  const trackOptions = useMemo(() => [
+    { value: '', label: '— غير محدّد —' },
+    ...(['GOLDEN', 'SILVER', 'TALQEEN'] as const).map((t) => ({ value: t, label: TRACK_AR[t] })),
+  ], []);
 
-  /* The level belongs to the track, and the track comes from the halaqa.
-     Talqeen has no levels at all, so the field disappears rather than
-     offering a choice that means nothing. */
-  const track = halaqa?.track ?? f.track;
   const levels = useMemo(
     () => levelsFor(track).map((n) => ({ value: String(n), label: `المستوى ${n}` })),
     [track]);
+
+  /* Levels belong to a track — silver runs 60→1, golden 30→1, talqeen has
+     none — so a level the new track does not contain is dropped rather than
+     squeezed into range. The supervisor picks the real one; we do not guess. */
+  const setTrack = (v: string) => setF((p) => {
+    const next = (v || null) as Track | null;
+    const keep = p.currentLevel != null && levelsFor(next).includes(p.currentLevel);
+    return { ...p, track: next, currentLevel: keep ? p.currentLevel : null };
+  });
+
+  /* The halaqa's track is a suggestion for a student who has none yet — it
+     never overwrites a track the student already carries. */
+  const setHalaqa = (v: string) => setF((p) => {
+    const halaqaId = v || null;
+    const suggested = halaqaId ? db.halaqat.find((h) => h.id === halaqaId)?.track ?? null : null;
+    return { ...p, halaqaId, track: p.track ?? suggested };
+  });
 
   const save = () => {
     if (!f.fullName.trim()) return;
@@ -74,11 +102,9 @@ export function StudentDialog({ open, student, defaultHalaqa, onClose }:
       fullName: f.fullName.trim(),
       nationalId: id,
       nationalIdFlag: flag,
-        guardianPhone: normalisePhone(f.guardianPhone),
-        currentLevel: track === 'TALQEEN' ? null : f.currentLevel,
-      /* The track belongs to the halaqa — a halaqa runs one track — so the
-         student inherits it instead of being set separately. */
-      track: halaqa?.track ?? f.track,
+      guardianPhone: normalisePhone(f.guardianPhone),
+      currentLevel: track === 'TALQEEN' ? null : f.currentLevel,
+      track,
     });
     onClose();
   };
@@ -104,12 +130,15 @@ export function StudentDialog({ open, student, defaultHalaqa, onClose }:
             onChange={(e) => setF({ ...f, guardianPhone: e.target.value })} />
         </Field>
 
-        <Field label="الحلقة" hint={halaqa?.track
-          ? `مسار الحلقة: ${TRACK_AR[halaqa.track]} — يرثه الطالب`
-          : 'يمكن نقله لاحقًا دون فقد تاريخه'}>
-          <Combobox value={f.halaqaId ?? ''} onChange={(v) => setF({ ...f, halaqaId: v || null })}
+        <Field label="الحلقة" hint="يمكن نقله لاحقًا دون فقد تاريخه">
+          <Combobox value={f.halaqaId ?? ''} onChange={setHalaqa}
             options={halaqaOptions} placeholder="اختر الحلقة" searchPlaceholder="ابحث باسم المعلّم…" />
         </Field>
+        <Field label="المسار" hint="مسار الطالب وحده — لا يتبع حلقته">
+          <Combobox value={f.track ?? ''} onChange={setTrack}
+            options={trackOptions} placeholder="اختر المسار" />
+        </Field>
+
         <Field label="المرحلة">
           <Combobox value={f.stage} onChange={setStage} options={stages} placeholder="اختر المرحلة" />
         </Field>
