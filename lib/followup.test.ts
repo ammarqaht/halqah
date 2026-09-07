@@ -2,8 +2,11 @@
    a wrong «آخر اختبار» column sends the supervisor to re-examine the wrong
    student. Fixtures below are minimal rows, not imports. */
 import { describe, expect, it } from 'vitest';
-import { followUpRows, followedRows, listRows, listCounts, TOP_LIST_SIZE } from './followup';
-import type { Exam, PointTxn, Student, StudentPlan } from './types';
+import {
+  followUpRows, followedRows, listRows, listCounts, TOP_LIST_SIZE,
+  dueBookings, dueForExamCount,
+} from './followup';
+import type { Exam, ExamBooking, PointTxn, Student, StudentPlan } from './types';
 
 const NOW = new Date('2026-09-01T12:00:00');
 
@@ -176,5 +179,41 @@ describe('readiness and balance ride along', () => {
   it('sums the ledger per student, not per screen', () => {
     const [r] = rowsFor({ txns: [txn({ delta: 50 }), txn({ id: 't2', delta: -20 })] });
     expect(r.balance).toBe(30);
+  });
+});
+
+describe('حان موعد اختباره — the appointment the supervisor set himself', () => {
+  const booking = (over: Partial<ExamBooking>): ExamBooking => ({
+    id: 'b1', studentId: 's1', scheduledOn: '2026-09-01', level: 29,
+    badge: 'BADGE_GOLDEN', status: 'BOOKED', examId: null, note: '',
+    createdAt: '2026-08-30T09:00:00',
+    ...over,
+  });
+
+  it('counts today', () => {
+    expect(dueForExamCount([booking({})], NOW)).toBe(1);
+  });
+
+  it('counts yesterday too — a sitting nobody held is not less urgent', () => {
+    expect(dueForExamCount([booking({ scheduledOn: '2026-08-25' })], NOW)).toBe(1);
+  });
+
+  it('leaves tomorrow alone', () => {
+    expect(dueForExamCount([booking({ scheduledOn: '2026-09-02' })], NOW)).toBe(0);
+  });
+
+  it('ignores what was already sat or called off', () => {
+    expect(dueBookings([
+      booking({ id: 'b1', status: 'DONE' }),
+      booking({ id: 'b2', status: 'CANCELLED' }),
+    ], NOW)).toEqual([]);
+  });
+
+  it('counts a boy once however many sittings he has open', () => {
+    expect(dueForExamCount([
+      booking({ id: 'b1' }),
+      booking({ id: 'b2', badge: 'BADGE_DIAMOND' }),
+      booking({ id: 'b3', studentId: 's2' }),
+    ], NOW)).toBe(2);
   });
 });

@@ -4,7 +4,7 @@
    work area, and selecting a halaqa turns the page into that halaqa's file. */
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   UserPlus, Search, Pencil, ArrowLeftRight, Inbox, X,
   AlertTriangle, Users2, Home } from 'lucide-react';
@@ -27,6 +27,7 @@ function StudentsScreen() {
   const { panelOpen, setPanelOpen } = usePanel();
   const db = useDB();
   const sp = useSearchParams();
+  const router = useRouter();
   const [q, setQ] = useState('');
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [editStudent, setEditStudent] = useState<Student | 'new' | null>(null);
@@ -69,6 +70,39 @@ function StudentsScreen() {
     return (['GOLDEN', 'SILVER', 'TALQEEN'] as const)
       .filter((t) => m.has(t)).map((t) => [t as string, m.get(t)!] as [string, number]);
   }, [halaqa, db.students]);
+
+  /* The halaqa's own size, for the same reason the chips beside it are counted
+     that way: the card is the halaqa's file, not a description of whatever is
+     left after the other filters. It read `rows.length` before, so a narrowing
+     filter made a halaqa of thirteen announce «٠ طالبًا» beside a chip saying
+     thirteen — two numbers for one fact, and the wrong one in the larger type. */
+  const halaqaTotal = useMemo(
+    () => (halaqa ? db.students.filter((s) => s.halaqaId === halaqa.id).length : 0),
+    [halaqa, db.students]);
+
+  /* Every filter that is on, named. The roster is filtered by the query string,
+     and the panel that sets it scrolls: a track or a stage chosen earlier stays
+     on while its chip is out of view, so «لا نتائج» arrived with no visible
+     cause. Naming them here — beside the count and again in the empty state —
+     is what turns a dead end into something the supervisor can undo. */
+  const activeFilters = useMemo(() => {
+    const out: { key: string; label: string }[] = [];
+    const track = sp.get('track');
+    if (track) out.push({ key: 'track', label: `المسار: ${TRACK_AR[track as keyof typeof TRACK_AR] ?? track}` });
+    const stage = sp.get('stage');
+    if (stage) out.push({ key: 'stage', label: `المرحلة: ${stage}` });
+    const status = sp.get('status');
+    if (status) out.push({ key: 'status', label: `الحالة: ${STATUS_AR[status as keyof typeof STATUS_AR] ?? status}` });
+    return out;
+  }, [sp]);
+
+  /** Drop one filter, or all of them, keeping the halaqa the screen is showing. */
+  const clearFilters = (key?: string) => {
+    const next = new URLSearchParams(sp.toString());
+    if (key) next.delete(key);
+    else for (const f of activeFilters) next.delete(f.key);
+    router.replace(`/admin/students${next.toString() ? `?${next}` : ''}`, { scroll: false });
+  };
 
   const halaqaName = (id: string | null) => {
     const t = id ? db.halaqat.find((h) => h.id === id)?.teacher : null;
@@ -130,7 +164,7 @@ function StudentsScreen() {
               </div>
               <div className="flex items-center gap-2">
                 <span className="rounded-lg bg-paper px-3 py-2 text-center">
-                  <span className="block font-display text-t1 text-ink-900"><Num>{rows.length}</Num></span>
+                  <span className="block font-display text-t1 text-ink-900"><Num>{halaqaTotal}</Num></span>
                   <span className="block text-micro text-ink-500">طالبًا</span>
                 </span>
                 <Btn icon={Pencil} onClick={() => setEditHalaqa(true)}>تعديل الحلقة</Btn>
@@ -155,8 +189,20 @@ function StudentsScreen() {
               placeholder="ابحث بالاسم أو رقم الهوية…" className={cx(INPUT, 'pe-10')} />
           </div>
           <span className="text-panel text-ink-500">
-            <Num className="font-medium text-ink-900">{rows.length}</Num> من <Num>{db.students.length}</Num>
+            <Num className="font-medium text-ink-900">{rows.length}</Num> من{' '}
+            <Num>{halaqa ? halaqaTotal : db.students.length}</Num>
           </span>
+
+          {/* The filters that are narrowing the list, each one removable where
+              the result of it is being read. */}
+          {activeFilters.map((f) => (
+            <button key={f.key} onClick={() => clearFilters(f.key)}
+              title={`إزالة تصفية ${f.label}`}
+              className="fade group flex items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 py-1.5 pe-2 ps-3 text-panel text-brand-800 transition-colors hover:border-risk-200 hover:bg-risk-100 hover:text-risk-700">
+              {f.label}
+              <X size={13} className="opacity-60 transition-opacity group-hover:opacity-100" />
+            </button>
+          ))}
           {sel.size > 0 && (
             <div className="fade flex items-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5">
               <span className="text-panel text-brand-800">حُدِّد <Num>{sel.size}</Num></span>
@@ -169,7 +215,18 @@ function StudentsScreen() {
         {/* ── roster ─────────────────────────────────────────────────────── */}
         <Sheet className="rise" pad={false}>
           {rows.length === 0 ? (
-            <Empty icon={Users2} title="لا نتائج" body="جرّب توسيع التصفية أو مسح البحث." />
+            /* Say what is hiding them, and offer to stop it. A halaqa that holds
+               students but shows none is otherwise indistinguishable from an
+               empty one, and the cause was a chip scrolled out of sight. */
+            <Empty icon={Users2} title="لا نتائج"
+              body={activeFilters.length > 0
+                ? `${halaqa ? `في هذه الحلقة ${halaqaTotal} طالبًا، لكن ` : ''}التصفية الحالية تُخفيهم — ${activeFilters.map((f) => f.label).join(' · ')}${q.trim() ? ` · البحث: ${q.trim()}` : ''}.`
+                : q.trim()
+                  ? 'لا اسم ولا رقم هوية يطابق بحثك.'
+                  : halaqa ? 'لا طلاب في هذه الحلقة بعد.' : 'لا طلاب بعد.'}
+              action={activeFilters.length > 0
+                ? <Btn variant="primary" icon={X} onClick={() => clearFilters()}>امسح التصفية</Btn>
+                : undefined} />
           ) : (
             <div className="overflow-x-auto">
               <table className={cx('w-full border-collapse text-body', halaqa ? 'min-w-[48rem]' : 'min-w-[56rem]')}>

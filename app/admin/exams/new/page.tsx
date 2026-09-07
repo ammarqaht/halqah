@@ -12,11 +12,12 @@
    The one thing that is not a suggestion is the join to the ledger: ticking
    «صُرفت» writes the points movement in the same commit as the exam, so there
    is «لا سجلّ منفصل ولا نسيان». */
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  ClipboardCheck, AlertTriangle, ArrowRight, Check, Coins, FileText, Plus, Trash2, X,
+  ClipboardCheck, AlertTriangle, ArrowRight, Check, Coins, FileText, Minus, Plus,
+  Trash2, X, CalendarCheck,
 } from 'lucide-react';
 import { TopBar } from '@/components/TopBar';
 import { Sheet, SheetHead } from '@/components/Sheet';
@@ -77,15 +78,20 @@ const STARTING_ROWS = 5;
 const blankRow = (): QRow =>
   ({ id: uid(), surah: '', ayahFrom: '', errors: '', warnings: '', note: '' });
 const freshRows = () => Array.from({ length: STARTING_ROWS }, blankRow);
+/* A line is blank until something is actually on it. The counters are tapped,
+   so a row he raised to one and put back to zero reads «0» rather than «» —
+   and a zero is not a question any more than an empty box is. */
 const isBlankRow = (q: QRow) =>
-  !q.surah.trim() && !q.ayahFrom.trim() && q.errors === '' && q.warnings === '' && !q.note.trim();
+  !q.surah.trim() && !q.ayahFrom.trim() && !q.note.trim()
+  && !(Number(q.errors) > 0) && !(Number(q.warnings) > 0);
 
 type Saved = { exam: Exam; studentName: string; nextLevel: number | null };
 
-export default function RecordExam() {
+function RecordExam() {
   const { panelOpen, setPanelOpen } = usePanel();
   const db = useDB();
   const router = useRouter();
+  const sp = useSearchParams();
 
   const [studentId, setStudentId] = useState('');
   const [type, setType] = useState<ExamType>('BADGE_GOLDEN');
@@ -107,6 +113,29 @@ export default function RecordExam() {
   const [examiner, setExaminer] = useState('');
   const [saved, setSaved] = useState<Saved | null>(null);
 
+  /* ── arriving from a booking ──────────────────────────────────────────────
+     «ابدأ الاختبار» on the booking list lands here rather than on a screen of
+     its own: recording is recording, and one form is easier to trust than two
+     that drift. The appointment carries the student, the badge, the day and the
+     level, so the form opens already filled in and he starts at the questions.
+     Every field stays editable — the booking is a plan, and plans get changed
+     at the desk. */
+  const bookingId = sp.get('booking');
+  const booking = bookingId
+    ? db.bookings.find((b) => b.id === bookingId && b.status === 'BOOKED') ?? null : null;
+
+  /* Applied ONCE per booking. Re-applying on every render would fight the
+     supervisor for the cursor: he corrects the level, the effect puts it back. */
+  const [appliedBooking, setAppliedBooking] = useState<string | null>(null);
+  useEffect(() => {
+    if (!booking || appliedBooking === booking.id) return;
+    setAppliedBooking(booking.id);
+    setStudentId(booking.studentId);
+    setType(booking.badge);
+    setTakenOn(booking.scheduledOn);
+    if (booking.level !== null) setLevel(String(booking.level));
+  }, [booking, appliedBooking]);
+
   const student = db.students.find((s) => s.id === studentId) ?? null;
   const halaqa = student?.halaqaId ? db.halaqat.find((h) => h.id === student.halaqaId) ?? null : null;
   const blocked = student ? !earnsPoints(student) : false;
@@ -117,8 +146,12 @@ export default function RecordExam() {
   // level ← the student's current level
   useEffect(() => {
     if (!student) return;
+    /* …unless a booking already said which level this sitting is on. It was
+       fixed when the appointment was made, and the roster may have moved since;
+       the appointment is what the boy came to sit. */
+    if (booking && booking.studentId === student.id && booking.level !== null) return;
     setLevel(student.currentLevel !== null ? String(student.currentLevel) : '');
-  }, [student]);
+  }, [student, booking]);
 
   const levelNum = level === '' ? null : Number(level);
   const suggestedAjza = useMemo(
@@ -294,6 +327,10 @@ export default function RecordExam() {
       tajweedErrors: 0,
       note: q.note.trim(),
     })));
+    /* Settle the appointment in the same action. Without this the sitting is in
+       the log and the booking is still «محجوز», so the overview goes on calling
+       for a boy who has already been heard. */
+    if (booking) store.closeBooking(booking.id, exam.id);
     const after = suggestionAfter(exam, exam.level);
     setSaved({ exam, studentName: student.fullName, nextLevel: after?.printLevel ?? null });
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -398,6 +435,21 @@ export default function RecordExam() {
         action={<Link href="/admin/exams"><Btn>سجلّ الاختبارات</Btn></Link>} />
 
       <div className="mx-auto max-w-column px-6 py-8 pb-16">
+        {/* Where this form came from, when it came from an appointment — so the
+            prefilled fields are explained rather than merely surprising, and so
+            he knows the booking will close itself when he saves. */}
+        {booking && (
+          <div className="rise mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3">
+            <CalendarCheck size={17} className="shrink-0 text-brand-800" />
+            <p className="min-w-0 flex-1 text-base2 text-ink-800">
+              اختبار محجوز — عُبِّئت بياناته من الحجز، وكلها قابلة للتعديل.
+              يُغلَق الحجز من نفسه عند الحفظ.
+            </p>
+            <Link href="/admin/exams/onsite"
+              className="text-panel text-brand-800 hover:underline">قائمة الحجوزات</Link>
+          </div>
+        )}
+
         <Sheet className="rise mb-4">
           <SheetHead title="الطالب والاختبار"
             meta="اختر الطالب، فتظهر حلقته ومساره ومستواه من نفسها" />
@@ -533,7 +585,7 @@ export default function RecordExam() {
                   </div>
 
                   <div className="overflow-x-auto rounded-xl border border-ink-200">
-                    <table className="w-full min-w-[42rem] border-collapse text-body">
+                    <table className="w-full min-w-[52rem] border-collapse text-body">
                       <thead>
                         <tr className="border-b border-ink-200 bg-page/50 text-cap text-ink-500">
                           {['#', 'السورة', 'من آية', 'الأخطاء', 'التنبيهات', 'ملاحظة', ''].map((h) => (
@@ -549,15 +601,35 @@ export default function RecordExam() {
                                 options={surahOptions} creatable createLabel="سورة"
                                 placeholder="السورة" searchPlaceholder="اكتب اسم السورة…" />
                             </td>
-                            {([
-                              ['ayahFrom', 'الآية'],
-                              ['errors', '0'],
-                              ['warnings', '0'],
-                            ] as const).map(([f, ph]) => (
-                              <td key={f} className="w-24 px-1.5 py-1.5">
-                                <input className={cx(INPUT, 'h-9 px-2 text-panel')} inputMode="numeric"
-                                  value={q[f]} placeholder={ph}
-                                  onChange={(e) => patchQuestion(q.id, { [f]: e.target.value.replace(/[^\d]/g, '') })} />
+                            <td className="w-24 px-1.5 py-1.5">
+                              <input className={cx(INPUT, 'h-9 px-2 text-panel')} inputMode="numeric"
+                                value={q.ayahFrom} placeholder="الآية"
+                                onChange={(e) => patchQuestion(q.id, { ayahFrom: e.target.value.replace(/[^\d]/g, '') })} />
+                            </td>
+                            {/* Tapped, never typed — the same counters as the
+                                on-site sheet, for the same reason: he is
+                                listening, and a hand that is following a
+                                recitation cannot go hunting for a keyboard. */}
+                            {(['errors', 'warnings'] as const).map((f) => (
+                              <td key={f} className="px-1.5 py-1.5">
+                                <div className="flex items-center gap-1">
+                                  <button type="button"
+                                    onClick={() => patchQuestion(q.id, { [f]: String((Number(q[f]) || 0) + 1) })}
+                                    aria-label={`زيادة ${f === 'errors' ? 'الأخطاء' : 'التنبيهات'} للسؤال ${i + 1}`}
+                                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-ink-100 text-ink-700 transition-colors hover:bg-brand-100 hover:text-brand-800 active:scale-95">
+                                    <Plus size={16} strokeWidth={2.4} />
+                                  </button>
+                                  <span className={cx('w-6 text-center font-display text-lg2',
+                                    Number(q[f]) > 0 ? 'text-ink-900' : 'text-ink-300')}>
+                                    <Num>{Number(q[f]) || 0}</Num>
+                                  </span>
+                                  <button type="button" disabled={!(Number(q[f]) > 0)}
+                                    onClick={() => patchQuestion(q.id, { [f]: String(Math.max(0, (Number(q[f]) || 0) - 1)) })}
+                                    aria-label={`إنقاص ${f === 'errors' ? 'الأخطاء' : 'التنبيهات'} للسؤال ${i + 1}`}
+                                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-ink-400 transition-colors hover:bg-ink-100 hover:text-ink-800 active:scale-95 disabled:opacity-30">
+                                    <Minus size={16} strokeWidth={2.4} />
+                                  </button>
+                                </div>
                               </td>
                             ))}
                             <td className="min-w-[10rem] px-1.5 py-1.5">
@@ -753,4 +825,8 @@ function TopicPicker({ chosen, onChange, options }: {
       )}
     </div>
   );
+}
+
+export default function Page() {
+  return <Suspense><RecordExam /></Suspense>;
 }

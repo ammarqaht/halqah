@@ -30,6 +30,36 @@ npm run dev      # http://localhost:3000
 npm test         # rules engine — lib/points.ts against the approved figures
 ```
 
+### The development database
+
+Logging in needs a real `admin_users` row, so development runs against its own
+throwaway Postgres cluster — **separate from any Postgres already on 5432**, on
+port 5433, trust-authenticated, its files under `%LOCALAPPDATA%\halqah-pg`. It
+holds nothing but the login account: every other screen still reads the browser
+store (see *Data* below).
+
+```bash
+# start / stop it (put the PostgreSQL 17 bin folder on PATH first)
+pg_ctl -D "%LOCALAPPDATA%\halqah-pg\data" -o "-p 5433" -l "%LOCALAPPDATA%\halqah-pg\server.log" start
+pg_ctl -D "%LOCALAPPDATA%\halqah-pg\data" stop
+```
+
+To build it again from nothing — `initdb`, then:
+
+```bash
+npx prisma db push                              # tables
+npm run admin:create "المشرف" admin 12345       # the development account
+npm run db:seed                                 # settings
+```
+
+`DATABASE_URL` lives in `.env` (the Prisma CLI reads only that file); `.env.local`
+keeps `AUTH_SECRET`. Both are gitignored. **The development password is a
+development password** — production credentials are set in CranL and never here.
+
+`GET /api/health` reports which link in the chain is broken — environment
+variables present, database reachable, tables created. It reveals counts and
+booleans only, so it is safe to call on the deployed site too.
+
 ## What exists today
 
 | Route | Status | Spec ref |
