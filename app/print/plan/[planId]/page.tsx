@@ -15,7 +15,7 @@
    Printing is also what records the issue date — the screen calls
    `store.markPrinted` when it opens this route, because §9 is explicit that
    «الحفظ يقع تلقائيًا مع الطباعة — لا تحتاج زر حفظ منفصلًا». */
-import { use, useEffect, useMemo, useRef } from 'react';
+import { Fragment, use, useEffect, useMemo, useRef } from 'react';
 import { Printer } from 'lucide-react';
 import { LogoMark, LogoJamiyah } from '@/components/Logo';
 import { Num, toArabicDigits } from '@/components/Num';
@@ -28,26 +28,30 @@ import { formatDate } from '@/lib/dates';
 
 const BADGE_AR = { BADGE_GOLDEN: 'الوسام الذهبي', BADGE_DIAMOND: 'الوسام الماسي' } as const;
 
+
 /**
- * «الملك ١–١٥» عند سورة واحدة، و«الجن ١٤ ← المزمل ١٩» عند سورتين.
+ * One مقرّر across its four columns.
  *
- * The editor saves whatever the supervisor typed — no completeness check — so
- * a HALF-filled range must print as visibly incomplete, never as ambiguous: a
- * missing side gets a «—» in its slot («الملك —–١٩», «— ← المزمل ١٩») instead
- * of collapsing into text a teacher could misread as a complete range.
+ * The editor saves whatever was typed — no completeness check — so a HALF
+ * filled range must print as visibly incomplete rather than as ambiguous: an
+ * empty slot stays empty, and «إلى سورة» repeats the surah when the range sits
+ * inside one, because a blank there would read on paper as «nothing set».
  */
-function rangeText(r: PlanRow | undefined): string {
-  if (!r || (!r.fromSurah && !r.toSurah)) return '';
-  const ay = (v: string) => (!v || v === 'آخر' ? v : toArabicDigits(v));
-  const fa = ay(r.fromAyah), ta = ay(r.toAyah);
-  if (!r.fromSurah) return `— ← ${r.toSurah}${ta ? ` ${ta}` : ''}`;
-  if (r.fromSurah === r.toSurah || !r.toSurah) {
-    const span = !fa && !ta ? '' : `${fa || '—'}–${ta || '—'}`;
-    /* Both ayahs empty ⇒ the whole surah; an end ayah alone must not read as
-       a start ayah, so the missing side stays visible. */
-    return span ? `${r.fromSurah} ${span}` : r.fromSurah;
-  }
-  return `${r.fromSurah} ${fa || '—'} ← ${r.toSurah} ${ta || '—'}`;
+function RangeCells({ r, cell, bold = false }: {
+  r: PlanRow | undefined; cell: string; bold?: boolean;
+}) {
+  const ay = (v: string | undefined) => (!v ? '' : v === 'آخر' ? v : toArabicDigits(v));
+  const from = r?.fromSurah ?? '';
+  const to = r?.toSurah || (from ? from : '');
+  const w = bold ? 'font-medium' : '';
+  return (
+    <>
+      <td className={`${cell} text-start ${w}`}>{from}</td>
+      <td className={cell}>{ay(r?.fromAyah)}</td>
+      <td className={`${cell} text-start ${w}`}>{to}</td>
+      <td className={cell}>{ay(r?.toAyah)}</td>
+    </>
+  );
 }
 
 export default function PlanSheet({ params }: { params: Promise<{ planId: string }> }) {
@@ -83,6 +87,10 @@ export default function PlanSheet({ params }: { params: Promise<{ planId: string
   }
 
   const cell = 'border border-ink-300 px-1.5 py-1 text-center align-middle';
+  /* Tighter, because seventeen columns cannot each afford six pixels a side.
+     `truncate` is the guard of last resort: a surah name that still will not
+     fit is clipped rather than allowed to widen its column. */
+  const tcell = 'border border-ink-300 px-1 py-1 text-center align-middle truncate';
 
   return (
     <>
@@ -137,17 +145,49 @@ export default function PlanSheet({ params }: { params: Promise<{ planId: string
         </table>
 
         {/* ── الجدول — صفّ واحد لكل يوم، والدرجة بجنب كل مقرّر ─────────── */}
-        <table className="w-full border-collapse text-[10.5px]">
+        {/* A4 at 12mm margins leaves ~703px, and seventeen columns will not
+            find their own way into that. `table-fixed` with an explicit width
+            per column is what keeps this one page: the browser stops measuring
+            content and honours the numbers, so a long surah name ellipsises
+            instead of pushing the sheet onto a second sheet. */}
+        <table className="w-full table-fixed border-collapse text-[9.5px]">
+          <colgroup>
+            <col style={{ width: '3.0%' }} />{/* اليوم */}
+            {[0, 1, 2].map((i) => (
+              <Fragment key={i}>
+                <col style={{ width: '9.2%' }} />{/* من سورة */}
+                <col style={{ width: '3.4%' }} />{/* آية */}
+                <col style={{ width: '9.2%' }} />{/* إلى سورة */}
+                <col style={{ width: '3.4%' }} />{/* آية */}
+                <col style={{ width: '4.0%' }} />{/* الدرجة */}
+              </Fragment>
+            ))}
+            <col style={{ width: '8.6%' }} />{/* ملاحظات */}
+          </colgroup>
+          {/* Two header rows: the مقرّر spans its four columns, and each names
+              what goes under it. «الحديد ١-٥» in one cell was compact but not
+              what the teacher reads down — he reads a column of surahs and a
+              column of ayat, so they are columns. */}
           <thead>
             <tr className="bg-page/60 text-[10px] text-ink-700">
-              <th className={`${cell} w-8`}>اليوم</th>
-              <th className={cell}>مراجعة كبرى</th>
-              <th className={`${cell} w-10`}>الدرجة</th>
-              <th className={cell}>مراجعة صغرى</th>
-              <th className={`${cell} w-10`}>الدرجة</th>
-              <th className={cell}>الدرس</th>
-              <th className={`${cell} w-10`}>الدرجة</th>
-              <th className={`${cell} w-24`}>ملاحظات</th>
+              <th className={tcell} rowSpan={2}>اليوم</th>
+              <th className={tcell} colSpan={4}>مراجعة كبرى</th>
+              <th className={tcell} rowSpan={2}>الدرجة</th>
+              <th className={tcell} colSpan={4}>مراجعة صغرى</th>
+              <th className={tcell} rowSpan={2}>الدرجة</th>
+              <th className={tcell} colSpan={4}>الدرس</th>
+              <th className={tcell} rowSpan={2}>الدرجة</th>
+              <th className={tcell} rowSpan={2}>ملاحظات</th>
+            </tr>
+            <tr className="bg-page/60 text-[9px] text-ink-600">
+              {[0, 1, 2].map((i) => (
+                <Fragment key={i}>
+                  <th className={tcell}>من سورة</th>
+                  <th className={tcell}>آية</th>
+                  <th className={tcell}>إلى سورة</th>
+                  <th className={tcell}>آية</th>
+                </Fragment>
+              ))}
             </tr>
           </thead>
           <tbody>
@@ -156,12 +196,12 @@ export default function PlanSheet({ params }: { params: Promise<{ planId: string
                 /* «يظهران في الورقة بصفّهما وخانة تاريخ … لا بمقرّر حفظ» */
                 return (
                   <tr key={d.dayNo} className="keep h-[26px] bg-brand-50">
-                    <td className={`${cell} font-medium`}><Num>{toArabicDigits(d.dayNo)}</Num></td>
-                    <td className={`${cell} font-medium text-brand-800`} colSpan={5}>
+                    <td className={`${tcell} font-medium`}><Num>{toArabicDigits(d.dayNo)}</Num></td>
+                    <td className={`${tcell} font-medium text-brand-800`} colSpan={13}>
                       {BADGE_AR[d.examBadge]}
                     </td>
-                    <td className={`${cell} text-[9px] text-ink-500`}>التاريخ</td>
-                    <td className={cell} />
+                    <td className={`${tcell} text-[8.5px] text-ink-500`}>التاريخ</td>
+                    <td className={tcell} />
                   </tr>
                 );
               }
@@ -175,14 +215,14 @@ export default function PlanSheet({ params }: { params: Promise<{ planId: string
                 : (noted[0]?.note ?? '');
               return (
                 <tr key={d.dayNo} className="keep h-[26px]">
-                  <td className={`${cell} font-medium`}><Num>{toArabicDigits(d.dayNo)}</Num></td>
-                  <td className={`${cell} text-start`}>{rangeText(mk)}</td>
-                  <td className={cell} />
-                  <td className={`${cell} text-start`}>{rangeText(ms)}</td>
-                  <td className={cell} />
-                  <td className={`${cell} text-start font-medium`}>{rangeText(dars)}</td>
-                  <td className={cell} />
-                  <td className={`${cell} text-start text-[9.5px]`}>
+                  <td className={`${tcell} font-medium`}><Num>{toArabicDigits(d.dayNo)}</Num></td>
+                  <RangeCells r={mk} cell={tcell} />
+                  <td className={tcell} />
+                  <RangeCells r={ms} cell={tcell} />
+                  <td className={tcell} />
+                  <RangeCells r={dars} cell={tcell} bold />
+                  <td className={tcell} />
+                  <td className={`${tcell} text-start text-[8.5px]`}>
                     {/* Clamped: an unbounded note would grow the row and spill
                         the sheet onto a second page — the merge's whole point. */}
                     <span title={notes} style={{

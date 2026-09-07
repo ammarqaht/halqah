@@ -148,7 +148,11 @@ function RecordExam() {
 
   const student = db.students.find((s) => s.id === studentId) ?? null;
   const halaqa = student?.halaqaId ? db.halaqat.find((h) => h.id === student.halaqaId) ?? null : null;
-  const blocked = student ? !earnsPoints(student) : false;
+  /* A talqeen student can be EXAMINED — the client records his association
+     results — he simply earns nothing (§13.1). So the form stays open and only
+     the points are held at zero, which `examPoints` already does. */
+  const talqeen = student?.track === 'TALQEEN';
+  const blocked = false;
 
   /* ── the chain of suggestions ─────────────────────────────────────────────
      Each link fills itself from the one before it and stays editable. */
@@ -236,8 +240,13 @@ function RecordExam() {
      curriculum (§13.1), so a levelled exam on one of them is not a mistake to
      warn about after the fact — it is a choice that should never be on the
      list. The count of who was left out is stated below the field instead. */
-  const eligible = useMemo(() => db.students.filter(earnsPoints), [db.students]);
-  const talqeenCount = db.students.length - eligible.length;
+  /* Every student, talqeen included. He sits association exams like anyone
+     else — the client records their results — and leaving him off the list
+     meant there was no way to enter one. What talqeen is exempt from is the
+     POINTS (§13.1), and `examPoints` already returns zero for him, so the
+     record can be kept without the exemption being touched. */
+  const eligible = useMemo(() => [...db.students], [db.students]);
+  const talqeenCount = db.students.filter((s) => s.track === 'TALQEEN').length;
 
   const studentOptions = useMemo(() => eligible.map((s) => ({
     value: s.id,
@@ -275,7 +284,9 @@ function RecordExam() {
   /* …but a tajweed sitting is examined on a RULE, not on a level or a number
      of ajza — the file records neither. Demanding them turned a two-field form
      into a four-field one and invented data the sheet never carried. */
-  const levelled = type !== 'TAJWEED';
+  /* Talqeen has no level and no curriculum (§13.1), so neither field can be
+     demanded of him — the same reasoning that exempts a tajweed sitting. */
+  const levelled = type !== 'TAJWEED' && student?.track !== 'TALQEEN';
   const levelValid = !levelled
     || (levelNum !== null && levelNum >= LEVEL_MIN && levelNum <= LEVEL_MAX);
   const ajzaValid = !levelled || (ajza !== '' && Number(ajza) > 0);
@@ -467,7 +478,7 @@ function RecordExam() {
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="اسم الطالب"
               hint={talqeenCount > 0
-                ? `${talqeenCount} من طلاب التلقين خارج هذه القائمة — لا مستوى لهم ولا منهج`
+                ? `${talqeenCount} من طلاب التلقين ضمن القائمة — تُسجَّل اختباراتهم بلا مستوى ولا نقاط`
                 : 'ابحث بالاسم'}>
               <Combobox value={studentId} onChange={setStudentId} options={studentOptions}
                 placeholder="اختر الطالب" searchPlaceholder="ابحث بالاسم…"
@@ -496,18 +507,18 @@ function RecordExam() {
             </div>
           )}
 
-          {blocked && (
-            <div className="mt-4 flex items-start gap-2.5 rounded-lg border border-risk-200 bg-risk-100 px-4 py-3">
-              <AlertTriangle size={17} className="mt-0.5 shrink-0 text-risk-700" />
-              <p className="text-base2 text-risk-700">
-                هذا الطالب على مسار التلقين، ولا مستوى له ولا منهج — فلا تُسجَّل عليه اختبارات
-                مستوياتية ولا نقاط — القرار الأول في القسم ١٣ من الوثيقة.
+          {talqeen && (
+            <div className="mt-4 flex items-start gap-2.5 rounded-lg border border-info-200 bg-info-100 px-4 py-3">
+              <AlertTriangle size={17} className="mt-0.5 shrink-0 text-info-700" />
+              <p className="text-base2 text-info-700">
+                طالب تلقين: يُسجَّل اختباره ودرجته كاملةً، بلا مستوى ولا أجزاء ولا نقاط —
+                القرار الأول في القسم ١٣ من الوثيقة.
               </p>
             </div>
           )}
         </Sheet>
 
-        {student && !blocked && (
+        {student && (
           <>
             <Sheet className="rise mb-4">
               <SheetHead title="نوع الاختبار" />
