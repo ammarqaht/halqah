@@ -83,6 +83,10 @@ export async function POST(req: Request) {
         const prev = byKey.get(key);
         if (!prev) {
           toCreate.push({
+            /* Keep the id the browser minted. Both sides then name the same
+               student by the same id, and the exams and plans that reference
+               him survive the state save instead of being dropped as orphans. */
+            id: s.id,
             dedupeKey: key,
             fullName: s.fullName,
             nationalId: s.nationalId || null,
@@ -124,7 +128,26 @@ export async function POST(req: Request) {
         },
       });
 
-      return { created, updated, flagged, halaqat: idByIncoming.size };
+      /* THE MAP THE BROWSER NEEDS.
+         Every parse mints its own student ids, and the ids that survive here
+         are whatever the database already held. Without handing the mapping
+         back, the browser goes on holding exams, plans and ledger rows that
+         name a student this database has never heard of — and the state save
+         drops every one of them. Which is exactly what happened: 3570 rows of
+         curriculum synced (they name no student) and not one exam did. */
+      const after = await tx.student.findMany({
+        where: { dedupeKey: { in: keys } },
+        select: { id: true, dedupeKey: true },
+      });
+      const byDedupe = new Map(after.map((r) => [r.dedupeKey!, r.id]));
+      const idMap: Record<string, string> = {};
+      for (const s of students) {
+        const key = s.dedupeKey || s.nationalId || s.fullName;
+        const kept = key ? byDedupe.get(key) : undefined;
+        if (kept && kept !== s.id) idMap[s.id] = kept;
+      }
+
+      return { created, updated, flagged, halaqat: idByIncoming.size, idMap };
     }, { timeout: 120_000 });
 
     return NextResponse.json({ ok: true, ...result, ms: Date.now() - started });

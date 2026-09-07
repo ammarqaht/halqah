@@ -21,7 +21,7 @@ import { usePanel } from '@/components/PanelState';
 import { KIND_AR } from '@/lib/importers/detect';
 import { readWorkbook, type WorkbookRead, type SheetOutcome } from '@/lib/importers/workbook';
 import { ISSUE_AR } from '@/lib/importers/roster';
-import { useDB, store } from '@/lib/store';
+import { useDB, store, flushToServer } from '@/lib/store';
 import { shortName } from '@/lib/normalise';
 import { TRACK_AR } from '@/lib/types';
 import { cx } from '@/lib/cx';
@@ -105,24 +105,45 @@ export default function ImportPage() {
 
   const commit = async () => {
     setBusy(true);
-    let synced = true;
+    let allSynced = true;
     for (const j of ready) {
       const p = j.read!.payload;
-      store.ingest({ ...p, sourceFile: j.name });
-      /* The browser parsed it; the server keeps it. Without this the upload
-         would only ever exist in the tab that made it. */
+
+      /* The server first, because it decides which student ids survive.
+         A student it already holds keeps ITS id, and every exam, plan and
+         ledger row in this payload still names the id this parse minted — so
+         they are remapped before anything is stored. Skipping this is why
+         3570 rows of curriculum reached the database and not one exam did. */
+      let idMap: Record<string, string> = {};
+      let synced = true;
       if (p.students.length || p.halaqat.length) {
         try {
           const res = await fetch('/api/import', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ students: p.students, halaqat: p.halaqat, fileName: j.name }),
           });
-          if (!res.ok) synced = false;
+          if (res.ok) idMap = (await res.json()).idMap ?? {};
+          else synced = false;
         } catch { synced = false; }
       }
+      if (!synced) allSynced = false;
+
+      const to = (id: string | null) => (id && idMap[id]) || id;
+      const mapped = {
+        ...p,
+        students: p.students.map((s) => ({ ...s, id: to(s.id)! })),
+        exams: p.exams.map((e) => ({ ...e, studentId: to(e.studentId)! })),
+        plans: p.plans.map((x) => ({ ...x, studentId: to(x.studentId)! })),
+      };
+      store.ingest({ ...mapped, sourceFile: j.name });
     }
+
+    /* Everything else this upload carried — the exams, the plans, the
+       curriculum — reaches the server through the state save. Flushed here
+       rather than left to the debounce, so «تم الاستيراد» means it landed. */
+    await flushToServer();
     setBusy(false);
-    setDone({ ...totals, files: ready.length, synced });
+    setDone({ ...totals, files: ready.length, synced: allSynced });
   };
 
   const open = jobs.find((j) => j.id === openId) ?? null;
