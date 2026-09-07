@@ -75,30 +75,17 @@ function PlansScreen() {
     ? levelAvailable(student.track, levelNum, db.curriculum) : null;
 
   /* The plan record exists as soon as there is something to preview; printing
-     is what stamps it. Issuing is idempotent per (student, level).
-
-     Issuing happens in an EFFECT and the record is then read back, rather than
-     being created inside a `useMemo`. `issuePlan` writes to the store and the
-     store notifies every subscriber, so doing it while rendering made React
-     update the rail in the middle of this screen's render — «Cannot update a
-     component while rendering a different component», which it logged on every
-     student picked. The preview is a frame later and nothing else changes. */
-  const wanted = student?.track && levelNum && availability?.ok
-    ? { studentId: student.id,
-        track: student.track as Exclude<typeof student.track, null>,
-        level: levelNum }
-    : null;
-
-  useEffect(() => {
-    if (!wanted) return;
-    store.issuePlan({ ...wanted, dailyAmount: dailyAmountFor(wanted.track) });
-  }, [wanted?.studentId, wanted?.track, wanted?.level]);   // eslint-disable-line react-hooks/exhaustive-deps
-
-  const plan = useMemo(() => (wanted
-    ? db.plans.find((p) => p.studentId === wanted.studentId
-        && p.track === wanted.track && p.level === wanted.level) ?? null
-    : null),
-    [wanted?.studentId, wanted?.track, wanted?.level, db.plans]);   // eslint-disable-line react-hooks/exhaustive-deps
+     is what stamps it. Issuing is idempotent per (student, level). */
+  const plan = useMemo(() => {
+    if (!student?.track || !levelNum || !availability?.ok) return null;
+    return store.issuePlan({
+      studentId: student.id,
+      track: student.track as Exclude<typeof student.track, null>,
+      level: levelNum,
+      dailyAmount: dailyAmountFor(student.track),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [student, levelNum, availability?.ok, db.plans.length]);
 
   const overrides = useMemo(
     () => db.planOverrides.filter((o) => o.planId === plan?.id), [db.planOverrides, plan]);
@@ -247,11 +234,8 @@ function PlansScreen() {
                 <table className="w-full min-w-[46rem] border-collapse text-body">
                   <thead>
                     <tr className="border-b border-ink-200 bg-page/50 text-cap text-ink-500">
-                      {['اليوم', 'المقرر', 'من سورة', 'آية', 'إلى سورة', 'آية', 'ملاحظة', ''].map((h, i) => (
-                        /* «آية» heads two columns — the from and the to — so the label
-                           is not unique and cannot be the key. The list is static and
-                           never reorders, so the index is. */
-                        <th key={i} className="px-3 py-2.5 text-start font-medium">{h}</th>))}
+                      {['اليوم', 'المقرر', 'من سورة', 'آية', 'إلى سورة', 'آية', 'ملاحظة', ''].map((h) => (
+                        <th key={h} className="px-3 py-2.5 text-start font-medium">{h}</th>))}
                     </tr>
                   </thead>
                   <tbody>

@@ -560,38 +560,9 @@ export const store = {
    */
   markPrinted(planId: string) {
     const cur = load();
-    const plan = cur.plans.find((p) => p.id === planId);
-    if (!plan) return;
-    /* First print — in both of the senses below. */
-    const first = plan.printedCount === 0;
-
-    commit({
-      ...cur,
-      plans: cur.plans.map((p) => (p.id === planId
-        ? { ...p,
-            printedCount: p.printedCount + 1,
-            issuedAt: first ? new Date().toISOString() : p.issuedAt }
-        : p)),
-      /* And the first print is also what puts the student ON that level.
-         Nothing in the product wrote `currentLevel` before this line, so the
-         screens that read it — the exam booking, «مستواه الحالي» on the plans
-         screen, the follow-up table, the halaqa sheet — were all reading a
-         field that stayed null for every student who came from the roster.
-
-         Printing is the honest moment for it, and the same one §9 already uses
-         for the date. A REPRINT must not move him, and an old sheet pulled out
-         again must not move him BACKWARDS — levels count down, so re-printing
-         level 43 for a boy now on 40 would undo two levels of progress. Both
-         are ruled out by riding the same `first` condition as `issuedAt`.
-
-         Talqeen is guarded here and not only on the screen that hides it
-         («التلقين بلا مستويات» §13.1), for the reason `grantPoints` guards at
-         the mutation: a screen can be routed around, a mutation cannot. */
-      students: first && plan.track !== 'TALQEEN'
-        ? cur.students.map((s) => (s.id === plan.studentId
-            ? { ...s, currentLevel: plan.level } : s))
-        : cur.students,
-    });
+    commit({ ...cur, plans: cur.plans.map((p) => (p.id === planId
+      ? { ...p, printedCount: p.printedCount + 1, issuedAt: p.printedCount === 0 ? new Date().toISOString() : p.issuedAt }
+      : p)) });
   },
 
   updatePlan(planId: string, patch: Partial<StudentPlan>) {
