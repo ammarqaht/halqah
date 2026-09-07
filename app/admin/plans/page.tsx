@@ -13,7 +13,7 @@
    «لا يُفقد الأصل أبدًا» true rather than merely promised. */
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   FileText, Printer, AlertTriangle, Inbox, UploadCloud,
 } from 'lucide-react';
@@ -21,6 +21,7 @@ import { TopBar } from '@/components/TopBar';
 import { Sheet, SheetHead } from '@/components/Sheet';
 import { Btn, Empty, Field, INPUT } from '@/components/ui';
 import { Combobox } from '@/components/Combobox';
+import { TrackPicker } from '@/components/TrackPicker';
 import { Num, juzPhrase } from '@/components/Num';
 import { usePanel } from '@/components/PanelState';
 import { store, useDB } from '@/lib/store';
@@ -37,6 +38,7 @@ function PlansScreen() {
   const { panelOpen, setPanelOpen } = usePanel();
   const db = useDB();
   const sp = useSearchParams();
+  const router = useRouter();
 
   const [studentId, setStudentId] = useState(sp.get('student') ?? '');
   /* The panel narrows the list by track; «الكل» is an absent parameter. */
@@ -161,11 +163,25 @@ function PlansScreen() {
         {/* ── ١ · الطالب ← ٢ · مستواه التالي ───────────────────────────── */}
         <Sheet className="rise mb-4">
           <SheetHead title="الطالب ومستواه"
-            meta="اختر الطالب، فتظهر حلقته ومساره ومستواه التالي من نفسها" />
+            meta="اختر المسار، ثم الطالب — فتظهر حلقته ومستواه التالي من نفسها" />
+
+          {/* The track first: he is working through one halaqa's silver boys or
+              the eleven golden ones, and knows which before he knows the name. */}
+          <div className="mb-4">
+            <p className="mb-2 text-xs2 font-medium text-ink-600">المسار</p>
+            <TrackPicker value={trackFilter} students={withTrack} tracks={['SILVER', 'GOLDEN']}
+              onChange={(t) => {
+                const p = new URLSearchParams(sp.toString());
+                if (t) p.set('track', t); else p.delete('track');
+                /* A name from the previous track would sit there unreadable. */
+                p.delete('student'); setStudentId('');
+                router.replace(`/admin/plans${p.toString() ? `?${p}` : ''}`, { scroll: false });
+              }} />
+          </div>
+
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="اسم الطالب"
               hint={[
-                trackFilter ? `المعروض: مسار ${TRACK_AR[trackFilter]} فقط — بدّله من اللوحة` : null,
                 talqeenCount > 0 ? `${talqeenCount} من طلاب التلقين خارج القائمة — لا منهج لهم ولا مستوى` : null,
                 untrackedCount > 0 ? `${untrackedCount} بلا مسار في الملف` : null,
               ].filter(Boolean).join(' · ') || 'ابحث بالاسم'}>

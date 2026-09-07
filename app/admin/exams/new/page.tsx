@@ -23,6 +23,7 @@ import { TopBar } from '@/components/TopBar';
 import { Sheet, SheetHead } from '@/components/Sheet';
 import { Btn, Empty, Chip, Field, INPUT } from '@/components/ui';
 import { Combobox } from '@/components/Combobox';
+import { TrackPicker } from '@/components/TrackPicker';
 import { Num, pointWord } from '@/components/Num';
 import { usePanel } from '@/components/PanelState';
 import { store, useDB } from '@/lib/store';
@@ -32,7 +33,7 @@ import {
   ajzaForLevel, isMidJuz, scoreFromCounters, isPassingFor, scoreMax, passMarkFor,
   suggestionAfter,
 } from '@/lib/exams';
-import { type Exam } from '@/lib/types';
+import { type Exam, type Track } from '@/lib/types';
 import { SURAHS } from '@/lib/surahs';
 import { shortName } from '@/lib/normalise';
 import { isoDate } from '@/lib/dates';
@@ -251,7 +252,12 @@ function RecordExam() {
      meant there was no way to enter one. What talqeen is exempt from is the
      POINTS (§13.1), and `examPoints` already returns zero for him, so the
      record can be kept without the exemption being touched. */
-  const eligible = useMemo(() => [...db.students], [db.students]);
+  /* Track first, then the name. A hundred and two names in one box is a
+     search pretending to be a choice; he knows the track before the name. */
+  const [track, setTrack] = useState<Track | null>(null);
+  const eligible = useMemo(
+    () => (track ? db.students.filter((s) => s.track === track) : [...db.students]),
+    [db.students, track]);
   const talqeenCount = db.students.filter((s) => s.track === 'TALQEEN').length;
 
   const studentOptions = useMemo(() => eligible.map((s) => ({
@@ -480,6 +486,13 @@ function RecordExam() {
         <Sheet className="rise mb-4">
           <SheetHead title="الطالب والاختبار"
             meta="اختر الطالب، فتظهر حلقته ومساره ومستواه من نفسها" />
+
+          <div className="mb-4">
+            <p className="mb-2 text-xs2 font-medium text-ink-600">المسار</p>
+            <TrackPicker value={track} students={db.students}
+              tracks={['SILVER', 'GOLDEN', 'TALQEEN']}
+              onChange={(t) => { setTrack(t); setStudentId(''); }} />
+          </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="اسم الطالب"
