@@ -76,7 +76,7 @@ export async function POST(req: Request) {
         set('stage', s.stage);
         set('nationality', s.nationality);
         set('guardianPhone', s.guardianPhone);
-        if (s.attended !== undefined && s.attended !== null) patch.attended = s.attended;
+        if (s.attendedDays !== undefined && s.attendedDays !== null) patch.attendedDays = s.attendedDays;
         if (typeof s.hifzPages === 'number') patch.hifzPages = s.hifzPages;
         if (typeof s.reviewPages === 'number') patch.reviewPages = s.reviewPages;
 
@@ -93,7 +93,7 @@ export async function POST(req: Request) {
             stage: s.stage ?? '',
             nationality: s.nationality ?? '',
             guardianPhone: s.guardianPhone ?? '',
-            attended: s.attended ?? null,
+            attendedDays: s.attendedDays ?? null,
             hifzPages: typeof s.hifzPages === 'number' ? s.hifzPages : null,
             reviewPages: typeof s.reviewPages === 'number' ? s.reviewPages : null,
           });

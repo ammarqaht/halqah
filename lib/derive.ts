@@ -18,13 +18,17 @@ export function derive(db: DB) {
       const v = list.map(f).filter((n): n is number => typeof n === 'number');
       return v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0;
     };
-    const marked = list.filter((x) => x.attended !== undefined);
+    const marked = list.filter((x) => x.attendedDays !== undefined);
     return {
       ...h,
       n: list.length,
       hp: avg((x) => x.hifzPages),
       rp: avg((x) => x.reviewPages),
-      att: marked.length ? Math.round((marked.filter((x) => x.attended).length / marked.length) * 100) : null,
+      /* Average DAYS attended. It used to be «what share of them showed up»
+         computed from a yes/no that was itself wrong — the column is a count. */
+      att: marked.length
+        ? Math.round((marked.reduce((n, x) => n + (x.attendedDays ?? 0), 0) / marked.length) * 10) / 10
+        : null,
       tracks: list.reduce<Record<string, number>>((m, x) => {
         if (x.track) m[TRACK_AR[x.track]] = (m[TRACK_AR[x.track]] ?? 0) + 1; return m;
       }, {}),

@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Printer } from 'lucide-react';
 import { Modal, Btn, Field, INPUT } from '@/components/ui';
 import { Combobox } from '@/components/Combobox';
+import { useBands } from '@/lib/useBands';
 import { Num, cardWord, pointWord } from '@/components/Num';
 import { store } from '@/lib/store';
 import { cardColour } from '@/lib/points';
@@ -24,6 +25,7 @@ export function BatchDialog({ open, onClose, onIssued }: {
 }) {
   const [value, setValue] = useState('10');
   const [quantity, setQuantity] = useState('40');
+  const { purposes } = useBands();
   const [purpose, setPurpose] = useState<string>(CODE_PURPOSES[0]);
   const [expires, setExpires] = useState('');
 
@@ -78,7 +80,7 @@ export function BatchDialog({ open, onClose, onIssued }: {
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="الغرض" hint="يظهر على البطاقة وفي متابعة الدفعات">
             <Combobox value={purpose} onChange={setPurpose} creatable createLabel="غرض جديد"
-              options={CODE_PURPOSES.map((p) => ({ value: p, label: p }))} />
+              options={purposes.map((p) => ({ value: p, label: p }))} />
           </Field>
           <Field label="تاريخ الانتهاء" hint="اختياري — حتى لا تبقى بطاقة قديمة صالحة إلى الأبد">
             <input type="date" className={INPUT} value={expires} min={isoDate(new Date())}

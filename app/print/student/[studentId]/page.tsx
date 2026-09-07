@@ -48,7 +48,7 @@ export default function StudentReport({ params }: { params: Promise<{ studentId:
   const granted = txns.filter((t) => t.delta > 0).reduce((n, t) => n + t.delta, 0);
   const redeemed = txns.filter((t) => t.delta < 0).reduce((n, t) => n - t.delta, 0);
   const talqeen = s.track === 'TALQEEN';
-  const hasRatel = s.attended !== undefined || s.hifzPages !== undefined;
+  const hasRatel = s.attendedDays !== undefined || s.hifzPages !== undefined;
 
   return (
     <>
@@ -212,9 +212,11 @@ export default function StudentReport({ params }: { params: Promise<{ studentId:
             <table className="keep w-full border-collapse text-sm2">
               <tbody>
                 <tr>
-                  <th className={`${PCELL} bg-page/60 font-medium`}>الحضور</th>
+                  <th className={`${PCELL} bg-page/60 font-medium`}>أيام الحضور</th>
                   <td className={PCELL}>
-                    {s.attended === undefined ? '—' : s.attended ? 'حاضر' : 'غائب'}
+                    {s.attendedDays === undefined ? '—'
+                      : <><Num>{toArabicDigits(s.attendedDays)}</Num>{' '}
+                          {s.attendedDays === 1 ? 'يوم' : s.attendedDays === 2 ? 'يومان' : 'أيام'}</>}
                   </td>
                   <th className={`${PCELL} bg-page/60 font-medium`}>أوجه الحفظ</th>
                   <td className={PCELL}>{s.hifzPages !== undefined ? <Num>{toArabicDigits(s.hifzPages)}</Num> : '—'}</td>

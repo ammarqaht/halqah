@@ -7,7 +7,7 @@ type DbStudent = {
   dedupeKey: string | null; track: string | null; halaqaId: string | null;
   grade: string; stage: string; nationality: string; guardianPhone: string;
   status: string; currentLevel: number | null;
-  attended: boolean | null; hifzPages: unknown; reviewPages: unknown;
+  attendedDays: number | null; hifzPages: unknown; reviewPages: unknown;
 };
 
 const num = (v: unknown) => (v === null || v === undefined ? undefined : Number(v));
@@ -26,7 +26,7 @@ export const toStudent = (s: DbStudent): Student => ({
   guardianPhone: s.guardianPhone,
   status: s.status as StudentStatus,
   currentLevel: s.currentLevel,
-  attended: s.attended ?? undefined,
+  attendedDays: num(s.attendedDays),
   hifzPages: num(s.hifzPages),
   reviewPages: num(s.reviewPages),
 });

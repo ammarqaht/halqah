@@ -90,7 +90,9 @@ model Student {
   currentLevel  Int?          @map("current_level")
 
   // last snapshot from a Ratel import
-  attended    Boolean? 
+  /** «الحضور» is a COUNT OF DAYS in the roster — 0 to 7 — not a yes/no.
+      Read as a boolean, a boy present three days out of three came back «غائب». */
+  attendedDays Int?    @map("attended_days") 
   hifzPages   Decimal? @map("hifz_pages")   @db.Decimal(6, 2)
   reviewPages Decimal? @map("review_pages") @db.Decimal(6, 2)
 

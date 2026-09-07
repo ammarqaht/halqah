@@ -37,7 +37,7 @@ const TRACKED: { field: keyof Student; label: string; fmt?: (v: unknown) => stri
   { field: 'stage',         label: 'المرحلة' },
   { field: 'nationality',   label: 'الجنسية' },
   { field: 'guardianPhone', label: 'جوال ولي الأمر' },
-  { field: 'attended',      label: 'الحضور', fmt: (v) => (v === undefined ? '—' : v ? 'حاضر' : 'غائب') },
+  { field: 'attendedDays',  label: 'أيام الحضور' },
   { field: 'hifzPages',     label: 'أوجه الحفظ' },
   { field: 'reviewPages',   label: 'أوجه المراجعة' },
 ];

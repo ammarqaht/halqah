@@ -9,6 +9,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Minus, Plus } from 'lucide-react';
 import { Modal, Btn, Field, INPUT, Segmented } from '@/components/ui';
 import { Combobox } from '@/components/Combobox';
+import { useBands } from '@/lib/useBands';
 import { Num, studentWord, pointWord } from '@/components/Num';
 import { store, useDB } from '@/lib/store';
 import { earnsPoints } from '@/lib/points';
@@ -33,6 +34,7 @@ export function GrantDialog({ open, onClose, preselected = [], defaultHalaqa = n
   const [studentId, setStudentId] = useState('');
   const [halaqaId, setHalaqaId] = useState('');
   const [amount, setAmount] = useState('');
+  const { reasons } = useBands();
   const [reason, setReason] = useState<string>(POINT_REASONS[0]);
   const [note, setNote] = useState('');
 
@@ -168,7 +170,7 @@ export function GrantDialog({ open, onClose, preselected = [], defaultHalaqa = n
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="السبب" hint="حقل إلزامي — عليه تُبنى التقارير">
             <Combobox value={reason} onChange={setReason}
-              options={POINT_REASONS.map((r) => ({ value: r, label: r }))} />
+              options={reasons.map((r) => ({ value: r, label: r }))} />
           </Field>
           <Field label={reason === 'أخرى' ? 'اكتب السبب' : 'تفصيل (اختياري)'}>
             <input className={INPUT} value={note} onChange={(e) => setNote(e.target.value)}

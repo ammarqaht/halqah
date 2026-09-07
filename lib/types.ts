@@ -40,7 +40,10 @@ export type Student = {
       one file legitimately carries the same id on two different rows. */
   dedupeKey?: string;
   // last Ratel snapshot
-  attended?: boolean;
+  /** «الحضور» in the roster is a COUNT OF DAYS — the file holds 0, 1, 2, 3 —
+      and was being read as a yes/no, so a boy present three days out of three
+      came back «غائب». Kept as the number it is. */
+  attendedDays?: number;
   hifzPages?: number;
   reviewPages?: number;
 };

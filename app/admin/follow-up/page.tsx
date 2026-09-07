@@ -389,11 +389,13 @@ function FollowUpScreen() {
                       </Def>
                     )}
                     <Def label="لقطة رتل الأسبوعية">
-                      {sel.student.attended === undefined && sel.student.hifzPages === undefined
+                      {sel.student.attendedDays === undefined && sel.student.hifzPages === undefined
                         ? <span className="text-ink-400">لم يرد في آخر ملف</span>
                         : <>
-                            {sel.student.attended !== undefined && (sel.student.attended
-                              ? <Chip tone="ok">حاضر</Chip> : <Chip tone="risk">غائب</Chip>)}
+                            {sel.student.attendedDays !== undefined && (
+                              <Chip tone={sel.student.attendedDays > 0 ? 'ok' : 'risk'}>
+                                <Num>{sel.student.attendedDays}</Num> {sel.student.attendedDays === 1 ? 'يوم' : 'أيام'}
+                              </Chip>)}
                             {' '}حفظ <Num>{sel.student.hifzPages ?? '—'}</Num> ·
                             {' '}مراجعة <Num>{sel.student.reviewPages ?? '—'}</Num>
                           </>}

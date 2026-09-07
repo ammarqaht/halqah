@@ -150,7 +150,8 @@ export function parseRoster(wb: XLSX.WorkBook, sheetName: string): ParseResult {
         guardianPhone: normalisePhone(cell(r, 'phone')),
         status: 'ACTIVE',
         currentLevel: null,
-        attended: attendedRaw === null ? undefined : Number(attendedRaw) === 1,
+        attendedDays: attendedRaw === null || attendedRaw === '' ? undefined
+          : (Number.isFinite(Number(attendedRaw)) ? Number(attendedRaw) : undefined),
         hifzPages: num(cell(r, 'hifzPages')),
         reviewPages: num(cell(r, 'reviewPages')),
       },

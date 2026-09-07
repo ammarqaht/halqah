@@ -10,6 +10,7 @@ import { usePanel } from '@/components/PanelState';
 import { store, useDB } from '@/lib/store';
 import { derive } from '@/lib/derive';
 import { PointsSettingsCard } from '@/components/PointsSettings';
+import { BandsSettingsCard } from '@/components/BandsSettings';
 
 type Stats = { students: number; halaqat: number; imports: number; audit: number; bytes: number };
 
@@ -67,6 +68,8 @@ export default function SettingsPage() {
         </header>
 
         <PointsSettingsCard />
+
+        <BandsSettingsCard />
 
         <Sheet className="rise mb-4">
           <SheetHead title="قاعدة البيانات"
