@@ -19,3 +19,14 @@ test('what comes next', () => {
   expect(ayahCount('العنكبوت')).toBe(69);
   expect(matchSurahs('العن')[0].name).toBe('العنكبوت');
 });
+
+test('a halaqa is named without its session time', async () => {
+  const { halaqaLabel } = await import('./normalise');
+  expect(halaqaLabel('تحفيظ هشام سليم (العصر)')).toBe('تحفيظ هشام سليم');
+  expect(halaqaLabel('صلاح الدين يحيى محمد محمد ( عصر)')).toBe('صلاح الدين يحيى محمد محمد');
+  /* Nothing to strip, nothing changes. */
+  expect(halaqaLabel('تحفيظ حسن محمد ماهر علي')).toBe('تحفيظ حسن محمد ماهر علي');
+  /* Brackets that are not the trailing session stay put. */
+  expect(halaqaLabel('حلقة (أ) الكبرى')).toBe('حلقة (أ) الكبرى');
+  expect(halaqaLabel(null)).toBe('');
+});

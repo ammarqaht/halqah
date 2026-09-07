@@ -14,7 +14,7 @@ import { followUpRows } from '@/lib/followup';
 import { scoreMax } from '@/lib/exams';
 import { EXAM_TYPE_AR, type ExamType } from '@/lib/points';
 import { TRACK_AR, STATUS_AR, TXN_KIND_AR } from '@/lib/types';
-import { shortName } from '@/lib/normalise';
+import { halaqaLabel, shortName  } from '@/lib/normalise';
 import { formatDate } from '@/lib/dates';
 
 const MAX_EXAM_ROWS = 14;
@@ -70,7 +70,7 @@ export default function StudentReport({ params }: { params: Promise<{ studentId:
             <tr>
               <th className={`${PCELL} bg-page/60 font-medium`}>الحلقة</th>
               <td className={PCELL}>
-                {halaqa ? `${shortName(halaqa.teacher)} · ${halaqa.timeSlot}` : 'بلا حلقة'}
+                {halaqa ? halaqaLabel(shortName(halaqa.teacher)) : 'بلا حلقة'}
               </td>
               <th className={`${PCELL} bg-page/60 font-medium`}>المسار</th>
               <td className={PCELL}>{s.track ? TRACK_AR[s.track] : '—'}</td>

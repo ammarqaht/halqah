@@ -163,7 +163,7 @@ function PlanSheetInner({ params }: { params: Promise<{ planId: string }> }) {
               <th className={`${cell} bg-page/60 font-medium`}>الحلقة</th>
               <td className={cell} colSpan={3}>
                 {halaqa ? shortName(halaqa.teacher) : (blank ? '' : 'بلا حلقة')}
-                {halaqa?.timeSlot ? ` · ${halaqa.timeSlot}` : ''}
+
               </td>
             </tr>
           </tbody>

@@ -45,7 +45,7 @@ export default function HalaqaReport({ params }: { params: Promise<{ halaqaId: s
 
       <div className="sheet-a4 font-sans" dir="rtl">
         <PrintHead title={`تقرير حلقة ${halaqa.teacher}`}
-          sub={`${halaqa.timeSlot} · جامع محمد العبدالكريم — ${toArabicDigits(plural(rows.length, 'طالب واحد', 'طالبان', 'طلاب', 'طالبًا'))}`} />
+          sub={`جامع محمد العبدالكريم — ${toArabicDigits(plural(rows.length, 'طالب واحد', 'طالبان', 'طلاب', 'طالبًا'))}`} />
 
         {rows.length === 0 ? (
           <p className="py-12 text-center text-lg2 text-ink-500">لا طلاب نشطين في هذه الحلقة.</p>

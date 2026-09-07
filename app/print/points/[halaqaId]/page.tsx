@@ -50,7 +50,7 @@ export default function PointsSheet({ params }: { params: Promise<{ halaqaId: st
 
       <div className="sheet-a4 font-sans" dir="rtl">
         <PrintHead title="قائمة نقاط الحلقة"
-          sub={`حلقة ${halaqa.teacher} · ${halaqa.timeSlot} — ${toArabicDigits(plural(rows.length, 'طالب واحد', 'طالبان', 'طلاب', 'طالبًا'))}`} />
+          sub={`حلقة ${halaqa.teacher} — ${toArabicDigits(plural(rows.length, 'طالب واحد', 'طالبان', 'طلاب', 'طالبًا'))}`} />
 
         {rows.length === 0 ? (
           <p className="py-12 text-center text-lg2 text-ink-500">لا طلاب في نظام النقاط بهذه الحلقة.</p>

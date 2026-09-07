@@ -21,7 +21,7 @@ import { useDB } from '@/lib/store';
 import { derive } from '@/lib/derive';
 import { followUpRows } from '@/lib/followup';
 import { EXAM_TYPE_AR, type ExamType } from '@/lib/points';
-import { shortName } from '@/lib/normalise';
+import { halaqaLabel, shortName } from '@/lib/normalise';
 import { formatDate } from '@/lib/dates';
 
 const EXAM_ORDER: ExamType[] = ['BADGE_GOLDEN', 'BADGE_DIAMOND', 'ASSOCIATION', 'TAJWEED', 'MOCK'];
@@ -176,7 +176,9 @@ function AssociationSheet() {
             <table className="w-full border-collapse text-[11px]">
               <thead>
                 <tr className="bg-page/60 text-[10px] text-ink-700">
-                  {['الحلقة', 'الوقت', 'الطلاب', 'جاهزون لاختبار الجمعية الآن'].map((h) => (
+                  {/* «الوقت» said «العصر» beside a name that already ended in
+                      «(العصر)» — the same fact twice. */}
+                  {['الحلقة', 'الطلاب', 'جاهزون لاختبار الجمعية الآن'].map((h) => (
                     <th key={h} className={PCELL}>{h}</th>))}
                 </tr>
               </thead>
@@ -186,8 +188,7 @@ function AssociationSheet() {
                     {/* The name as it is registered, which is what the association's
                         own paperwork carries — a shortened teacher name does not
                         match anything they hold. */}
-                    <td className={`${PCELL} text-start`}>{h.name || h.teacher}</td>
-                    <td className={PCELL}>{h.timeSlot || '—'}</td>
+                    <td className={`${PCELL} text-start`}>{halaqaLabel(h.name || h.teacher)}</td>
                     <td className={PCELL}><Num>{toArabicDigits(h.n)}</Num></td>
                     <td className={PCELL}><Num>{toArabicDigits(readyByHalaqa.get(h.id) ?? 0)}</Num></td>
                   </tr>

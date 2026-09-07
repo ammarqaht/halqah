@@ -83,6 +83,21 @@ export function shortName(full: unknown): string {
   return `${parts[0]} ${parts[parts.length - 1]}`;
 }
 
+/**
+ * A halaqa's name with the time taken out of it.
+ *
+ * The roster registers a halaqa as «تحفيظ هشام سليم (العصر)» — the name and
+ * the session glued into one string. Printed beside a «الوقت» column that says
+ * «العصر» again, the reader is told the same thing twice; and the client asked
+ * for the sheikh's name kept apart from his halaqa's time everywhere.
+ *
+ * Only a TRAILING parenthetical goes: a name that happens to carry brackets in
+ * the middle keeps them, because that is part of what he was registered as.
+ */
+export function halaqaLabel(name: unknown): string {
+  return collapse(name).replace(/\s*[(（][^()（）]*[)）]\s*$/, '').trim();
+}
+
 /** A student's teacher, short form — the lookup every roster-shaped screen
     needs, kept in ONE place so the no-halaqa wording cannot drift per file. */
 export function teacherName(
