@@ -597,6 +597,53 @@ export const store = {
     return exam;
   },
 
+  /**
+   * Delete an exam entered by mistake.
+   *
+   * The RECORD goes; the LEDGER does not. §3.5 makes points append-only — a
+   * balance is the sum of its movements — so points already awarded are taken
+   * back with a reversing row that says why, never by erasing the row that
+   * paid them. The boy's history then reads: he was given two hundred, and
+   * they were taken back when the exam was removed. That is the truth of what
+   * happened; a silently vanished row is not.
+   *
+   * A booking that this exam settled is released back to its appointment,
+   * or approving it again would be refused for an exam that no longer exists.
+   */
+  removeExam(examId: string) {
+    const cur = load();
+    const exam = cur.exams.find((e) => e.id === examId);
+    if (!exam) return;
+
+    const paid = cur.txns
+      .filter((t) => t.refType === 'exam' && t.refId === examId)
+      .reduce((sum, t) => sum + t.delta, 0);
+
+    const txns = [...cur.txns];
+    if (paid !== 0) {
+      txns.push({
+        id: uid(),
+        studentId: exam.studentId,
+        delta: -paid,
+        kind: 'CORRECTION',
+        reason: `حذف اختبار — ${EXAM_LABEL(exam.type)}`,
+        refType: 'exam',
+        refId: examId,
+        createdBy: 'المشرف',
+        createdAt: new Date().toISOString(),
+      });
+    }
+
+    commit({
+      ...cur,
+      exams: cur.exams.filter((e) => e.id !== examId),
+      examQuestions: cur.examQuestions.filter((q) => q.examId !== examId),
+      bookings: cur.bookings.map((b) => (b.examId === examId
+        ? { ...b, examId: null, status: 'BOOKED' } : b)),
+      txns,
+    });
+  },
+
   /** Topics the supervisor adds himself, «دون أن نعدّل النظام». */
   upsertTajweedTopic(topic: TajweedTopic) {
     const cur = load();

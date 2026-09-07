@@ -16,12 +16,17 @@ import { useDB } from '@/lib/store';
 import { shortName } from '@/lib/normalise';
 
 /** Where each report actually lives, once its choices are filled in. */
-function printHref(id: ReportId, halaqa: string, student: string): string | null {
+function printHref(id: ReportId, halaqa: string, student: string, sections = ''): string | null {
   switch (id) {
     case 'halaqa':      return halaqa ? `/print/halaqa/${halaqa}` : null;
     case 'student':     return student ? `/print/student/${student}` : null;
     case 'points':      return halaqa ? `/print/points/${halaqa}` : null;
-    case 'association': return '/print/association';
+    case 'association': {
+      /* The chosen tables ride along, so the preview and the print are the
+         same sheet — which is the whole promise of this screen. */
+      const q = sections ? `?sections=${encodeURIComponent(sections)}` : '';
+      return `/print/association${q}`;
+    }
     case 'ready':       return halaqa ? `/print/ready?halaqa=${halaqa}` : '/print/ready';
     case 'honour':      return halaqa ? `/print/honour?halaqa=${halaqa}` : '/print/honour';
     case 'pick-list':   return '/print/pick-list';
@@ -39,7 +44,7 @@ function ReportsScreen() {
   const report = REPORTS.find((r) => r.id === id) ?? REPORTS[0];
   const halaqa = sp.get('halaqa') ?? '';
   const student = sp.get('student') ?? '';
-  const href = printHref(id, halaqa, student);
+  const href = printHref(id, halaqa, student, sp.get('sections') ?? '');
 
   const subject = useMemo(() => {
     if (report.needs === 'halaqa') {

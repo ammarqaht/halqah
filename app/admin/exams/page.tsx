@@ -12,7 +12,7 @@
 import { Fragment, Suspense, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { ClipboardCheck, Plus, Search, Coins, AlertTriangle, Inbox, ChevronLeft } from 'lucide-react';
+import { ClipboardCheck, Plus, Search, Coins, AlertTriangle, Inbox, ChevronLeft, Trash2 } from 'lucide-react';
 import { TopBar } from '@/components/TopBar';
 import { Sheet } from '@/components/Sheet';
 import { Btn, Empty, Chip, Modal, INPUT } from '@/components/ui';
@@ -78,6 +78,12 @@ function ExamsScreen() {
   const sp = useSearchParams();
   const [q, setQ] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
+  /* Deleting an exam pays its points BACK — `store.removeExam` writes the
+     reversal rather than deleting the ledger row, because §3.5 makes the
+     ledger append-only. So the confirmation has to say what the balance does,
+     not only that a row disappears. */
+  const [doomed, setDoomed] = useState<Exam | null>(null);
+  const [toDelete, setToDelete] = useState<Exam | null>(null);
   /** The sitting whose full record is open. Null while the log is just a log. */
   const [detail, setDetail] = useState<Exam | null>(null);
 
@@ -214,7 +220,7 @@ function ExamsScreen() {
                 <thead>
                   <tr className="border-b border-ink-200 bg-page/50 text-cap text-ink-500">
                     {['', 'الطالب', 'آخر اختبار', 'الحلقة', 'النوع', 'المستوى', 'الأجزاء',
-                      'الدرجة', 'النتيجة', 'النقاط', 'ملاحظة'].map((h, i) => (
+                      'الدرجة', 'النتيجة', 'النقاط', 'ملاحظة', ''].map((h, i) => (
                       <th key={i} className="px-3 py-3 text-start font-medium">{h}</th>))}
                   </tr>
                 </thead>
@@ -252,7 +258,7 @@ function ExamsScreen() {
                               </span>
                             )}
                           </td>
-                          <ExamCells e={g.latest} halaqaOf={halaqaOf} />
+                          <ExamCells e={g.latest} halaqaOf={halaqaOf} onDelete={setToDelete} />
                         </tr>
 
                         {/* his earlier sittings, newest first */}
@@ -261,7 +267,7 @@ function ExamsScreen() {
                             className="fade cursor-pointer border-b border-ink-150 bg-page/40 transition-colors last:border-0 hover:bg-brand-50">
                             <td className="px-3 py-2.5" />
                             <td className="px-3 py-2.5 ps-8 text-panel text-ink-500">سابق</td>
-                            <ExamCells e={e} halaqaOf={halaqaOf} dim />
+                            <ExamCells e={e} halaqaOf={halaqaOf} dim onDelete={setToDelete} />
                           </tr>
                         ))}
                       </Fragment>
@@ -437,8 +443,9 @@ function ExamDetail({ exam, studentName, halaqaName, onClose }: {
 /* The columns of one sitting. Shared so a student's latest line and his earlier
    ones stay in step — two copies of this drifted apart the moment either was
    touched. */
-function ExamCells({ e, halaqaOf, dim = false }: {
+function ExamCells({ e, halaqaOf, dim = false, onDelete }: {
   e: Exam; halaqaOf: (id: string | null) => string; dim?: boolean;
+  onDelete?: (e: Exam) => void;
 }) {
   const tone = dim ? 'text-ink-500' : 'text-ink-700';
   return (
@@ -501,6 +508,15 @@ function ExamCells({ e, halaqaOf, dim = false }: {
               <span className="block max-w-[11rem] truncate">{e.note}</span>
             </Tooltip>
           : '—'}
+      </td>
+      <td className="w-9 px-2 py-3">
+        {onDelete && (
+          <button onClick={(ev) => { ev.stopPropagation(); onDelete(e); }}
+            title="حذف هذا الاختبار" aria-label="حذف هذا الاختبار"
+            className="rounded p-1.5 text-ink-300 transition-colors hover:bg-risk-100 hover:text-risk-700">
+            <Trash2 size={14} />
+          </button>
+        )}
       </td>
     </>
   );

@@ -171,3 +171,52 @@ describe('previewing a plan writes nothing', () => {
     expect(store.get().students[0].currentLevel).toBe(40);
   });
 });
+
+describe('deleting an exam takes back its points without erasing the ledger', () => {
+  it('reverses the award with a row that says why', () => {
+    store.reset();
+    store.upsertStudent(student({ id: 's9', track: 'GOLDEN' }));
+    const e = exam({ id: 'e9', studentId: 's9', pointsAwarded: 200, pointsPaid: true });
+    store.saveExam(e);
+    expect(balance('s9')).toBe(200);
+    expect(ledgerFor('e9')).toHaveLength(1);
+
+    store.removeExam('e9');
+
+    /* The record is gone. */
+    expect(store.get().exams.find((x) => x.id === 'e9')).toBeUndefined();
+    /* The points are back to zero — but by ADDITION, not by deletion: two rows
+       stand, +200 and −200, so the history still reads. */
+    expect(balance('s9')).toBe(0);
+    const rows = ledgerFor('e9');
+    expect(rows).toHaveLength(2);
+    expect(rows.map((t) => t.delta)).toEqual([200, -200]);
+    expect(rows[1].reason).toContain('حذف اختبار');
+  });
+
+  it('writes nothing when the exam never paid', () => {
+    store.reset();
+    store.upsertStudent(student({ id: 's10' }));
+    store.saveExam(exam({ id: 'e10', studentId: 's10', pointsAwarded: 0, pointsPaid: false }));
+    store.removeExam('e10');
+    expect(ledgerFor('e10')).toHaveLength(0);
+    expect(store.get().exams).toHaveLength(0);
+  });
+
+  it('releases a booking the exam had settled', () => {
+    store.reset();
+    store.upsertStudent(student({ id: 's11' }));
+    store.saveExam(exam({ id: 'e11', studentId: 's11', pointsAwarded: 0, pointsPaid: false }));
+    /* `book` mints the id and `closeBooking` is what settles it against an
+       exam — there is no `saveBooking`, and the test was calling one. */
+    const booked = store.book({
+      studentId: 's11', scheduledOn: '2026-09-07', level: 29,
+      badge: 'BADGE_DIAMOND', note: '',
+    });
+    store.closeBooking(booked.id, 'e11');
+    store.removeExam('e11');
+    const b = store.get().bookings[0];
+    expect(b.examId).toBeNull();
+    expect(b.status).toBe('BOOKED');
+  });
+});

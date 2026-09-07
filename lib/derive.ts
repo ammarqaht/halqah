@@ -1,14 +1,19 @@
 /* Aggregates computed from whatever the supervisor has imported.
    Replaces the seeded snapshot: every figure below is his own data. */
+import { nationalityBand } from '@/lib/types';
 import type { DB } from './store';
 import { TRACK_AR, type Student } from './types';
 
 export function derive(db: DB) {
   const s = db.students;
   const active = s.filter((x) => x.status === 'ACTIVE');
+  /* Statistics describe who is IN the halaqa. A student who stopped coming is
+     kept in the system — his exams, his level and his points are all still
+     there for the day he returns — but counting him among the tracks and
+     stages would report a halaqa that no longer exists. */
   const count = <K extends string>(pick: (x: Student) => K | null | undefined) => {
     const m: Record<string, number> = {};
-    for (const x of s) { const k = pick(x); if (k) m[k] = (m[k] ?? 0) + 1; }
+    for (const x of active) { const k = pick(x); if (k) m[k] = (m[k] ?? 0) + 1; }
     return m;
   };
 
@@ -45,7 +50,7 @@ export function derive(db: DB) {
     halaqat: db.halaqat.length,
     tracks: count((x) => (x.track ? TRACK_AR[x.track] : null)),
     stages: count((x) => x.stage || null),
-    nationalities: count((x) => x.nationality || null),
+    nationalities: count((x) => nationalityBand(x.nationality)),
     byHalaqa, orphans, flagged,
     importedAt: db.importedAt, sourceFile: db.sourceFile,
   };

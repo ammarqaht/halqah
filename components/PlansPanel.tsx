@@ -58,6 +58,34 @@ export function PlansPanel({ onClose }: { onClose: () => void }) {
 
       {/* which levels exist to print or edit — the answer to «هل المستوى جاهز؟»
           before he picks it, not after */}
+      {/* «ورقة فارغة»: the supervisor keeps a stack of a level's sheets on the
+          desk and writes a name on one when a boy reaches it. The curriculum of
+          a level is the same for everyone who takes it, so nothing but the name
+          is missing — and printing one issues nothing and promotes nobody. */}
+      <PanelGroup label="ورقة فارغة">
+        <p className="px-1.5 pb-1.5 text-panel leading-relaxed text-ink-500">
+          بلا اسم — تُطبع بالمستوى وحده، ويُكتب الاسم باليد.
+        </p>
+        {cover.map((c) => (
+          <div key={c.track} className="px-1.5 pb-1.5">
+            <p className="mb-1 text-micro text-ink-500">{TRACK_AR[c.track]}</p>
+            <div className="flex flex-wrap gap-1">
+              {c.levels.map((n) => (
+                <a key={n} href={`/print/plan/blank?track=${c.track}&level=${n}`}
+                  target="_blank" rel="noreferrer"
+                  title={`طباعة ورقة فارغة — ${TRACK_AR[c.track]} المستوى ${n}`}
+                  className="rounded border border-ink-200 bg-paper px-1.5 py-0.5 text-micro text-ink-600 transition-colors hover:border-brand-700 hover:bg-brand-50 hover:text-brand-800">
+                  <Num>{n}</Num>
+                </a>
+              ))}
+            </div>
+          </div>
+        ))}
+        {cover.length === 0 && (
+          <p className="px-1.5 text-panel text-ink-500">ارفع «منهج الحفظ» أولًا.</p>
+        )}
+      </PanelGroup>
+
       <PanelGroup label="المنهج المحفوظ">
         {cover.length === 0 ? (
           <p className="px-1.5 py-2 text-panel leading-relaxed text-ink-500">

@@ -15,14 +15,18 @@
    Printing is also what records the issue date — the screen calls
    `store.markPrinted` when it opens this route, because §9 is explicit that
    «الحفظ يقع تلقائيًا مع الطباعة — لا تحتاج زر حفظ منفصلًا». */
-import { Fragment, use, useEffect, useMemo, useRef } from 'react';
+import { Fragment, Suspense, use, useEffect, useMemo, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Printer } from 'lucide-react';
 import { LogoMark, LogoJamiyah } from '@/components/Logo';
 import { Num, toArabicDigits } from '@/components/Num';
 import { Btn } from '@/components/ui';
 import { store, useDB } from '@/lib/store';
-import { resolvePlan, TAJWEED_FOOTER, type PlanRow } from '@/lib/curriculum';
-import { PLAN_KIND_AR, TRACK_AR } from '@/lib/types';
+import {
+  resolvePlan, dailyAmountFor, DEFAULT_DAY_COUNT, DEFAULT_EXAM_DAYS,
+  TAJWEED_FOOTER, type PlanRow,
+} from '@/lib/curriculum';
+import { PLAN_KIND_AR, TRACK_AR, type StudentPlan, type Track } from '@/lib/types';
 import { shortName } from '@/lib/normalise';
 import { formatDate } from '@/lib/dates';
 
@@ -54,12 +58,32 @@ function RangeCells({ r, cell, bold = false }: {
   );
 }
 
-export default function PlanSheet({ params }: { params: Promise<{ planId: string }> }) {
+function PlanSheetInner({ params }: { params: Promise<{ planId: string }> }) {
   const { planId } = use(params);
   const db = useDB();
 
-  const plan = db.plans.find((p) => p.id === planId) ?? null;
-  const student = plan ? db.students.find((s) => s.id === plan.studentId) ?? null : null;
+  /* A BLANK sheet: `/print/plan/blank?track=SILVER&level=40`.
+     The supervisor keeps a stack of a level's sheets on the desk and writes a
+     name on one when a boy reaches it — the level's curriculum is the same for
+     everyone who takes it, so nothing but the name is missing. It issues
+     nothing and stamps nothing: no plan record, no printed count, and no
+     student moved onto a level he was not handed. */
+  const sp = useSearchParams();
+  const blank = planId === 'blank';
+  const bTrack = (sp.get('track') as Track | null) ?? 'SILVER';
+  const bLevel = Number(sp.get('level')) || null;
+
+  const plan: StudentPlan | null = blank
+    ? (bLevel ? {
+        id: 'blank', studentId: '', track: bTrack, level: bLevel,
+        issuedAt: '', issuedBy: null, dayCount: DEFAULT_DAY_COUNT,
+        examDays: DEFAULT_EXAM_DAYS, dailyAmount: dailyAmountFor(bTrack),
+        printedCount: 0, createdAt: '',
+      } : null)
+    : db.plans.find((p) => p.id === planId) ?? null;
+
+  const student = blank ? null
+    : (plan ? db.students.find((s) => s.id === plan.studentId) ?? null : null);
   const halaqa = student?.halaqaId ? db.halaqat.find((h) => h.id === student.halaqaId) ?? null : null;
 
   const days = useMemo(
@@ -70,17 +94,18 @@ export default function PlanSheet({ params }: { params: Promise<{ planId: string
      double-invoke does not count one print as two. */
   const stamped = useRef(false);
   useEffect(() => {
-    if (!plan || stamped.current) return;
+    if (!plan || blank || stamped.current) return;
     stamped.current = true;
     store.markPrinted(plan.id);
-  }, [plan]);
+  }, [plan, blank]);
 
-  if (!plan || !student) {
+  if (!plan || (!blank && !student)) {
     return (
       <div className="sheet-a4 font-sans" dir="rtl">
         <p className="text-lg2 text-ink-700">لا توجد خطة بهذا الرقم.</p>
         <p className="mt-2 text-base2 text-ink-500">
           افتح الطباعة من شاشة الخطط، فالورقة تُبنى من الخطة نفسها.
+          {blank && ' ولطباعة ورقة فارغة، اختر المسار والمستوى.'}
         </p>
       </div>
     );
@@ -118,9 +143,9 @@ export default function PlanSheet({ params }: { params: Promise<{ planId: string
           <tbody>
             <tr>
               <th className={`${cell} bg-page/60 font-medium`}>الطالب</th>
-              <td className={`${cell} text-start`} colSpan={3}>{student.fullName}</td>
+              <td className={`${cell} text-start`} colSpan={3}>{student?.fullName ?? ''}</td>
               <th className={`${cell} bg-page/60 font-medium`}>المعلّم</th>
-              <td className={`${cell} text-start`} colSpan={2}>{halaqa?.teacher ?? '—'}</td>
+              <td className={`${cell} text-start`} colSpan={2}>{halaqa?.teacher ?? (blank ? '' : '—')}</td>
             </tr>
             <tr>
               <th className={`${cell} bg-page/60 font-medium`}>المسار</th>
@@ -133,11 +158,11 @@ export default function PlanSheet({ params }: { params: Promise<{ planId: string
             <tr>
               <th className={`${cell} bg-page/60 font-medium`}>تاريخ التسليم</th>
               <td className={cell} colSpan={2}>
-                <Num>{toArabicDigits(formatDate(plan.issuedAt))}</Num>
+                {plan.issuedAt ? <Num>{toArabicDigits(formatDate(plan.issuedAt))}</Num> : ''}
               </td>
               <th className={`${cell} bg-page/60 font-medium`}>الحلقة</th>
               <td className={cell} colSpan={3}>
-                {halaqa ? shortName(halaqa.teacher) : 'بلا حلقة'}
+                {halaqa ? shortName(halaqa.teacher) : (blank ? '' : 'بلا حلقة')}
                 {halaqa?.timeSlot ? ` · ${halaqa.timeSlot}` : ''}
               </td>
             </tr>
@@ -260,4 +285,8 @@ export default function PlanSheet({ params }: { params: Promise<{ planId: string
       </div>
     </>
   );
+}
+
+export default function PlanSheet(props: { params: Promise<{ planId: string }> }) {
+  return <Suspense><PlanSheetInner {...props} /></Suspense>;
 }

@@ -56,6 +56,13 @@ function AssociationSheet() {
   const to = sp.get('to');
   const period = !!(from || to);
 
+  /* Which sections to print. The association asks for different cuts at
+     different times, and a sheet carrying five tables when one was wanted is
+     four tables of noise. Absent, everything prints — the report has always
+     meant «all of it», and a bare link must keep meaning that. */
+  const only = sp.get('sections');
+  const show = (id: string) => !only || only.split(',').includes(id);
+
   const d = useMemo(() => derive(db), [db]);
   const readyByHalaqa = useMemo(() => {
     const m = new Map<string, number>();
@@ -119,15 +126,22 @@ function AssociationSheet() {
               {stat('معلمون', teachers)}
             </div>
 
-            <PrintSec assoc>المسارات</PrintSec>
-            <CountsTable data={d.tracks} />
+            {show('tracks') && <>
+              <PrintSec assoc>المسارات</PrintSec>
+              <CountsTable data={d.tracks} />
+            </>}
 
-            <PrintSec assoc>المراحل الدراسية</PrintSec>
-            <CountsTable data={d.stages} />
+            {show('stages') && <>
+              <PrintSec assoc>المراحل الدراسية</PrintSec>
+              <CountsTable data={d.stages} />
+            </>}
 
-            <PrintSec assoc>الجنسيات</PrintSec>
-            <CountsTable data={d.nationalities} />
+            {show('nationalities') && <>
+              <PrintSec assoc>الجنسيات</PrintSec>
+              <CountsTable data={d.nationalities} />
+            </>}
 
+            {show('exams') && <>
             <PrintSec assoc>حصيلة الاختبارات{period ? ' — خلال الفترة' : ''}</PrintSec>
             <table className="keep w-full border-collapse text-[11px]">
               <thead>
@@ -155,7 +169,9 @@ function AssociationSheet() {
                 </tr>
               </tbody>
             </table>
+            </>}
 
+            {show('halaqat') && <>
             <PrintSec assoc>الحلقات</PrintSec>
             <table className="w-full border-collapse text-[11px]">
               <thead>
@@ -167,7 +183,10 @@ function AssociationSheet() {
               <tbody>
                 {d.byHalaqa.map((h) => (
                   <tr key={h.id} className="keep">
-                    <td className={`${PCELL} text-start`}>{shortName(h.teacher)}</td>
+                    {/* The name as it is registered, which is what the association's
+                        own paperwork carries — a shortened teacher name does not
+                        match anything they hold. */}
+                    <td className={`${PCELL} text-start`}>{h.name || h.teacher}</td>
                     <td className={PCELL}>{h.timeSlot || '—'}</td>
                     <td className={PCELL}><Num>{toArabicDigits(h.n)}</Num></td>
                     <td className={PCELL}><Num>{toArabicDigits(readyByHalaqa.get(h.id) ?? 0)}</Num></td>
@@ -175,6 +194,7 @@ function AssociationSheet() {
                 ))}
               </tbody>
             </table>
+            </>}
           </>
         )}
 

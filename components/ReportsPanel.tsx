@@ -17,6 +17,15 @@ export type ReportId =
   | 'halaqa' | 'student' | 'association' | 'ready' | 'points' | 'honour'
   | 'pick-list' | 'bookings';
 
+/** The association sheet's five tables, each printable on its own. */
+export const ASSOC_SECTIONS: { id: string; label: string }[] = [
+  { id: 'tracks',        label: 'المسارات' },
+  { id: 'stages',        label: 'المراحل الدراسية' },
+  { id: 'nationalities', label: 'الجنسيات' },
+  { id: 'exams',         label: 'حصيلة الاختبارات' },
+  { id: 'halaqat',       label: 'الحلقات' },
+];
+
 export const REPORTS: {
   id: ReportId; label: string; icon: LucideIcon;
   needs?: 'halaqa' | 'student';
@@ -82,6 +91,34 @@ export function ReportsPanel({ onClose }: { onClose: () => void }) {
             ]}
             placeholder={report.optional ? 'كل الحلقات' : 'اختر الحلقة…'}
             searchPlaceholder="ابحث باسم المعلّم…" />
+        </PanelGroup>
+      )}
+
+      {/* «إحصاءات الجمعية» carries five tables, and the association asks for
+          different cuts at different times. Nothing chosen means all of them,
+          which is what the report has always meant. */}
+      {current === 'association' && (
+        <PanelGroup label="أقسام التقرير">
+          {(() => {
+            const picked = (sp.get('sections') ?? '').split(',').filter(Boolean);
+            const all = picked.length === 0;
+            const toggle = (id: string) => {
+              const now = all ? ASSOC_SECTIONS.map((x) => x.id) : picked;
+              const next = now.includes(id) ? now.filter((x) => x !== id) : [...now, id];
+              /* Everything ticked is the same as nothing ticked — keep the URL
+                 clean so a shared link stays the plain report. */
+              set('sections', next.length === ASSOC_SECTIONS.length ? '' : next.join(','));
+            };
+            return (
+              <>
+                <PanelItem active={all} onClick={() => set('sections', '')}>الكل</PanelItem>
+                {ASSOC_SECTIONS.map((sec) => (
+                  <PanelItem key={sec.id} active={all || picked.includes(sec.id)}
+                    onClick={() => toggle(sec.id)}>{sec.label}</PanelItem>
+                ))}
+              </>
+            );
+          })()}
         </PanelGroup>
       )}
 

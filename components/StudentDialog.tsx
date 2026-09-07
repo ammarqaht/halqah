@@ -2,8 +2,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Modal, Btn, Field, INPUT } from '@/components/ui';
 import { Combobox } from '@/components/Combobox';
+import { cx } from '@/lib/cx';
 import { store, useDB } from '@/lib/store';
-import { ALL_GRADES, BASE_NATIONALITIES, GRADES_BY_STAGE, STAGES, TRACK_AR, levelsFor, type Student, type Track } from '@/lib/types';
+import { ALL_GRADES, BASE_NATIONALITIES, GRADES_BY_STAGE, STAGES, STATUS_AR, TRACK_AR, levelsFor, type Student, type StudentStatus, type Track } from '@/lib/types';
 import { normalisePhone, normaliseNationalId, shortName } from '@/lib/normalise';
 import { Num } from '@/components/Num';
 
@@ -163,6 +164,29 @@ export function StudentDialog({ open, student, defaultHalaqa, onClose }:
           <Combobox value={f.nationality} onChange={(v) => setF({ ...f, nationality: v })}
             options={nationalities} placeholder="اختر أو اكتب" searchPlaceholder="ابحث أو اكتب جنسية…"
             creatable createLabel="إضافة جنسية" />
+        </Field>
+
+        {/* A boy who stops coming is marked, never deleted. His exams, his
+            level and his points stay exactly where they are — so the day he
+            comes back there is nothing to re-enter — and the statistics stop
+            counting him, because they describe the halaqa as it is today. */}
+        <Field label="الحالة"
+          hint={f.status === 'ACTIVE'
+            ? 'يُحتسب في الإحصاءات والكشوف'
+            : 'خارج الإحصاءات — وبياناته كلها محفوظة كما هي'}>
+          <div className="flex flex-wrap gap-2">
+            {(['ACTIVE', 'INACTIVE', 'GRADUATED'] as StudentStatus[]).map((st) => (
+              <button key={st} type="button" onClick={() => setF({ ...f, status: st })}
+                className={cx('rounded-lg border px-3.5 py-2 text-body transition-colors',
+                  f.status === st
+                    ? st === 'ACTIVE' ? 'border-ok-700 bg-ok-100 font-medium text-ok-700'
+                      : st === 'INACTIVE' ? 'border-warn-700 bg-warn-100 font-medium text-warn-700'
+                      : 'border-brand-700 bg-brand-50 font-medium text-brand-900'
+                    : 'border-ink-200 bg-paper text-ink-700 hover:border-ink-300')}>
+                {STATUS_AR[st]}
+              </button>
+            ))}
+          </div>
         </Field>
       </div>
     </Modal>

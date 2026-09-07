@@ -48,12 +48,23 @@ export type Student = {
   reviewPages?: number;
 };
 
-/** Nationalities the client's own files already contain. The list grows —
-    whatever the supervisor types once is offered from then on. */
-export const BASE_NATIONALITIES = [
-  'سعودي', 'يمني', 'سوداني', 'مصري', 'سوري', 'أردني', 'فلسطيني',
-  'باكستاني', 'هندي', 'بنغلاديشي', 'نيجيري', 'تشادي', 'أخرى',
-];
+/**
+ * Two, because two is what the halaqa uses.
+ *
+ * The list carried thirteen — يمني، سوداني، مصري… — and the client's own files
+ * only ever record سعودي or غير سعودي. Offering the breakdown invited an entry
+ * nothing reports on, and split one figure into a dozen. Anything else already
+ * in the data is still offered (StudentDialog adds what it finds) and still
+ * counted; this is what the picker leads with.
+ */
+export const BASE_NATIONALITIES = ['سعودي', 'غير سعودي'];
+
+/** «مصري» in an old row is «غير سعودي» in every figure — the reports ask
+    whether he is Saudi, not where else he is from. */
+export const isSaudi = (n: string | null | undefined) =>
+  String(n ?? '').replace(/\s+/g, ' ').trim() === 'سعودي';
+export const nationalityBand = (n: string | null | undefined): string | null =>
+  !String(n ?? '').trim() ? null : (isSaudi(n) ? 'سعودي' : 'غير سعودي');
 
 /** School stages, and the grades that belong to each. Derived from the client's
     own roster: the young ones sit under «تلقين» (التمهيدي and the first three
