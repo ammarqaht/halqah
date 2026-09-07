@@ -105,6 +105,12 @@ model Student {
   @@index([status])
   @@index([nationalId])
   @@map("students")
+  /* Everything a student accumulates, now that it lives in the database. */
+  txns        PointTxn[]
+  orders      Order[]
+  exams       Exam[]
+  bookings    ExamBooking[]
+  plans       StudentPlan[]
 }
 
 model HalaqaTransfer {
@@ -163,4 +169,211 @@ model Setting {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("settings")
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Everything below lived in the browser alone.
+
+   Eleven entities — the whole points ledger, every exam, every plan, the
+   curriculum, the store and its orders — were held in localStorage. That is not
+   a sync problem so much as a durability one: the supervisor's work existed in
+   one browser profile on one machine, and clearing site data or opening the
+   system on the phone showed an empty system.
+
+   They are tables now, with the foreign keys that make them one system rather
+   than eleven lists that happen to share ids.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/** §3.5 — append-only. A balance is the sum of its rows, never a column. */
+model PointTxn {
+  id        String   @id
+  studentId String   @map("student_id")
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  delta     Int
+  kind      String
+  reason    String   @default("")
+  refType   String?  @map("ref_type")
+  refId     String?  @map("ref_id")
+  createdBy String?  @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([studentId])
+  @@index([refType, refId])
+  @@map("point_txns")
+}
+
+model PointCodeBatch {
+  id        String      @id
+  value     Int
+  purpose   String      @default("")
+  quantity  Int
+  expiresAt DateTime?   @map("expires_at")
+  revokedAt DateTime?   @map("revoked_at")
+  createdBy String?     @map("created_by")
+  createdAt DateTime    @default(now()) @map("created_at")
+  codes     PointCode[]
+
+  @@map("point_code_batches")
+}
+
+model PointCode {
+  id         String         @id
+  batchId    String         @map("batch_id")
+  batch      PointCodeBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  /** Ten characters, random — never sequential, or the next card is guessable. */
+  code       String         @unique
+  redeemedBy String?        @map("redeemed_by")
+  redeemedAt DateTime?      @map("redeemed_at")
+
+  @@index([batchId])
+  @@map("point_codes")
+}
+
+model Gift {
+  id                String   @id
+  name              String
+  description       String   @default("")
+  /** A data URL until an object store exists — lib/image.ts downscales it. */
+  image             String?
+  pointsCost        Int      @map("points_cost")
+  quantity          Int
+  lowStockThreshold Int      @default(3) @map("low_stock_threshold")
+  category          String   @default("")
+  status            String   @default("VISIBLE")
+  createdAt         DateTime @default(now()) @map("created_at")
+  orders            Order[]
+
+  @@map("gifts")
+}
+
+model Order {
+  id               String    @id
+  /** Short, human, and quotable at the desk: «رقم طلبي ٧٣». */
+  number           Int       @unique
+  studentId        String    @map("student_id")
+  student          Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  giftId           String    @map("gift_id")
+  gift             Gift      @relation(fields: [giftId], references: [id])
+  /** Snapshots: the gift's price and name may change, what he paid may not. */
+  pointsSpent      Int       @map("points_spent")
+  giftNameSnapshot String    @map("gift_name_snapshot")
+  status           String    @default("PENDING")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  deliveredAt      DateTime? @map("delivered_at")
+  cancelledReason  String?   @map("cancelled_reason")
+
+  @@index([studentId])
+  @@index([status])
+  @@map("orders")
+}
+
+model Exam {
+  id            String         @id
+  studentId     String         @map("student_id")
+  student       Student        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  /** Denormalised deliberately: a student may move halaqa later, and the
+      record of who examined him must not move with him. */
+  halaqaId      String?        @map("halaqa_id")
+  track         String?
+  type          String
+  takenOn       String         @map("taken_on")
+  level         Int?
+  ajza          Int?
+  errors        Int?
+  warnings      Int?
+  tajweedErrors Int?           @map("tajweed_errors")
+  score         Int?
+  passed        Boolean?
+  pointsAwarded Int            @default(0) @map("points_awarded")
+  pointsPaid    Boolean        @default(false) @map("points_paid")
+  note          String         @default("")
+  examiner      String         @default("")
+  /** One sitting, several rules — a tajweed exam covers as many as were set. */
+  tajweedTopics String[]       @map("tajweed_topics")
+  source        String         @default("MANUAL")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  questions     ExamQuestion[]
+
+  @@index([studentId])
+  @@index([takenOn])
+  @@map("exams")
+}
+
+model ExamQuestion {
+  id            String @id
+  examId        String @map("exam_id")
+  exam          Exam   @relation(fields: [examId], references: [id], onDelete: Cascade)
+  seq           Int
+  surah         String @default("")
+  ayahFrom      String @default("") @map("ayah_from")
+  ayahTo        String @default("") @map("ayah_to")
+  errors        Int    @default(0)
+  warnings      Int    @default(0)
+  tajweedErrors Int    @default(0) @map("tajweed_errors")
+  note          String @default("")
+
+  @@index([examId])
+  @@map("exam_questions")
+}
+
+model ExamBooking {
+  id          String   @id
+  studentId   String   @map("student_id")
+  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  scheduledOn String   @map("scheduled_on")
+  level       Int?
+  badge       String
+  status      String   @default("BOOKED")
+  examId      String?  @map("exam_id")
+  note        String   @default("")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([scheduledOn])
+  @@index([studentId])
+  @@map("exam_bookings")
+}
+
+/** Reference data — one row per (track, level, day, kind). */
+model CurriculumDay {
+  track     String
+  level     Int
+  dayNo     Int    @map("day_no")
+  kind      String
+  fromSurah String @default("") @map("from_surah")
+  fromAyah  String @default("") @map("from_ayah")
+  toSurah   String @default("") @map("to_surah")
+  toAyah    String @default("") @map("to_ayah")
+  note      String @default("")
+
+  @@id([track, level, dayNo, kind])
+  @@index([track, level])
+  @@map("curriculum_days")
+}
+
+model StudentPlan {
+  id           String            @id
+  studentId    String            @map("student_id")
+  student      Student           @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  track        String
+  level        Int
+  issuedAt     String            @map("issued_at")
+  issuedBy     String?           @map("issued_by")
+  dayCount     Int               @default(24) @map("day_count")
+  examDays     Json              @map("exam_days")
+  dailyAmount  String            @default("") @map("daily_amount")
+  printedCount Int               @default(0) @map("printed_count")
+  createdAt    DateTime          @default(now()) @map("created_at")
+
+  @@unique([studentId, track, level])
+  @@index([studentId])
+  @@map("student_plans")
+}
+
+
+model TajweedTopic {
+  id     String  @id
+  name   String  @unique
+  active Boolean @default(true)
+
+  @@map("tajweed_topics")
 }

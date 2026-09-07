@@ -3,6 +3,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { Rail } from '@/components/Rail';
 import { RouteVeil } from '@/components/RouteVeil';
 import { IdleGuard } from '@/components/IdleGuard';
+import { SyncGuard } from '@/components/SyncGuard';
 import { PanelContext } from '@/components/PanelContext';
 import { PanelState } from '@/components/PanelState';
 
@@ -53,6 +54,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <main className="thin-scroll flex-1 overflow-y-auto">
           <RouteVeil>{children}</RouteVeil>
           <IdleGuard />
+          <SyncGuard />
         </main>
       </div>
     </PanelState.Provider>

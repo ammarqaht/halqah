@@ -255,3 +255,26 @@ describe('store rules — §8 (إد-٤-ج)', () => {
     });
   });
 });
+
+describe('تخصيص النقاط — an override, never a second source of truth', () => {
+  const custom = {
+    SILVER: { BADGE_GOLDEN: 75, BADGE_DIAMOND: 150, ASSOCIATION: 300 },
+    GOLDEN: { BADGE_GOLDEN: 120, BADGE_DIAMOND: 240, ASSOCIATION: 300 },
+  };
+
+  it('uses the client\'s figures when he has set them', () => {
+    expect(examPoints('SILVER', 'BADGE_GOLDEN', custom)).toBe(75);
+    expect(examPoints('GOLDEN', 'ASSOCIATION', custom)).toBe(300);
+  });
+
+  it('falls back to the approved figure for anything the table omits', () => {
+    /* A half-written row must not silently award zero. */
+    expect(examPoints('SILVER', 'BADGE_DIAMOND', { SILVER: {}, GOLDEN: {} })).toBe(100);
+  });
+
+  it('cannot buy talqeen into the system, or make a mock worth anything', () => {
+    expect(examPoints('TALQEEN', 'BADGE_DIAMOND', custom)).toBe(0);
+    expect(examPoints('SILVER', 'MOCK', custom)).toBe(0);
+    expect(examPoints('SILVER', 'TAJWEED', custom)).toBeNull();
+  });
+});

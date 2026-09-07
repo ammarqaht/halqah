@@ -27,6 +27,7 @@ import { Num, pointWord } from '@/components/Num';
 import { usePanel } from '@/components/PanelState';
 import { store, useDB } from '@/lib/store';
 import { earnsPoints, examPoints, EXAM_TYPE_AR, type ExamType } from '@/lib/points';
+import { DEFAULT_POINTS, POINTS_KEY, readPoints } from '@/lib/settings';
 import {
   ajzaForLevel, isMidJuz, scoreFromCounters, isPassingFor, scoreMax, passMarkFor,
   suggestionAfter,
@@ -109,6 +110,15 @@ function RecordExam() {
   const [pointsOverride, setPointsOverride] = useState<string | null>(null);
   const [pointsPaid, setPointsPaid] = useState(true);
   const [topics, setTopics] = useState<string[]>([]);
+  /* «تخصيص النقاط» — the approved figures until the client changes them, and
+     read here so the change reaches the form that awards them. */
+  const [pointsTable, setPointsTable] = useState<Record<string, Record<string, number>>>(DEFAULT_POINTS);
+  useEffect(() => {
+    fetch('/api/settings')
+      .then((r) => (r.ok ? r.json() : {}))
+      .then((all) => setPointsTable(readPoints((all as Record<string, unknown>)?.[POINTS_KEY])))
+      .catch(() => { /* the approved defaults stand */ });
+  }, []);
   const [note, setNote] = useState('');
   const [examiner, setExaminer] = useState('');
   const [saved, setSaved] = useState<Saved | null>(null);
@@ -210,8 +220,8 @@ function RecordExam() {
   const suggestedPoints = useMemo(() => {
     if (!student || blocked) return 0;
     if (passed !== true) return 0;               // points follow a pass, §9
-    return examPoints(student.track, type);      // null ⇒ TAJWEED, he types it
-  }, [student, blocked, passed, type]);
+    return examPoints(student.track, type, pointsTable);  // null ⇒ TAJWEED, he types it
+  }, [student, blocked, passed, type, pointsTable]);
 
   const points = pointsOverride !== null && pointsOverride !== ''
     ? Number(pointsOverride)

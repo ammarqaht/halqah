@@ -9,6 +9,7 @@ import { Num } from '@/components/Num';
 import { usePanel } from '@/components/PanelState';
 import { store, useDB } from '@/lib/store';
 import { derive } from '@/lib/derive';
+import { PointsSettingsCard } from '@/components/PointsSettings';
 
 type Stats = { students: number; halaqat: number; imports: number; audit: number; bytes: number };
 
@@ -64,6 +65,8 @@ export default function SettingsPage() {
         <header className="rise mb-8">
           <h2 className="font-display text-d1 text-ink-900">الإعدادات</h2>
         </header>
+
+        <PointsSettingsCard />
 
         <Sheet className="rise mb-4">
           <SheetHead title="قاعدة البيانات"

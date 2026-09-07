@@ -82,6 +82,98 @@ function load(): DB {
   return db;
 }
 
+/* ── The server copy ──────────────────────────────────────────────────────
+   localStorage is the CACHE now, not the record. Eleven of these lists — the
+   points ledger, every exam, every plan, the curriculum, the store — existed
+   only in one browser profile on one machine. Opening the system on another
+   device showed an empty system, and clearing site data wiped a term's work.
+
+   Reads hydrate from the server once on boot; writes go back to it, coalesced,
+   so a burst of edits is one request rather than thirty. The system belongs to
+   one supervisor, so last write wins — what matters is that the write lands
+   somewhere every device reads from. */
+
+/** The lists the server owns. Students and halaqat already had their own API. */
+const SYNCED = [
+  'txns', 'batches', 'codes', 'gifts', 'orders', 'exams', 'examQuestions',
+  'bookings', 'curriculum', 'plans', 'tajweedTopics',
+] as const;
+
+type SyncState = 'idle' | 'saving' | 'saved' | 'offline';
+let syncState: SyncState = 'idle';
+let hydrated = false;
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let inFlight: Promise<void> | null = null;
+
+const slice = (d: DB) => Object.fromEntries(SYNCED.map((k) => [k, d[k]]));
+
+function setSync(s: SyncState) { syncState = s; subs.forEach((f) => f()); }
+
+async function pushNow(): Promise<void> {
+  setSync('saving');
+  try {
+    const res = await fetch('/api/state', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(slice(db)),
+    });
+    setSync(res.ok ? 'saved' : 'offline');
+  } catch {
+    /* No connection. The cache still holds it, and the next successful save
+       carries everything — this is a whole-state PUT, not a diff. */
+    setSync('offline');
+  }
+}
+
+/** Coalesce a burst of edits into one save. */
+function schedulePush() {
+  if (!hydrated) return;              // never overwrite the server with a blank
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    inFlight = pushNow().finally(() => { inFlight = null; });
+  }, 900);
+}
+
+/** Called once, from the admin shell. Safe to call again; it only runs once. */
+export async function hydrateFromServer(): Promise<void> {
+  if (hydrated) return;
+  try {
+    const res = await fetch('/api/state');
+    if (!res.ok) { setSync('offline'); return; }
+    const remote = await res.json();
+    const cur = load();
+    /* The server is the record. A cache holding work this device made while
+       signed out would be silently replaced, so anything the server does not
+       have yet is kept and pushed straight back. */
+    const merged: DB = { ...cur };
+    let carried = 0;
+    for (const k of SYNCED) {
+      const server = (remote[k] ?? []) as { id?: string }[];
+      const local = (cur[k] ?? []) as { id?: string }[];
+      if (server.length === 0 && local.length > 0) { carried += local.length; continue; }
+      (merged as Record<string, unknown>)[k] = server;
+    }
+    db = migrate(merged);
+    hydrated = true;
+    try { localStorage.setItem(KEY, JSON.stringify(db)); } catch { /* private mode */ }
+    subs.forEach((f) => f());
+    if (carried > 0) schedulePush();
+    else setSync('saved');
+  } catch {
+    setSync('offline');
+  }
+}
+
+/** Flush anything pending — the page is closing, or the user asked. */
+export async function flushToServer(): Promise<void> {
+  if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+  if (inFlight) await inFlight;
+  if (hydrated) await pushNow();
+}
+
+export const syncStatus = () => syncState;
+
 /* Gift images pushed this store from kilobytes into megabytes, and a browser
    caps an origin near 5 MB. A silently swallowed quota error would leave the
    supervisor working against a database that stops existing at the next reload,
@@ -90,6 +182,7 @@ let persistError: string | null = null;
 
 function commit(next: DB) {
   db = next;
+  schedulePush();
   try {
     localStorage.setItem(KEY, JSON.stringify(next));
     persistError = null;

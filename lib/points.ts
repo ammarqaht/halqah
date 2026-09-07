@@ -43,11 +43,18 @@ export const EXAM_POINTS: Record<'SILVER' | 'GOLDEN', Record<string, number>> = 
  * MOCK is always zero; TAJWEED is a free number the supervisor types; a Talqeen
  * student is worth zero because he sits outside the points system entirely.
  */
-export function examPoints(track: Track | null, type: ExamType): number | null {
+export function examPoints(
+  track: Track | null,
+  type: ExamType,
+  /* What «تخصيص النقاط» saved, when it has been changed. Absent, the approved
+     figures apply — so a fresh database behaves exactly as §13.5 says, and the
+     setting is an override rather than a second source of truth. */
+  table: Record<string, Record<string, number>> = EXAM_POINTS,
+): number | null {
   if (!track || track === 'TALQEEN') return 0;
   if (type === 'MOCK') return 0;
   if (type === 'TAJWEED') return null;          // null ⇒ ask, do not suggest
-  return EXAM_POINTS[track][type] ?? 0;
+  return table[track]?.[type] ?? EXAM_POINTS[track][type] ?? 0;
 }
 
 /**
