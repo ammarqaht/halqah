@@ -121,3 +121,52 @@ describe('a re-import never disturbs what the ledger has paid', () => {
     expect(balance('s1')).toBe(200);
   });
 });
+
+/* Until now nothing in the product wrote `currentLevel`, so the field the exam
+   booking and the plans screen both read stayed null for every student who came
+   from the roster. §9 makes printing the moment of record — «الحفظ يقع تلقائيًا
+   مع الطباعة» — so printing is where it is written, and these lock the two ways
+   that could go wrong. */
+describe('printing a plan puts the student on its level — §9', () => {
+  const issue = (level: number) =>
+    store.issuePlan({ studentId: 's1', track: 'GOLDEN', level, dailyAmount: 'صفحة' });
+
+  const levelOf = (id = 's1') => store.get().students.find((s) => s.id === id)?.currentLevel;
+
+  it('the first print sets it', () => {
+    store.upsertStudent(student({ currentLevel: null }));
+    const p = issue(29);
+    expect(levelOf()).toBe(null);          // issuing alone is not giving
+    store.markPrinted(p.id);
+    expect(levelOf()).toBe(29);
+  });
+
+  it('a reprint of an old sheet does not drag him backwards', () => {
+    const a = issue(29);
+    store.markPrinted(a.id);
+    const b = issue(28);
+    store.markPrinted(b.id);
+    expect(levelOf()).toBe(28);
+
+    /* He loses the paper and prints level 29 again a month later. Levels count
+       down, so treating that as an assignment would undo a whole level. */
+    store.markPrinted(a.id);
+    expect(levelOf()).toBe(28);
+    expect(store.get().plans.find((p) => p.id === a.id)?.printedCount).toBe(2);
+  });
+
+  it('and the reprint does not restamp the date the lateness alert reads', () => {
+    const p = issue(29);
+    store.markPrinted(p.id);
+    const first = store.get().plans.find((x) => x.id === p.id)!.issuedAt;
+    store.markPrinted(p.id);
+    expect(store.get().plans.find((x) => x.id === p.id)!.issuedAt).toBe(first);
+  });
+
+  it('never gives a talqeen student a level — §13.1', () => {
+    store.upsertStudent(student({ id: 's2', track: 'TALQEEN', currentLevel: null }));
+    const p = store.issuePlan({ studentId: 's2', track: 'TALQEEN', level: 29, dailyAmount: 'صفحة' });
+    store.markPrinted(p.id);
+    expect(levelOf('s2')).toBe(null);
+  });
+});

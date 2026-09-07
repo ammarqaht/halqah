@@ -5,7 +5,7 @@ import { Combobox } from '@/components/Combobox';
 import { store, useDB } from '@/lib/store';
 import { ALL_GRADES, BASE_NATIONALITIES, GRADES_BY_STAGE, STAGES, TRACK_AR, type Student } from '@/lib/types';
 import { normalisePhone, normaliseNationalId, shortName } from '@/lib/normalise';
-import { Num } from '@/components/Num';
+import { Num, toArabicDigits } from '@/components/Num';
 
 const blank = (halaqaId: string | null): Student => ({
   id: Math.random().toString(36).slice(2, 10),
@@ -58,8 +58,27 @@ export function StudentDialog({ open, student, defaultHalaqa, onClose }:
 
   const halaqa = db.halaqat.find((h) => h.id === f.halaqaId) ?? null;
 
+  /* The track the level will be read against. It comes from the halaqa when
+     there is one, exactly as `save` writes it, so the field below cannot offer
+     a bound that the saved record then contradicts. */
+  const track = halaqa?.track ?? f.track;
+
+  /* «الفضي ٦٠ ← ١ · الذهبي ٣٠ ← ١» §4.1. Both count DOWN, so the ceiling is
+     the START of the track, not its end. */
+  const maxLevel = track === 'GOLDEN' ? 30 : 60;
+
+  const levelError = (() => {
+    if (f.currentLevel === null) return null;             // blank is allowed
+    if (!Number.isInteger(f.currentLevel)) return 'المستوى رقم صحيح.';
+    if (f.currentLevel < 1 || f.currentLevel > maxLevel) {
+      return `المستوى بين ١ و${toArabicDigits(maxLevel)}${
+        track ? ` في المسار ${TRACK_AR[track]}` : ''}.`;
+    }
+    return null;
+  })();
+
   const save = () => {
-    if (!f.fullName.trim()) return;
+    if (!f.fullName.trim() || levelError) return;
     const { id, flag } = normaliseNationalId(f.nationalId);
     store.upsertStudent({
       ...f,
@@ -70,6 +89,9 @@ export function StudentDialog({ open, student, defaultHalaqa, onClose }:
       /* The track belongs to the halaqa — a halaqa runs one track — so the
          student inherits it instead of being set separately. */
       track: halaqa?.track ?? f.track,
+      /* «التلقين بلا مستويات» §13.1. A boy moved INTO Talqeen drops the level
+         he was carrying, rather than keeping a number nothing can interpret. */
+      currentLevel: track === 'TALQEEN' ? null : f.currentLevel,
     });
     onClose();
   };
@@ -77,7 +99,7 @@ export function StudentDialog({ open, student, defaultHalaqa, onClose }:
   return (
     <Modal open={open} onClose={onClose} wide
       title={student ? `تعديل بيانات ${student.fullName}` : 'إضافة طالب'}
-      footer={<><Btn onClick={onClose}>إلغاء</Btn><Btn variant="primary" onClick={save}>حفظ</Btn></>}>
+      footer={<><Btn onClick={onClose}>إلغاء</Btn><Btn variant="primary" onClick={save} disabled={!!levelError}>حفظ</Btn></>}>
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="sm:col-span-2">
           <Field label="اسم الطالب">
@@ -101,6 +123,33 @@ export function StudentDialog({ open, student, defaultHalaqa, onClose }:
           <Combobox value={f.halaqaId ?? ''} onChange={(v) => setF({ ...f, halaqaId: v || null })}
             options={halaqaOptions} placeholder="اختر الحلقة" searchPlaceholder="ابحث باسم المعلّم…" />
         </Field>
+        {/* Beside the halaqa on purpose: the halaqa gives the track, and the
+            track is what says whether 45 is a level at all. */}
+        <Field label="المستوى الحالي"
+          hint={track === 'TALQEEN' ? undefined
+            : track ? `يُكتب وحده عند أول طباعة — ${TRACK_AR[track]}: من ${toArabicDigits(maxLevel)} نزولًا إلى ١`
+            : 'اختر الحلقة ليُعرف مساره'}>
+          {track === 'TALQEEN' ? (
+            /* Not a locked box: «التلقين بلا مستويات» §13.1, and a disabled
+               field still reads as a value withheld. There is no value. */
+            <p className="flex h-11 items-center rounded-md border border-dashed border-ink-200 px-3.5 text-base2 text-ink-500">
+              لا مستوى — مسار التلقين
+            </p>
+          ) : (
+            <>
+              <input className={`${INPUT} num`} dir="ltr" inputMode="numeric" placeholder="—"
+                value={f.currentLevel ?? ''}
+                onChange={(e) => {
+                  const v = e.target.value.trim();
+                  setF({ ...f, currentLevel: v === '' ? null : Number(v) });
+                }} />
+              {levelError && (
+                <span className="mt-1 block text-micro text-risk-700">{levelError}</span>
+              )}
+            </>
+          )}
+        </Field>
+
         <Field label="المرحلة">
           <Combobox value={f.stage} onChange={setStage} options={stages} placeholder="اختر المرحلة" />
         </Field>
