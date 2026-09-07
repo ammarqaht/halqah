@@ -177,17 +177,17 @@ function PlanSheetInner({ params }: { params: Promise<{ planId: string }> }) {
             instead of pushing the sheet onto a second sheet. */}
         <table className="w-full table-fixed border-collapse text-[9.5px]">
           <colgroup>
-            <col style={{ width: '3.0%' }} />{/* اليوم */}
+            <col style={{ width: '4.4%' }} />{/* اليوم */}
             {[0, 1, 2].map((i) => (
               <Fragment key={i}>
-                <col style={{ width: '9.4%' }} />{/* من سورة */}
-                <col style={{ width: '3.4%' }} />{/* آية */}
-                <col style={{ width: '9.4%' }} />{/* إلى سورة */}
-                <col style={{ width: '3.4%' }} />{/* آية */}
-                <col style={{ width: '3.6%' }} />{/* الدرجة — «د.», written in by hand */}
+                <col style={{ width: '8.7%' }} />{/* من سورة */}
+                <col style={{ width: '3.3%' }} />{/* آية */}
+                <col style={{ width: '8.7%' }} />{/* إلى سورة */}
+                <col style={{ width: '3.3%' }} />{/* آية */}
+                <col style={{ width: '5.4%' }} />{/* الدرجة — written in by hand */}
               </Fragment>
             ))}
-            <col style={{ width: '8.6%' }} />{/* ملاحظات */}
+            <col style={{ width: '7.2%' }} />{/* ملاحظات */}
           </colgroup>
           {/* Two header rows: the مقرّر spans its four columns, and each names
               what goes under it. «الحديد ١-٥» in one cell was compact but not
@@ -199,11 +199,11 @@ function PlanSheetInner({ params }: { params: Promise<{ planId: string }> }) {
               {/* The order the teacher works in: today's lesson first, then
                   what it revises, then the long revision behind it. */}
               <th className={tcell} colSpan={4}>الدرس</th>
-              <th className={tcell} rowSpan={2}>د.</th>
+              <th className={tcell} rowSpan={2}>درجة</th>
               <th className={tcell} colSpan={4}>مراجعة صغرى</th>
-              <th className={tcell} rowSpan={2}>د.</th>
+              <th className={tcell} rowSpan={2}>درجة</th>
               <th className={tcell} colSpan={4}>مراجعة كبرى</th>
-              <th className={tcell} rowSpan={2}>د.</th>
+              <th className={tcell} rowSpan={2}>درجة</th>
               <th className={tcell} rowSpan={2}>ملاحظات</th>
             </tr>
             <tr className="bg-page/60 text-[9px] text-ink-600">
@@ -224,11 +224,13 @@ function PlanSheetInner({ params }: { params: Promise<{ planId: string }> }) {
                 return (
                   <tr key={d.dayNo} className="keep h-[26px] bg-brand-50">
                     <td className={`${tcell} font-medium`}><Num>{toArabicDigits(d.dayNo)}</Num></td>
-                    <td className={`${tcell} font-medium text-brand-800`} colSpan={13}>
+                    {/* The badge spans everything but the last column, so the
+                        date it asks for lands in the widest cell on the row
+                        rather than in a scoring box too narrow to hold it. */}
+                    <td className={`${tcell} font-medium text-brand-800`} colSpan={14}>
                       {BADGE_AR[d.examBadge]}
                     </td>
-                    <td className={`${tcell} text-[8px] text-ink-500`}>التاريخ</td>
-                    <td className={tcell} />
+                    <td className={`${tcell} text-ink-500`}>التاريخ</td>
                   </tr>
                 );
               }
