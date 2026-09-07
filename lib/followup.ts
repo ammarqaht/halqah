@@ -10,9 +10,10 @@
    The four list DEFINITIONS live here too (`listRows`, `listCounts`) so the
    follow-up screen, the panel, the overview alerts and the printed sheets all
    read one rule — a cap or predicate changed here changes everywhere at once. */
-import type { Exam, PointTxn, Student, StudentPlan } from './types';
+import type { Exam, ExamBooking, PointTxn, Student, StudentPlan } from './types';
 import { readyForAssociation, isLate, daysSince, examOverdue } from './exams';
 import { balances, earnsPoints } from './points';
+import { isoDate } from './dates';
 
 export type FollowUpRow = {
   student: Student;
@@ -124,6 +125,26 @@ export function listRows(rows: FollowUpRow[], list: ListKey): FollowUpRow[] {
         .slice(0, TOP_LIST_SIZE);
   }
 }
+
+/* ── من حان موعد اختباره ────────────────────────────────────────────────────
+   The other three lists are inferred — the system decides a boy is late, or
+   ready, or has been silent too long. This one was DECIDED: somebody booked a
+   sitting for a named day, and that day has come or gone with nobody closing
+   it. It belongs beside them because it is the same question asked of a
+   different table: who is waiting on you today. */
+
+/** Bookings still open whose day has arrived or passed. Overdue ones count:
+    a sitting nobody held yesterday is more urgent than one due this afternoon,
+    not less. */
+export const dueBookings = (bookings: ExamBooking[], now: Date = new Date()) => {
+  const today = isoDate(now);
+  return bookings.filter((b) => b.status === 'BOOKED' && b.scheduledOn <= today);
+};
+
+/** Counted by STUDENT, not by booking — two sittings for one boy are one name
+    to call, and the alert is a list of people to see. */
+export const dueForExamCount = (bookings: ExamBooking[], now: Date = new Date()) =>
+  new Set(dueBookings(bookings, now).map((b) => b.studentId)).size;
 
 /** The badge figures beside the list names — by construction `listRows().length`. */
 export const listCounts = (rows: FollowUpRow[]) => ({

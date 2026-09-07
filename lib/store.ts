@@ -766,6 +766,21 @@ export const store = {
       (b.id === bookingId && b.status === 'BOOKED' ? { ...b, status: 'CANCELLED' } : b)) });
   },
 
+  /**
+   * Close a booking against the exam that was recorded for it.
+   *
+   * The recording screen writes the exam itself, so this only settles the
+   * appointment: the sitting happened, and here is its record. Without it a
+   * booking stays «محجوز» after the exam is in the log, and the overview goes
+   * on asking for a student who has already been heard.
+   */
+  closeBooking(bookingId: string, examId: string) {
+    const cur = load();
+    commit({ ...cur, bookings: cur.bookings.map((b) =>
+      (b.id === bookingId && b.status === 'BOOKED'
+        ? { ...b, status: 'DONE', examId } : b)) });
+  },
+
   /** Replace the whole sheet for one booking. Renumbering happens in the screen
       (§9: «يعيد النظام ترقيم الأسئلة … مع كل تغيير»), so this just persists. */
   setQuestions(ownerId: string, questions: ExamQuestion[]) {

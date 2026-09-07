@@ -12,7 +12,7 @@ import { ReportsPanel } from '@/components/ReportsPanel';
 import { PlansPanel } from '@/components/PlansPanel';
 import { useDB } from '@/lib/store';
 import { derive } from '@/lib/derive';
-import { followUpRows, followedRows, listCounts } from '@/lib/followup';
+import { followUpRows, followedRows, listCounts, dueForExamCount } from '@/lib/followup';
 import { isLowStock } from '@/lib/points';
 
 export function PanelContext({ onClose }: { onClose: () => void }) {
@@ -38,6 +38,7 @@ export function PanelContext({ onClose }: { onClose: () => void }) {
       d,
       pendingOrders: db.orders.filter((o) => o.status === 'PENDING').length,
       lowStockGifts: db.gifts.filter(isLowStock).length,
+      dueExams: dueForExamCount(db.bookings),
       readyCount: counts.ready,
       lateCount: counts.late,
       overdueCount: counts.overdue,
@@ -58,7 +59,7 @@ export function PanelContext({ onClose }: { onClose: () => void }) {
   }
 
   if (overview) {
-    const { d, pendingOrders, lowStockGifts, readyCount, lateCount, overdueCount } = overview;
+    const { d, pendingOrders, lowStockGifts, dueExams, readyCount, lateCount, overdueCount } = overview;
     return (
       <PanelShell title="ما يحتاج تدخّلك"
         meta={d.sourceFile ? `آخر ملف: ${d.sourceFile}` : 'لم يُرفع ملف بعد'} onClose={onClose}>
@@ -75,6 +76,14 @@ export function PanelContext({ onClose }: { onClose: () => void }) {
             {d.flagged > 0 && (
               <PanelItem tone="warn" count={d.flagged}
                 onClick={() => router.push('/admin/students')}>رقم هوية يحتاج مراجعة</PanelItem>
+            )}
+            {/* A booked sitting whose day has come is the only alert here the
+                supervisor made himself, so it outranks the inferred ones: he is
+                not being told something about a boy, he is being reminded of an
+                appointment he set. */}
+            {dueExams > 0 && (
+              <PanelItem tone="risk" count={dueExams}
+                onClick={() => router.push('/admin/exams/onsite')}>حان موعد اختباره</PanelItem>
             )}
             {/* SPEC.md §6.1 lists both of these against phase 6, and phase 6 is
                 now built, so they can finally be computed rather than promised.
@@ -100,7 +109,7 @@ export function PanelContext({ onClose }: { onClose: () => void }) {
                 onClick={() => router.push('/admin/store')}>هدية قاربت على النفاد</PanelItem>
             )}
             {d.orphans === 0 && d.flagged === 0 && pendingOrders === 0 && lowStockGifts === 0
-              && readyCount === 0 && lateCount === 0 && overdueCount === 0 && (
+              && dueExams === 0 && readyCount === 0 && lateCount === 0 && overdueCount === 0 && (
               <p className="px-1.5 py-2 text-panel text-ink-500">لا شيء يحتاج تدخّلك الآن.</p>
             )}
           </PanelGroup>

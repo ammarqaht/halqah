@@ -15,7 +15,7 @@ import { useSearchParams } from 'next/navigation';
 import { ClipboardCheck, Plus, Search, Coins, AlertTriangle, Inbox, ChevronLeft } from 'lucide-react';
 import { TopBar } from '@/components/TopBar';
 import { Sheet } from '@/components/Sheet';
-import { Btn, Empty, Chip, INPUT } from '@/components/ui';
+import { Btn, Empty, Chip, Modal, INPUT } from '@/components/ui';
 import { KPI } from '@/components/Stat';
 import { Tooltip } from '@/components/Tooltip';
 import { Num, pointWord, plural, studentWord } from '@/components/Num';
@@ -78,6 +78,8 @@ function ExamsScreen() {
   const sp = useSearchParams();
   const [q, setQ] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
+  /** The sitting whose full record is open. Null while the log is just a log. */
+  const [detail, setDetail] = useState<Exam | null>(null);
 
   const typeFilter = sp.get('type');
   const halaqaFilter = sp.get('halaqa');
@@ -221,15 +223,25 @@ function ExamsScreen() {
                     const open = expanded === g.studentId;
                     return (
                       <Fragment key={g.studentId}>
+                        {/* Two different questions, so two different targets:
+                            the chevron asks «what came before this?», the row
+                            asks «what happened in this one?». One click doing
+                            both meant the record could only ever be read
+                            through the columns that fit on screen. */}
                         <tr
-                          onClick={() => g.earlier.length && setExpanded(open ? null : g.studentId)}
-                          className={cx('border-b border-ink-150 transition-colors last:border-0',
-                            g.earlier.length ? 'cursor-pointer hover:bg-brand-50' : '',
+                          onClick={() => setDetail(g.latest)}
+                          className={cx('cursor-pointer border-b border-ink-150 transition-colors last:border-0 hover:bg-brand-50',
                             open && 'bg-brand-50')}>
                           <td className="w-8 px-3 py-3">
                             {g.earlier.length > 0 && (
-                              <ChevronLeft size={15} aria-hidden
-                                className={cx('text-ink-400 transition-transform', open && '-rotate-90')} />
+                              <button
+                                onClick={(ev) => { ev.stopPropagation(); setExpanded(open ? null : g.studentId); }}
+                                aria-label={open ? 'إخفاء اختباراته السابقة' : 'عرض اختباراته السابقة'}
+                                aria-expanded={open}
+                                className="rounded p-1 text-ink-400 transition-colors hover:bg-ink-100 hover:text-ink-800">
+                                <ChevronLeft size={15} aria-hidden
+                                  className={cx('transition-transform', open && '-rotate-90')} />
+                              </button>
                             )}
                           </td>
                           <td className="px-3 py-3 text-ink-900">
@@ -245,7 +257,8 @@ function ExamsScreen() {
 
                         {/* his earlier sittings, newest first */}
                         {open && g.earlier.map((e) => (
-                          <tr key={e.id} className="fade border-b border-ink-150 bg-page/40 last:border-0">
+                          <tr key={e.id} onClick={() => setDetail(e)}
+                            className="fade cursor-pointer border-b border-ink-150 bg-page/40 transition-colors last:border-0 hover:bg-brand-50">
                             <td className="px-3 py-2.5" />
                             <td className="px-3 py-2.5 ps-8 text-panel text-ink-500">سابق</td>
                             <ExamCells e={e} halaqaOf={halaqaOf} dim />
@@ -260,7 +273,164 @@ function ExamsScreen() {
           )}
         </Sheet>
       </div>
+
+      <ExamDetail exam={detail} onClose={() => setDetail(null)}
+        studentName={detail ? nameOf(detail.studentId) : ''}
+        halaqaName={detail ? halaqaOf(detail.halaqaId) : ''} />
     </>
+  );
+}
+
+/* ── one sitting, in full ───────────────────────────────────────────────────
+   The log is a table, and a table can only carry the columns that fit. What it
+   drops is exactly what he opens a record to see: which passages were set, how
+   the mistakes fell across them, and what was written down at the time. So the
+   row opens to all of it — the questions in the order they were asked, each
+   with its own counters and its own note. */
+function ExamDetail({ exam, studentName, halaqaName, onClose }: {
+  exam: Exam | null; studentName: string; halaqaName: string; onClose: () => void;
+}) {
+  const db = useDB();
+  const questions = useMemo(
+    () => (exam ? db.examQuestions.filter((q) => q.examId === exam.id).sort((a, b) => a.seq - b.seq) : []),
+    [db.examQuestions, exam]);
+
+  if (!exam) return null;
+  const notes = questions.filter((q) => q.note.trim());
+
+  return (
+    <Modal open wide onClose={onClose} title={studentName}
+      footer={<Btn onClick={onClose}>إغلاق</Btn>}>
+      <div className="space-y-4">
+        {/* the headline: what it was, and how it went */}
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-brand-200 bg-brand-50/60 px-4 py-3.5">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <Chip tone={EXAM_TYPE_TONE[exam.type as ExamType] ?? 'ink'}>
+                {EXAM_TYPE_AR[exam.type as ExamType] ?? exam.type}
+              </Chip>
+              {exam.passed === true && <Chip tone="ok">اجتاز</Chip>}
+              {exam.passed === false && <Chip tone="risk">لم يجتز</Chip>}
+            </div>
+            <p className="mt-1.5 text-panel text-ink-600">
+              <Num>{formatDate(exam.takenOn)}</Num> · {halaqaName}
+              {exam.level !== null && <> · المستوى <Num>{exam.level}</Num></>}
+              {exam.ajza !== null && <> · <Num>{exam.ajza}</Num> أجزاء</>}
+              {exam.examiner && <> · المختبِر {exam.examiner}</>}
+            </p>
+          </div>
+          <div className="text-center">
+            <p className="font-display text-d2 leading-none text-brand-800"><Num>{exam.score ?? '—'}</Num></p>
+            <p className="mt-1 text-micro text-ink-500">من <Num>{scoreMax(exam.type)}</Num></p>
+          </div>
+        </div>
+
+        {/* how the score was arrived at — the same three counters as the log's
+            hover, but here they have room to be read rather than glimpsed */}
+        {hasCounters(exam) && (
+          <div className="grid gap-2 sm:grid-cols-3">
+            {([['الأخطاء', exam.errors ?? 0, SCORE_DEDUCTIONS.error],
+               ['التنبيهات', exam.warnings ?? 0, SCORE_DEDUCTIONS.warning],
+               ['الأخطاء التجويدية', exam.tajweedErrors ?? 0, SCORE_DEDUCTIONS.tajweedError]] as const)
+              .map(([label, n, each]) => (
+                <div key={label} className="rounded-lg border border-ink-150 bg-page/50 px-3.5 py-2.5">
+                  <p className="text-micro text-ink-500">{label}</p>
+                  <p className="mt-0.5 font-display text-t1 text-ink-900"><Num>{n}</Num>
+                    {n > 0 && <span className="ms-2 text-panel font-normal text-risk-700">
+                      <Num>{`− ${n * each}`}</Num></span>}
+                  </p>
+                </div>
+              ))}
+          </div>
+        )}
+
+        {exam.tajweedTopics.length > 0 && (
+          <div>
+            <p className="mb-1.5 text-xs2 font-medium text-ink-600">مواضيع التجويد</p>
+            <div className="flex flex-wrap gap-1.5">
+              {exam.tajweedTopics.map((t) => <Chip key={t} tone="info">{t}</Chip>)}
+            </div>
+          </div>
+        )}
+
+        {/* the questions, as they were asked */}
+        <div>
+          <p className="mb-1.5 text-xs2 font-medium text-ink-600">
+            أسئلة الاختبار
+            {questions.length > 0 && <span className="ms-2 font-normal text-ink-500">
+              <Num>{questions.length}</Num></span>}
+          </p>
+          {questions.length === 0 ? (
+            /* An older sitting, or one entered from a paper that kept only the
+               totals. Saying so beats an empty table pretending to be a record. */
+            <p className="rounded-lg bg-page px-3.5 py-3 text-panel text-ink-500">
+              لم تُسجَّل أسئلة لهذا الاختبار — سُجِّل بإجماليّاته وحدها.
+            </p>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-ink-200">
+              <table className="w-full min-w-[30rem] border-collapse text-body">
+                <thead>
+                  <tr className="border-b border-ink-200 bg-page/50 text-cap text-ink-500">
+                    {['#', 'السورة', 'من آية', 'الأخطاء', 'التنبيهات'].map((h) => (
+                      <th key={h} className="px-3 py-2.5 text-start font-medium">{h}</th>))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {questions.map((qq) => (
+                    <tr key={qq.id} className="border-b border-ink-150 last:border-0">
+                      <td className="px-3 py-2.5 text-panel text-ink-500"><Num>{qq.seq}</Num></td>
+                      <td className="px-3 py-2.5 text-ink-900">{qq.surah || '—'}</td>
+                      <td className="px-3 py-2.5"><Num className="text-panel text-ink-700">{qq.ayahFrom || '—'}</Num></td>
+                      <td className="px-3 py-2.5">
+                        <Num className={cx('font-medium', qq.errors > 0 ? 'text-risk-700' : 'text-ink-400')}>
+                          {qq.errors}</Num>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <Num className={cx('font-medium', qq.warnings > 0 ? 'text-warn-700' : 'text-ink-400')}>
+                          {qq.warnings}</Num>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* everything written down: the per-question notes and the exam's own */}
+        {(notes.length > 0 || exam.note) && (
+          <div>
+            <p className="mb-1.5 text-xs2 font-medium text-ink-600">الملاحظات</p>
+            <div className="space-y-1.5">
+              {notes.map((qq) => (
+                <p key={qq.id} className="rounded-lg bg-page px-3.5 py-2.5 text-panel text-ink-700">
+                  <span className="text-ink-500">
+                    سؤال <Num>{qq.seq}</Num>{qq.surah ? ` · ${qq.surah}` : ''} —{' '}
+                  </span>
+                  {qq.note}
+                </p>
+              ))}
+              {exam.note && (
+                <p className="rounded-lg bg-page px-3.5 py-2.5 text-panel leading-relaxed text-ink-700">
+                  <span className="text-ink-500">على الاختبار — </span>{exam.note}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {exam.pointsAwarded > 0 && (
+          <p className="flex items-center gap-2 rounded-lg bg-brand-50 px-3.5 py-3 text-base2 text-ink-800">
+            <Coins size={16} className="shrink-0 text-brand-800" />
+            <Num className="font-medium text-brand-800">{exam.pointsAwarded}</Num>{' '}
+            {pointWord(exam.pointsAwarded)}{' '}
+            {exam.pointsPaid
+              ? <span className="text-ok-700">أُضيفت إلى رصيده.</span>
+              : <span className="text-warn-700">لم تُصرف بعد.</span>}
+          </p>
+        )}
+      </div>
+    </Modal>
   );
 }
 

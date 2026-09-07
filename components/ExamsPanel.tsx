@@ -67,7 +67,7 @@ export function ExamsPanel({ onClose }: { onClose: () => void }) {
         <PanelItem active={path.startsWith('/admin/exams/onsite')}
           onClick={() => router.push('/admin/exams/onsite')}
           count={dueToday || undefined}
-          tone={dueToday > 0 ? 'warn' : undefined}>الاختبار على الشاشة</PanelItem>
+          tone={dueToday > 0 ? 'warn' : undefined}>حجوزات الاختبارات</PanelItem>
       </PanelGroup>
 
       {onLog && db.exams.length > 0 && (

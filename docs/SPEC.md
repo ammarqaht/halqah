@@ -623,6 +623,7 @@ The contextual panel carries the alerts, not the page body (`DESIGN.md` §4).
 > | Ready for association | rule §4.8 | phase 5 |
 > | Passed but points unpaid | `exams where passed and not points_paid` | phase 5 |
 > | Not examined in N days | `max(taken_on)` per student | phase 5 |
+> | **حان موعد اختباره** | `exam_bookings where status='BOOKED' and scheduled_on <= today`, distinct student | **built** |
 > | Gift low on stock | `gifts where 0 < quantity <= low_stock_threshold` | **built** |
 > | Orders awaiting delivery | `orders where status='PENDING'` | **built** |
 > | Ratel data stale | `max(ratel_imports.imported_at) < now() - 14d` | phase 8 |
@@ -824,9 +825,12 @@ Bulk print for multiple students into one document.
 ### 6.8 `إد-٥-ب` Record exam — `/admin/exams/new`  ✅ built (Qiyas import pending)
 Form per §3.4. Student search auto-fills track/halaqa/teacher. `ajza` suggested from level via §4.2. `passed` suggested from score via §4.5. Points suggested from §4.6 — awarding writes the `point_transactions` row **in the same transaction** as the exam.
 
-- **A questions table, like the on-site sheet (§6.9).** One row per question —
+- **A questions table** — the one the on-site sheet used to carry, now here
+  with it (§6.9). One row per question —
   السورة (the level's own surahs first, then the rest of the mushaf, free text
-  allowed) · من آية · الأخطاء · التنبيهات · ملاحظة. **Five blank rows to start**
+  allowed) · من آية · الأخطاء · التنبيهات · ملاحظة, the two counters TAPPED
+  rather than typed — a hand following a recitation cannot go hunting for a
+  keyboard. **Five blank rows to start**
   and «إضافة سؤال» for a longer sitting; a row nobody typed into is not a
   question and is never stored. Saved as `exam_questions` under the exam's id,
   so next time he can avoid «أن تُعيد عليه المواضع نفسها».
@@ -868,9 +872,22 @@ this repository. Ask for one sample file before building it.
 - A passed diamond offers the next level for printing — «اجتاز ٢٦، المفروض
   أطبع له ٢٥», his own sentence.
 
-### 6.9 `إد-٥-ج` On-site exam — `/admin/exams/onsite`
-Booking list, then the exam screen: a table with **one row per question** — surah field (suggest surahs inside the student's level, free text allowed) + three tap-counters (errors / warnings / tajweed errors) + note.
-**Question count is not fixed:** starts at `settings.default_exam_questions`, and add/remove a question with one tap; renumber and recompute live. Score computed by §4.4, editable. One "approve" writes everything.
+### 6.9 `إد-٥-ج` Exam bookings — `/admin/exams/onsite`  ✅ built
+The appointment book: «تُسجّل من سيُختبر ومتى وفي أي مستوى ولأي وسام», the day's
+list printable at `/print/bookings`.
+
+- **The sitting is recorded on §6.8, not here.** This screen carried a second
+  scoring sheet of its own, and two forms for one act drifted: different fields,
+  two copies of the same arithmetic, two places to fix a rule. «ابدأ الاختبار»
+  now opens `/admin/exams/new?booking=<id>` with the student, badge, day and
+  level already filled in — every one of them still editable, because a booking
+  is a plan and plans get changed at the desk.
+- Saving there calls `store.closeBooking`, so the appointment settles in the
+  same action that writes the exam. Without it the sitting is in the log while
+  the booking is still «محجوز», and §6.1's «حان موعد اختباره» goes on calling
+  for a boy who has already been heard.
+- The question table and its tap-counters moved to §6.8 with the rest of the
+  sheet — same row shape, same counters, one screen.
 
 ### 6.10 `إد-٥-د` Follow-up — `/admin/follow-up`  ✅ built
 By halaqa (replaces the client's `البحث بالحلقة` sheet): name · grade · attendance · today's hifz · level · issue date · days held · last association exam (date/ajza/result) · last internal exam (date/type/level/score/note). Students with no plan render "لا توجد خطة", not blanks.
