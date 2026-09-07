@@ -180,11 +180,11 @@ function PlanSheetInner({ params }: { params: Promise<{ planId: string }> }) {
             <col style={{ width: '3.0%' }} />{/* اليوم */}
             {[0, 1, 2].map((i) => (
               <Fragment key={i}>
-                <col style={{ width: '9.2%' }} />{/* من سورة */}
+                <col style={{ width: '9.4%' }} />{/* من سورة */}
                 <col style={{ width: '3.4%' }} />{/* آية */}
-                <col style={{ width: '9.2%' }} />{/* إلى سورة */}
+                <col style={{ width: '9.4%' }} />{/* إلى سورة */}
                 <col style={{ width: '3.4%' }} />{/* آية */}
-                <col style={{ width: '4.0%' }} />{/* الدرجة */}
+                <col style={{ width: '3.6%' }} />{/* الدرجة — «د.», written in by hand */}
               </Fragment>
             ))}
             <col style={{ width: '8.6%' }} />{/* ملاحظات */}
@@ -196,12 +196,14 @@ function PlanSheetInner({ params }: { params: Promise<{ planId: string }> }) {
           <thead>
             <tr className="bg-page/60 text-[10px] text-ink-700">
               <th className={tcell} rowSpan={2}>اليوم</th>
-              <th className={tcell} colSpan={4}>مراجعة كبرى</th>
-              <th className={tcell} rowSpan={2}>الدرجة</th>
-              <th className={tcell} colSpan={4}>مراجعة صغرى</th>
-              <th className={tcell} rowSpan={2}>الدرجة</th>
+              {/* The order the teacher works in: today's lesson first, then
+                  what it revises, then the long revision behind it. */}
               <th className={tcell} colSpan={4}>الدرس</th>
-              <th className={tcell} rowSpan={2}>الدرجة</th>
+              <th className={tcell} rowSpan={2}>د.</th>
+              <th className={tcell} colSpan={4}>مراجعة صغرى</th>
+              <th className={tcell} rowSpan={2}>د.</th>
+              <th className={tcell} colSpan={4}>مراجعة كبرى</th>
+              <th className={tcell} rowSpan={2}>د.</th>
               <th className={tcell} rowSpan={2}>ملاحظات</th>
             </tr>
             <tr className="bg-page/60 text-[9px] text-ink-600">
@@ -225,7 +227,7 @@ function PlanSheetInner({ params }: { params: Promise<{ planId: string }> }) {
                     <td className={`${tcell} font-medium text-brand-800`} colSpan={13}>
                       {BADGE_AR[d.examBadge]}
                     </td>
-                    <td className={`${tcell} text-[8.5px] text-ink-500`}>التاريخ</td>
+                    <td className={`${tcell} text-[8px] text-ink-500`}>التاريخ</td>
                     <td className={tcell} />
                   </tr>
                 );
@@ -241,11 +243,11 @@ function PlanSheetInner({ params }: { params: Promise<{ planId: string }> }) {
               return (
                 <tr key={d.dayNo} className="keep h-[26px]">
                   <td className={`${tcell} font-medium`}><Num>{toArabicDigits(d.dayNo)}</Num></td>
-                  <RangeCells r={mk} cell={tcell} />
+                  <RangeCells r={dars} cell={tcell} bold />
                   <td className={tcell} />
                   <RangeCells r={ms} cell={tcell} />
                   <td className={tcell} />
-                  <RangeCells r={dars} cell={tcell} bold />
+                  <RangeCells r={mk} cell={tcell} />
                   <td className={tcell} />
                   <td className={`${tcell} text-start text-[8.5px]`}>
                     {/* Clamped: an unbounded note would grow the row and spill

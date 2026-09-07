@@ -70,14 +70,6 @@ function PlanEditorScreen() {
         action={<Link href="/admin/plans"><Btn icon={Printer}>طباعة خطة</Btn></Link>} />
 
       <div className="mx-auto max-w-column px-6 py-8 pb-16">
-        <div className="rise mb-4 flex items-start gap-3 rounded-xl border border-info-200 bg-info-100 p-4">
-          <Users2 size={18} className="mt-0.5 shrink-0 text-info-700" />
-          <p className="text-base2 text-info-700">
-            التعديل هنا على <strong>المستوى نفسه</strong>، فيصل كل طالب يأخذه بعد الآن.
-            لا تُعدَّل خطة طالب بعينه — ورقة المستوى واحدة للجميع.
-          </p>
-        </div>
-
         <LevelCurriculumEditor onToast={setToast} />
       </div>
 

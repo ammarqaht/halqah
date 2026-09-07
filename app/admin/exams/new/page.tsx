@@ -209,11 +209,17 @@ function RecordExam() {
     warnings: Number(warnings) || 0,
     tajweedErrors: Number(tajweedErrors) || 0,
   };
+  /* The association runs its own exam and hands back ONE number. There is no
+     question sheet to fill and no errors to count on this side of it, so the
+     screen asks for the score and nothing else — a page of empty counters
+     invited an entry the association never gave us.
+     A tajweed sitting is scored out of ten the same way. */
+  const counted = type !== 'TAJWEED' && type !== 'ASSOCIATION';
   const anyCounter = errors !== '' || warnings !== '' || tajweedErrors !== '';
 
   /* Tajweed is entered out of 10 and has no error counters in the client's
      sheet, so the computed score only applies to the other four types. */
-  const computedScore = type === 'TAJWEED' || !anyCounter ? null : scoreFromCounters(counts);
+  const computedScore = !counted || !anyCounter ? null : scoreFromCounters(counts);
   const score = scoreOverride !== null && scoreOverride !== ''
     ? Number(scoreOverride)
     : computedScore;
@@ -323,9 +329,9 @@ function RecordExam() {
       takenOn,
       level: levelled ? levelNum : null,
       ajza: levelled && ajza !== '' ? Number(ajza) : null,
-      errors: type === 'TAJWEED' ? null : counts.errors,
-      warnings: type === 'TAJWEED' ? null : counts.warnings,
-      tajweedErrors: type === 'TAJWEED' ? null : counts.tajweedErrors,
+      errors: counted ? counts.errors : null,
+      warnings: counted ? counts.warnings : null,
+      tajweedErrors: counted ? counts.tajweedErrors : null,
       score,
       passed,
       pointsAwarded: Math.max(0, Math.round(points)),
@@ -552,6 +558,8 @@ function RecordExam() {
               <SheetHead title={levelled ? 'المستوى والدرجة' : 'الدرجة'}
                 meta={type === 'TAJWEED'
                   ? 'اختبار التجويد يُسجَّل بدرجة من ١٠ كما في ملفكم — بلا مستوى ولا أجزاء'
+                  : type === 'ASSOCIATION'
+                  ? 'اختبار الجمعية يُجرى عندهم وتُسجَّل درجته النهائية هنا — بلا أسئلة ولا عدّادات'
                   : 'الأسئلة تُجمَع في الإجماليّين، والإجماليّان يحسبان الدرجة — وكلها قابلة للتعديل'} />
 
               {levelled && <div className="grid gap-4 sm:grid-cols-2">
@@ -594,7 +602,7 @@ function RecordExam() {
                   their sum, so the arithmetic is on screen rather than in his
                   head — and the questions are kept, so next time he can avoid
                   «أن تُعيد عليه المواضع نفسها». */}
-              {type !== 'TAJWEED' && (
+              {counted && (
                 <div className="mt-5">
                   <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
                     <span className="text-xs2 font-medium text-ink-600">أسئلة الاختبار</span>
@@ -680,7 +688,7 @@ function RecordExam() {
                 </div>
               )}
 
-              {type !== 'TAJWEED' && (
+              {counted && (
                 <div className="mt-5 grid gap-4 sm:grid-cols-3">
                   {([
                     ['إجمالي الأخطاء', errors, setErrorsOverride, '٢ درجة لكل خطأ', true],
