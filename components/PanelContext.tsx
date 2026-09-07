@@ -10,6 +10,7 @@ import { ExamsPanel } from '@/components/ExamsPanel';
 import { FollowUpPanel } from '@/components/FollowUpPanel';
 import { ReportsPanel } from '@/components/ReportsPanel';
 import { PlansPanel } from '@/components/PlansPanel';
+import { SettingsPanel } from '@/components/SettingsPanel';
 import { useDB } from '@/lib/store';
 import { derive } from '@/lib/derive';
 import { followUpRows, followedRows, listCounts, dueForExamCount } from '@/lib/followup';
@@ -48,6 +49,7 @@ export function PanelContext({ onClose }: { onClose: () => void }) {
   if (path.startsWith('/admin/students')) return <StudentsPanel onClose={onClose} />;
   if (path.startsWith('/admin/exams')) return <ExamsPanel onClose={onClose} />;
   if (path.startsWith('/admin/plans')) return <PlansPanel onClose={onClose} />;
+  if (path.startsWith('/admin/settings')) return <SettingsPanel onClose={onClose} />;
   /* Two sections, two panels. Sharing one made the follow-up lists appear
      while printing and the report picker appear while following up. */
   if (path.startsWith('/admin/reports')) return <ReportsPanel onClose={onClose} />;

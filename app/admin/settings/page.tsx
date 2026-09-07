@@ -1,6 +1,6 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useCallback, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Database, Trash2, AlertTriangle, FlaskConical, Loader2, CheckCircle2, WifiOff } from 'lucide-react';
 import { TopBar } from '@/components/TopBar';
 import { Sheet, SheetHead } from '@/components/Sheet';
@@ -11,6 +11,7 @@ import { store, useDB } from '@/lib/store';
 import { derive } from '@/lib/derive';
 import { PointsSettingsCard } from '@/components/PointsSettings';
 import { BandsSettingsCard } from '@/components/BandsSettings';
+import { SETTINGS_SECTIONS, type SettingsSection } from '@/components/SettingsPanel';
 
 type Stats = { students: number; halaqat: number; imports: number; audit: number; bytes: number };
 
@@ -22,8 +23,13 @@ const humanBytes = (b: number) => {
   return `${n.toFixed(n < 10 && i > 0 ? 1 : 0)} ${u[i]}`;
 };
 
-export default function SettingsPage() {
+function SettingsScreen() {
   const { panelOpen, setPanelOpen } = usePanel();
+  const sp = useSearchParams();
+  /* Which section. Absent, the one he opens for is the points — wiping the
+     database is not the screen anyone lands on. */
+  const section = (SETTINGS_SECTIONS.some((x) => x.id === sp.get('s'))
+    ? sp.get('s') : 'points') as SettingsSection;
   const local = derive(useDB());
   const router = useRouter();
 
@@ -60,16 +66,22 @@ export default function SettingsPage() {
 
   return (
     <>
-      <TopBar title="الإعدادات" panelOpen={panelOpen} onOpenPanel={() => setPanelOpen(true)} />
+      <TopBar title="الإعدادات" crumbs={[SETTINGS_SECTIONS.find((x) => x.id === section)!.label]}
+        panelOpen={panelOpen} onOpenPanel={() => setPanelOpen(true)} />
 
       <div className="mx-auto max-w-column px-6 py-8 pb-16">
         <header className="rise mb-8">
-          <h2 className="font-display text-d1 text-ink-900">الإعدادات</h2>
+          <h2 className="font-display text-d1 text-ink-900">
+            {SETTINGS_SECTIONS.find((x) => x.id === section)!.label}
+          </h2>
         </header>
 
-        <PointsSettingsCard />
+        {section === 'points' && <>
+          <PointsSettingsCard />
+          <BandsSettingsCard />
+        </>}
 
-        <BandsSettingsCard />
+        {section === 'database' && <>
 
         <Sheet className="rise mb-4">
           <SheetHead title="قاعدة البيانات"
@@ -137,6 +149,7 @@ export default function SettingsPage() {
             </Btn>
           </div>
         </Sheet>
+        </>}
       </div>
 
       <Modal open={confirm} onClose={() => !busy && setConfirm(false)} title="تصفير البيانات"
@@ -165,4 +178,8 @@ export default function SettingsPage() {
       </Modal>
     </>
   );
+}
+
+export default function SettingsPage() {
+  return <Suspense><SettingsScreen /></Suspense>;
 }
