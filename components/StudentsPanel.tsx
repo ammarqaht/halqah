@@ -92,7 +92,19 @@ export function StudentsPanel({ onClose }: { onClose: () => void }) {
           )}
         </PanelGroup>
 
-        {db.students.length > 0 && Object.keys(counts.byStage).length > 0 && (
+        {/* Back on the panel now that a halaqa is no longer one track: with
+            golden and silver sitting side by side, this is how the supervisor
+            reaches one of them — inside a halaqa or across all of them. */}
+        {counts.byTrack.size > 0 && (
+          <PanelGroup label="المسار">
+            {(['GOLDEN', 'SILVER', 'TALQEEN'] as const).filter((t) => counts.byTrack.has(t)).map((t) => (
+              <PanelItem key={t} active={sp.get('track') === t} onClick={() => set('track', t)}
+                count={counts.byTrack.get(t)}>{TRACK_AR[t]}</PanelItem>
+            ))}
+          </PanelGroup>
+        )}
+
+        {counts.byStage.size > 0 && (
           <PanelGroup label="المرحلة">
             {[...counts.byStage.entries()].map(([k, v]) => (
               <PanelItem key={k} active={sp.get('stage') === k} onClick={() => set('stage', k)} count={v}>{k}</PanelItem>

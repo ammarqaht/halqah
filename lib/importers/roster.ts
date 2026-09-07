@@ -6,7 +6,7 @@ import type { Student, Halaqa, Track } from '@/lib/types';
 import { AR_TRACK } from '@/lib/types';
 import {
   collapse, foldArabic, stripTeacherPrefix, normalisePhone,
-  normaliseNationalId, isNonStudentRow,
+  normaliseNationalId, isNonStudentRow, isNonHalaqaName,
 } from '@/lib/normalise';
 import { scanSheet, type SheetScan } from './detect';
 
@@ -93,8 +93,8 @@ export function parseRoster(wb: XLSX.WorkBook, sheetName: string): ParseResult {
     const rowNumber = i + 1;
     const rawName = collapse(cell(r, 'name'));
 
-    if (isNonStudentRow(rawName)) {
-      if (rawName) skipped.push({ rowNumber, reason: 'صف غير طالب (مجموع أو ترويسة مكررة)', raw: rawName });
+    if (isNonStudentRow(cell(r, 'name'))) {
+      if (rawName) skipped.push({ rowNumber, reason: 'ليس اسم طالب — عنوان قسم أو تاريخ أو رقم', raw: rawName });
       continue;
     }
 
@@ -104,7 +104,7 @@ export function parseRoster(wb: XLSX.WorkBook, sheetName: string): ParseResult {
     const track: Track | null = AR_TRACK[trackAr] ?? null;
 
     let halaqaId: string | null = null;
-    if (halaqaName) {
+    if (halaqaName && !isNonHalaqaName(halaqaName)) {
       let h = halaqaByName.get(halaqaName);
       if (!h) {
         const teacherFromCol = stripTeacherPrefix(cell(r, 'hifzTeacher'));

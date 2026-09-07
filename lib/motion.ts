@@ -14,12 +14,15 @@ export const INTRO = {
   lift: 780,     // the curtain rises out of view
 } as const;
 
-/* Between screens there is no curtain — just the mark with a turning ring,
-   held long enough not to flash. Client asked for the full reveal to belong to
-   the sign-in alone. */
+/* Between screens there is no curtain — the mark holds the centre over a blur
+   of the work, long enough to read as a transition and short enough never to
+   be waited on. The full reveal still belongs to the sign-in alone.
+
+   620 is deliberate: the veil fades in over 380ms, so anything much shorter
+   would start fading out before it had finished arriving. */
 export const VEIL = {
   /** minimum time the indicator stays up, so a fast navigation doesn't blink */
-  minVisible: 520,
+  minVisible: 620,
 } as const;
 
 /** The curtain's easing: slow to release, quick to clear. */

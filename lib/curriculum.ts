@@ -1,13 +1,13 @@
 /* Plan rules — SPEC.md §3.2, §3.3, §4.3, §9(f), and the approved PDF §9 (إد-٥-أ).
    Pure functions. No storage, no React.
 
-   The load-bearing idea is the resolution rule in §3.3: a plan renders as the
-   curriculum LEFT JOIN the student's overrides. The curriculum row is never
-   written over, so «لا يُفقد الأصل أبدًا» is structural rather than a promise —
-   dropping the overrides restores the original because the original never
-   moved. */
+   The load-bearing idea in §3.3: a plan renders as the level's curriculum, and
+   nothing else. There is no per-student layer over it — a level's sheet is one
+   sheet for everyone who takes it, edited in one place. So there is only ever
+   one answer to «ما مقرَّر اليوم الثالث؟», and no way for two students on the
+   same level to hold different papers. */
 import type {
-  CurriculumDay, ExamDayMap, PlanDayOverride, PlanKind, StudentPlan, Track,
+  CurriculumDay, ExamDayMap, PlanKind, StudentPlan, Track,
 } from './types';
 import { PLAN_KIND_ORDER } from './types';
 
@@ -47,9 +47,6 @@ export type PlanRow = {
   toSurah: string;
   toAyah: string;
   note: string;
-  /** True when this row differs from the curriculum — shown in the editor so
-      the supervisor can see at a glance what he has changed. */
-  overridden: boolean;
 };
 
 export type PlanDay = {
@@ -62,27 +59,66 @@ export type PlanDay = {
 const EMPTY_ROW = { fromSurah: '', fromAyah: '', toSurah: '', toAyah: '', note: '' };
 
 /**
+ * How many working days a level actually runs to.
+ *
+ * The level's own curriculum is the authority — it is the only place a day can
+ * be added or removed now — so a level extended to 26 days hands out 26. A
+ * level with nothing uploaded falls back to the §4.3 default rather than to
+ * zero, which would print a sheet with no days on it at all.
+ */
+export function dayCountFor(
+  track: Track, level: number, curriculum: CurriculumDay[],
+): number {
+  const days = curriculum
+    .filter((d) => d.track === track && d.level === level)
+    .map((d) => d.dayNo);
+  return days.length ? Math.max(...days) : DEFAULT_DAY_COUNT;
+}
+
+/**
+ * A plan to LOOK at, built in memory and stored nowhere.
+ *
+ * Previewing must not write. The screen used to call `store.issuePlan` while
+ * rendering, so opening a student's sheet created a plan row and overwrote his
+ * level with whatever level happened to be on screen. This is what a preview
+ * needs — the same shape, with the defaults §9 fixes — and printing is still
+ * what commits it.
+ */
+export function draftPlan(args: {
+  studentId: string; track: Exclude<Track, null>; level: number; dailyAmount: string;
+  dayCount?: number;
+}): StudentPlan {
+  return {
+    id: `draft-${args.studentId}-${args.track}-${args.level}`,
+    studentId: args.studentId,
+    track: args.track,
+    level: args.level,
+    issuedAt: '',
+    issuedBy: '',
+    dayCount: args.dayCount ?? DEFAULT_DAY_COUNT,
+    examDays: DEFAULT_EXAM_DAYS,
+    dailyAmount: args.dailyAmount,
+    printedCount: 0,
+    createdAt: '',
+  };
+}
+
+/**
  * Build the sheet a student actually gets.
  *
- * The curriculum supplies the content; the overrides win per (day, kind); the
- * plan supplies how many days there are and where the two badges sit. Days
- * beyond the curriculum are legitimate — «تزيد أيامًا على الأربعة والعشرين» —
- * and simply arrive empty for the supervisor to fill.
+ * The level's curriculum supplies every line; the plan supplies how many days
+ * there are and where the two badges sit. Days the curriculum does not reach
+ * arrive empty rather than missing, so a gap prints as a blank row the
+ * supervisor can see — and the editor names those days before it comes to that.
  */
 export function resolvePlan(
-  plan: Pick<StudentPlan, 'id' | 'track' | 'level' | 'dayCount' | 'examDays'>,
+  plan: Pick<StudentPlan, 'track' | 'level' | 'dayCount' | 'examDays'>,
   curriculum: CurriculumDay[],
-  overrides: PlanDayOverride[],
 ): PlanDay[] {
   const base = new Map<string, CurriculumDay>();
   for (const d of curriculum) {
     if (d.track !== plan.track || d.level !== plan.level) continue;
     base.set(`${d.dayNo}:${d.kind}`, d);
-  }
-  const over = new Map<string, PlanDayOverride>();
-  for (const o of overrides) {
-    if (o.planId !== plan.id) continue;
-    over.set(`${o.dayNo}:${o.kind}`, o);
   }
 
   const days: PlanDay[] = [];
@@ -99,16 +135,12 @@ export function resolvePlan(
       dayNo,
       examBadge: null,
       rows: PLAN_KIND_ORDER.map((kind) => {
-        const key = `${dayNo}:${kind}`;
-        const o = over.get(key);
-        const b = base.get(key);
-        const src = o ?? b ?? EMPTY_ROW;
+        const src = base.get(`${dayNo}:${kind}`) ?? EMPTY_ROW;
         return {
           dayNo, kind,
           fromSurah: src.fromSurah, fromAyah: src.fromAyah,
           toSurah: src.toSurah, toAyah: src.toAyah,
           note: src.note,
-          overridden: !!o,
         };
       }),
     });
@@ -132,9 +164,17 @@ export function levelAvailable(
   const rows = curriculum.filter((d) => d.track === track && d.level === level);
   if (rows.length === 0) {
     const trackAr = track === 'GOLDEN' ? 'الذهبي' : 'الفضي';
+    /* Naming the range that IS there turns «غير موجود» from a dead end into an
+       instruction: the client's own «منهج الحفظ» carries silver 40–60 only, and
+       without saying so the message reads like a fault in the system. */
+    const have = [...new Set(curriculum.filter((d) => d.track === track).map((d) => d.level))]
+      .sort((a, b) => a - b);
+    const span = have.length === 0 ? 'ولا مستوى واحد من هذا المسار مرفوع بعد.'
+      : `المرفوع من هذا المسار: المستويات ${have[0]}–${have[have.length - 1]}`
+        + `${have.length === have[have.length - 1] - have[0] + 1 ? '' : ' (بفجوات)'}.`;
     return {
       ok: false,
-      reason: `المستوى ${level} في المسار ${trackAr} غير موجود في ملف المنهج المرفوع. `
+      reason: `المستوى ${level} في المسار ${trackAr} غير موجود في ملف المنهج المرفوع. ${span} `
         + 'ارفع الصفحات الناقصة من «منهج الحفظ» ثم أعد المحاولة — لن تُطبع ورقة فارغة.',
     };
   }
@@ -155,65 +195,31 @@ export function coverage(curriculum: CurriculumDay[]) {
   });
 }
 
-/* ── Editing — §9, «تعديل الخطة وإضافة السور» ─────────────────────────────── */
-
 /**
- * Adding or removing a day renumbers the rest — «فيعيد النظام ترقيمها من نفسه».
- * The badges ride along: a badge sitting after the removed day shifts down with
- * everything else, or it would end up marking a different day's work.
+ * The days of a level that are not filled in.
+ *
+ * A day is incomplete when any of its three lines has no «من سورة» — that is
+ * the one field a line cannot be read without, and the client's own uploaded
+ * sheets have gaps in exactly that shape. A level printed with a gap hands a
+ * student a blank row, so the editor names the days rather than waiting for the
+ * paper to say it.
  */
-export function removeDay(
-  plan: Pick<StudentPlan, 'dayCount' | 'examDays'>,
-  overrides: PlanDayOverride[],
-  dayNo: number,
-): { dayCount: number; examDays: ExamDayMap; overrides: PlanDayOverride[] } {
-  const dayCount = Math.max(1, plan.dayCount - 1);
-  const shift = (n: number) => (n > dayNo ? n - 1 : n);
-  return {
-    dayCount,
-    examDays: {
-      BADGE_GOLDEN: Math.min(shift(plan.examDays.BADGE_GOLDEN), dayCount),
-      BADGE_DIAMOND: Math.min(shift(plan.examDays.BADGE_DIAMOND), dayCount),
-    },
-    overrides: overrides
-      .filter((o) => o.dayNo !== dayNo)
-      .map((o) => ({ ...o, dayNo: shift(o.dayNo) })),
-  };
+export function incompleteDays(
+  days: CurriculumDay[], dayCount: number,
+): { day: number; missing: PlanKind[] }[] {
+  const out: { day: number; missing: PlanKind[] }[] = [];
+  for (let day = 1; day <= dayCount; day++) {
+    const missing = PLAN_KIND_ORDER.filter((kind) => {
+      const row = days.find((d) => d.dayNo === day && d.kind === kind);
+      return !row || !String(row.fromSurah ?? '').trim();
+    });
+    if (missing.length) out.push({ day, missing });
+  }
+  return out;
 }
 
-/** Insert a blank day after `afterDay`, pushing everything below it down. */
-export function insertDay(
-  plan: Pick<StudentPlan, 'dayCount' | 'examDays'>,
-  overrides: PlanDayOverride[],
-  afterDay: number,
-): { dayCount: number; examDays: ExamDayMap; overrides: PlanDayOverride[] } {
-  const shift = (n: number) => (n > afterDay ? n + 1 : n);
-  return {
-    dayCount: plan.dayCount + 1,
-    examDays: {
-      BADGE_GOLDEN: shift(plan.examDays.BADGE_GOLDEN),
-      BADGE_DIAMOND: shift(plan.examDays.BADGE_DIAMOND),
-    },
-    overrides: overrides.map((o) => ({ ...o, dayNo: shift(o.dayNo) })),
-  };
-}
-
-/** True when a row still matches the curriculum — used to drop dead overrides. */
-export function matchesCurriculum(
-  o: PlanDayOverride, track: Track, level: number, curriculum: CurriculumDay[],
-): boolean {
-  const b = curriculum.find(
-    (d) => d.track === track && d.level === level && d.dayNo === o.dayNo && d.kind === o.kind);
-  if (!b) return false;
-  return b.fromSurah === o.fromSurah && b.fromAyah === o.fromAyah
-    && b.toSurah === o.toSurah && b.toAyah === o.toAyah && b.note === o.note;
-}
-
-/** «هل عُدِّلت هذه الورقة عن المنهج؟» — for the badge on the plan screen. */
-export const isCustomised = (
-  plan: Pick<StudentPlan, 'id' | 'dayCount' | 'examDays'>,
-  overrides: PlanDayOverride[],
-) => overrides.some((o) => o.planId === plan.id)
-  || plan.dayCount !== DEFAULT_DAY_COUNT
-  || plan.examDays.BADGE_GOLDEN !== DEFAULT_EXAM_DAYS.BADGE_GOLDEN
-  || plan.examDays.BADGE_DIAMOND !== DEFAULT_EXAM_DAYS.BADGE_DIAMOND;
+/* Editing lives at the level and nowhere else — §9, «تعديل الخطة وإضافة
+   السور». Days are added and removed by editing that level's curriculum, so
+   there is deliberately no per-plan removeDay/insertDay here: a day inserted
+   for one student and not another is exactly the divergence this design
+   removed. `dayCountFor` above is how a plan learns the new length. */

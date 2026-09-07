@@ -4,10 +4,11 @@
 import * as XLSX from 'xlsx';
 import { collapse } from '@/lib/normalise';
 
-export type FileKind = 'RATEL' | 'QIYAS' | 'EXAMS' | 'PLAN_LOG' | 'CURRICULUM' | 'ROSTER' | 'UNKNOWN';
+export type FileKind = 'RATEL' | 'QIYAS' | 'EXAMS' | 'TAJWEED' | 'PLAN_LOG' | 'CURRICULUM' | 'ROSTER' | 'UNKNOWN';
 
 export const KIND_AR: Record<FileKind, string> = {
   RATEL: 'تقرير رتل', QIYAS: 'نتائج قياس', EXAMS: 'سجل الاختبارات',
+  TAJWEED: 'سجل اختبارات التجويد',
   PLAN_LOG: 'سجل متابعة الخطط', CURRICULUM: 'منهج الحفظ',
   ROSTER: 'قاعدة بيانات الطلاب', UNKNOWN: 'غير معروف',
 };
@@ -16,6 +17,7 @@ export const KIND_TARGET: Record<FileKind, string> = {
   RATEL: 'الطلاب · الحضور · أوجه الحفظ والمراجعة',
   QIYAS: 'سجل اختبارات الجمعية',
   EXAMS: 'سجل الأوسمة واختبارات التجويد',
+  TAJWEED: 'اختبارات التجويد ومواضيعها',
   PLAN_LOG: 'تواريخ تسليم المستويات',
   CURRICULUM: 'المنهج المرجعي',
   ROSTER: 'الطلاب والحلقات',
@@ -29,6 +31,13 @@ const SIGNATURES: { kind: FileKind; need: string[]; exclude?: string[]; weight?:
   /* «نوع الاختبار» is what separates an exam log from a plan log — both carry
      الطالب/المسار/المستوى/المعلم, so the plan log must explicitly NOT have it. */
   { kind: 'EXAMS',      need: ['نوع الاختبار', 'الدرجة النهائية'], weight: 4 },
+  /* The tajweed log looks like the exam log and is not: its «نوع الاختبار»
+     holds the RULE examined («النون الساكنة والتنوين»), it scores out of ten in
+     «درجة الاختبار» rather than «الدرجة النهائية», and it carries no level and
+     no juz count at all. Classified as EXAMS it matched nothing and was
+     dropped — forty-seven sittings that the file did record. */
+  { kind: 'TAJWEED',    need: ['اسم الطالب', 'نوع الاختبار', 'درجة الاختبار'],
+                        exclude: ['الدرجة النهائية', 'عدد الاخطاء'], weight: 5 },
   { kind: 'PLAN_LOG',   need: ['اسم الطالب', 'المسار', 'المستوى', 'معلم الحلقة'],
                         exclude: ['نوع الاختبار', 'الدرجة النهائية', 'عدد الاخطاء'], weight: 2 },
   { kind: 'CURRICULUM', need: ['المستوى', 'اليوم', 'المقرر', 'من سورة'], weight: 4 },
@@ -44,7 +53,20 @@ const norm = (s: unknown) => collapse(s).replace(/[أإآ]/g, 'ا').replace(/ة/
 /** The Ratel export puts a banner on row 1 and the real header on row 2 — and
     other files differ. Never assume an offset: find the row that carries the
     signature headers. SPEC.md §5.1 */
+/* The dashboard workbook holds lookup sheets — «البحث باسم الطالب»,
+   «البحث بالحلقة» — that show ONE student or ONE halaqa through formulas.
+   They carry the same headers as the real logs, so they classify perfectly and
+   import complete nonsense: reading them added fifteen students who do not
+   exist and five halaqat that were never taught. They are outputs, not
+   records, and their names say so. */
+/* No \b here: JavaScript's word boundary is defined over [A-Za-z0-9_], so it
+   never matches beside an Arabic letter and the whole pattern silently failed. */
+const LOOKUP_SHEET = /^\s*(ال)?بحث(\s|$)/;
+
 export function scanSheet(ws: XLSX.WorkSheet, sheetName: string): SheetScan {
+  if (LOOKUP_SHEET.test(sheetName)) {
+    return { sheet: sheetName, kind: 'UNKNOWN', headerRow: -1, headers: [], dataRows: 0 };
+  }
   const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, blankrows: false, defval: null });
   let best: SheetScan = { sheet: sheetName, kind: 'UNKNOWN', headerRow: -1, headers: [], dataRows: 0 };
   let bestScore = 0;

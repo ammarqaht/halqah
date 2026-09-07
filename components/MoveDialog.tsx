@@ -19,11 +19,12 @@ export function MoveDialog({ open, ids, onClose }:
         <Combobox value={target} onChange={setTarget}
           options={[{ value: '', label: '— بلا حلقة —' },
                     ...db.halaqat.map((h) => ({ value: h.id, label: shortName(h.teacher),
-                                                hint: h.track ? TRACK_AR[h.track] : h.timeSlot }))]}
+                                                hint: h.timeSlot }))]}
           placeholder="اختر الحلقة" searchPlaceholder="ابحث باسم المعلّم…" />
       </Field>
       <p className="mt-4 rounded-lg bg-page px-3 py-2.5 text-panel text-ink-600">
-        ينتقل مع الطالب كل تاريخه — نقاطه ومستواه واختباراته. لا يبدأ من الصفر.
+        ينتقل مع الطالب كل تاريخه — نقاطه ومستواه ومساره واختباراته. لا يبدأ من الصفر،
+        والنقل لا يغيّر مساره.
       </p>
     </Modal>
   );

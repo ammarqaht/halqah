@@ -27,7 +27,7 @@ const exam = (over: Partial<Exam>): Exam => ({
   type: 'BADGE_GOLDEN', takenOn: '2026-08-25', level: 29, ajza: 2,
   errors: 0, warnings: 0, tajweedErrors: 0, score: 100, passed: true,
   pointsAwarded: 0, pointsPaid: false, note: '', examiner: 'المشرف',
-  tajweedTopic: null, source: 'MANUAL', createdAt: '2026-08-25T10:00:00',
+  tajweedTopics: [], source: 'MANUAL', createdAt: '2026-08-25T10:00:00',
   ...over,
 });
 

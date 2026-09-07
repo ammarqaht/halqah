@@ -18,6 +18,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Users, Award, Hourglass, CalendarClock, Search, Inbox, Printer, FileText,
 } from 'lucide-react';
+import { LevelEditor } from '@/components/LevelEditor';
 import { TopBar } from '@/components/TopBar';
 import { Sheet, SheetHead } from '@/components/Sheet';
 import { Btn, Empty, Chip, Segmented, INPUT } from '@/components/ui';
@@ -76,8 +77,9 @@ function InternalCell({ exam }: { exam: FollowUpRow['lastInternal'] }) {
   if (!exam) return <span className="text-ink-400">—</span>;
   const rows: [string, React.ReactNode][] = [
     ['التاريخ', <Num key="d">{formatDate(exam.takenOn)}</Num>],
-    ...(exam.type === 'TAJWEED' && exam.tajweedTopic
-      ? [['الموضوع', exam.tajweedTopic] as [string, React.ReactNode]] : []),
+    ...(exam.type === 'TAJWEED' && exam.tajweedTopics.length
+      ? [[exam.tajweedTopics.length > 1 ? 'المواضيع' : 'الموضوع',
+          exam.tajweedTopics.join('، ')] as [string, React.ReactNode]] : []),
     ...(exam.level != null
       ? [['المستوى', <Num key="l">{exam.level}</Num>] as [string, React.ReactNode]] : []),
     ['الدرجة', <Num key="s">{`${exam.score ?? '—'} / ${scoreMax(exam.type)}`}</Num>],
@@ -194,9 +196,9 @@ function FollowUpScreen() {
         <div className="mx-auto max-w-column px-6 py-8">
           <Sheet className="rise">
             <Empty icon={Inbox} title="لا طلاب بعد"
-              body="شاشة المتابعة تبحث بالحلقة وبالطالب، وتعدّ لك أربعة كشوف جاهزة: الجاهزين للجمعية، والمتأخرين في مستواهم، ومن لم يُختبروا مؤخرًا، والمتفوقين. ابدأ برفع ملف الطلاب."
-              action={<Link href="/admin/students/import">
-                <Btn variant="primary" size="lg">رفع ملف</Btn></Link>} />
+              body="شاشة المتابعة تبحث بالحلقة وبالطالب، وتعدّ لك أربعة كشوف جاهزة: الجاهزين للجمعية، والمتأخرين في مستواهم، ومن لم يُختبروا مؤخرًا، والمتفوقين. ابدأ برفع ملفاتك من الصفحة الرئيسية."
+              action={<Link href="/admin">
+                <Btn variant="primary" size="lg">الصفحة الرئيسية</Btn></Link>} />
           </Sheet>
         </div>
       </>
@@ -280,7 +282,11 @@ function FollowUpScreen() {
                       <tr className="border-b border-ink-200 bg-page/50 text-cap text-ink-500">
                         {['الطالب',
                           ...(halaqaFilter ? [] : ['الحلقة']),
-                          'الصف', 'الحضور', 'حفظ اليوم', 'المستوى',
+                          /* Attendance and today's pages come from one Ratel
+                             report on one day. Follow-up asks who is behind
+                             ACROSS levels and exams, and a column of «غائب» and
+                             zero for everybody answered nothing. */
+                          'الصف', 'المستوى',
                           'تاريخ الإصدار', 'الأيام',
                           ...(list === 'ready' ? ['الجزء الجاهز'] : []),
                           ...(list === 'top' ? ['الرصيد'] : []),
@@ -304,15 +310,6 @@ function FollowUpScreen() {
                             <td className="px-3 py-3 text-panel text-ink-600">{teacherOf(r.student.halaqaId)}</td>
                           )}
                           <td className="px-3 py-3 text-panel text-ink-600">{r.student.grade || '—'}</td>
-                          <td className="px-3 py-3">
-                            {r.student.attended === undefined ? <span className="text-ink-400">—</span>
-                              : r.student.attended ? <Chip tone="ok">حاضر</Chip> : <Chip tone="risk">غائب</Chip>}
-                          </td>
-                          <td className="px-3 py-3">
-                            {r.student.hifzPages !== undefined
-                              ? <Num className="text-panel text-ink-700">{r.student.hifzPages}</Num>
-                              : <span className="text-ink-400">—</span>}
-                          </td>
                           <td className="px-3 py-3">
                             {r.student.track === 'TALQEEN'
                               ? <Chip tone="ink">تلقين</Chip>
@@ -412,10 +409,8 @@ function FollowUpScreen() {
                     ) : sel.plan ? (
                       <>
                         <Def label="المستوى الحالي">
-                          <Num className="font-medium">{sel.student.currentLevel ?? sel.plan.level}</Num>
-                          {isMidJuz(sel.student.track, sel.student.currentLevel) && (
-                            <span className="ms-1.5 text-micro text-ink-500">منتصف الجزء</span>
-                          )}
+                          <LevelEditor studentId={sel.student.id} track={sel.student.track}
+                            level={sel.student.currentLevel ?? sel.plan.level} />
                         </Def>
                         <Def label="ورقة المستوى">
                           <Num>{sel.plan.level}</Num> — {TRACK_AR[sel.plan.track]}
@@ -442,7 +437,11 @@ function FollowUpScreen() {
                       </>
                     ) : (
                       <>
-                        <p className="text-base2 text-ink-600">لا توجد خطة مُصدرة لهذا الطالب.</p>
+                        <Def label="المستوى الحالي">
+                          <LevelEditor studentId={sel.student.id} track={sel.student.track}
+                            level={sel.student.currentLevel} />
+                        </Def>
+                        <p className="mt-3 text-base2 text-ink-600">لا توجد خطة مُصدرة لهذا الطالب.</p>
                         <div className="mt-4">
                           <Link href={`/admin/plans?student=${sel.student.id}`}>
                             <Btn size="sm" variant="primary" icon={FileText}>إصدار خطة</Btn>

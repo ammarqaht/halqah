@@ -39,9 +39,40 @@ export function normaliseNationalId(v: unknown): { id: string | null; flag: 'SHO
   return { id, flag: null };
 }
 
-/** Rows that are not students: the totals row, blank rows, header echoes. */
-export const isNonStudentRow = (name: string) =>
-  !name || ['المجموع', 'الاجمالي', 'الإجمالي', 'اسم الطالب'].includes(collapse(name));
+/** Labels the client's sheets use as section headings inside the data. */
+const SECTION_LABELS = [
+  'المجموع', 'الاجمالي', 'الإجمالي', 'اسم الطالب', 'أسم الطالب',
+  'متابعة الخطة', 'الاختبارات', 'التاريخ', 'المستوى', 'الحلقة',
+  'البيانات الشخصية', 'اختبارات الجمعية', 'المسار', 'الصف',
+];
+
+/** A cell is a student only if it reads like a person's name.
+    The dashboard workbook stacks several small tables in one sheet, so its
+    section headings and its date cells sit in the same column as the names.
+    Read without this guard, «متابعة الخطة» and a raw Date both became students
+    and their level numbers became halaqat. */
+export function isNonStudentRow(name: unknown): boolean {
+  if (name instanceof Date) return true;
+  const n = collapse(name);
+  if (!n) return true;
+  if (SECTION_LABELS.includes(n)) return true;
+  if (/^\d+([.,]\d+)?$/.test(n)) return true;                 // a bare number
+  if (/^[A-Za-z]{3}\s[A-Za-z]{3}\s\d{2}\s\d{4}/.test(n)) return true;  // a stringified Date
+  if (!/[؀-ۿ]/.test(n)) return true;                           // no Arabic at all
+  if (n.split(' ').filter(Boolean).length < 2) return true;    // a name has parts
+  return false;
+}
+
+/** Halaqa names follow the same reasoning: a level number is not a halaqa. */
+export function isNonHalaqaName(name: unknown): boolean {
+  if (name instanceof Date) return true;
+  const n = collapse(name);
+  if (!n) return true;
+  if (SECTION_LABELS.includes(n)) return true;
+  if (/^\d+([.,]\d+)?$/.test(n)) return true;
+  if (!/[؀-ۿ]/.test(n)) return true;
+  return false;
+}
 
 /** «الحسيني عبد الوهاب الحسيني السعدني» → «الحسيني السعدني».
     Arabic names run four or five parts; a narrow list only has room for the

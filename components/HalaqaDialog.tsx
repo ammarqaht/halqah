@@ -19,23 +19,22 @@ export function HalaqaDialog({ open, halaqa, onClose }:
   { open: boolean; halaqa: Halaqa | null; onClose: () => void }) {
   const db = useDB();
   const [f, setF] = useState<Halaqa>(blank);
-  const [applyTrack, setApplyTrack] = useState(true);
-  useEffect(() => { if (open) { setF(halaqa ? { ...halaqa } : blank()); setApplyTrack(true); } }, [open, halaqa]);
+  useEffect(() => { if (open) setF(halaqa ? { ...halaqa } : blank()); }, [open, halaqa]);
 
   const students = db.students.filter((s) => s.halaqaId === f.id);
   const isNew = !halaqa;
-  const trackChanged = !!f.track && f.track !== halaqa?.track;
-  const offTrack = f.track ? students.filter((s) => s.track !== f.track).length : 0;
+
+  /* What the halaqa actually holds today, in the order the chips read. The
+     default below is a starting point for the next student, not a claim about
+     these ones — each of them carries his own track. */
+  const present = (['GOLDEN', 'SILVER', 'TALQEEN'] as const)
+    .map((t) => [t, students.filter((s) => s.track === t).length] as const)
+    .filter(([, n]) => n > 0);
 
   const save = () => {
     const name = f.name.trim() || (f.teacher.trim() ? `تحفيظ ${f.teacher.trim()} (${f.timeSlot})` : '');
     if (!name || !f.teacher.trim()) return;
     store.upsertHalaqa({ ...f, name });
-    /* A halaqa runs one track, so setting it here can carry to its students
-       instead of being repeated on each one. Opt-out, never silent. */
-    if (f.track && applyTrack && offTrack > 0) {
-      store.setTrackForHalaqa(f.id, f.track);
-    }
     onClose();
   };
 
@@ -60,7 +59,7 @@ export function HalaqaDialog({ open, halaqa, onClose }:
         </Field>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="المسار" hint="الحلقة تسير على مسار واحد">
+          <Field label="المسار الافتراضي" hint="يُقترح على الطالب الجديد فقط — والمسار يُعدَّل من بطاقة الطالب">
             <Combobox value={f.track ?? ''} onChange={(v) => setF({ ...f, track: (v || null) as Track | null })}
               options={[{ value: '', label: '— غير محدّد —' }, ...TRACKS]} placeholder="اختر المسار" />
           </Field>
@@ -78,21 +77,19 @@ export function HalaqaDialog({ open, halaqa, onClose }:
           <input className={INPUT} value={f.notes ?? ''} onChange={(e) => setF({ ...f, notes: e.target.value })} />
         </Field>
 
-        {!isNew && f.track && offTrack > 0 && (
-          <label className="flex cursor-pointer items-start gap-2.5 rounded-lg bg-brand-50 px-3 py-3 text-panel">
-            <input type="checkbox" checked={applyTrack} onChange={(e) => setApplyTrack(e.target.checked)}
-              className="mt-0.5 h-4 w-4 shrink-0 rounded-sm border-ink-300 accent-brand-800" />
-            <span className="text-ink-700">
-              تطبيق مسار <strong className="text-brand-800">{TRACK_AR[f.track]}</strong> على{' '}
-              <Num className="font-medium text-ink-900">{offTrack}</Num> من طلاب الحلقة الذين يخالفونه.
-            </span>
-          </label>
-        )}
-
         {!isNew && (
           <p className="rounded-lg bg-page px-3 py-2.5 text-panel text-ink-600">
-            في هذه الحلقة <Num className="font-medium text-ink-900">{students.length}</Num> طالبًا.
-            حذف الحلقة يفصلهم عنها ولا يحذف أحدًا.
+            في هذه الحلقة <Num className="font-medium text-ink-900">{students.length}</Num> طالبًا
+            {present.length > 0 && <>
+              {' — '}
+              {present.map(([t, n], i) => (
+                <span key={t}>{i > 0 && ' · '}
+                  <Num className="font-medium text-ink-900">{n}</Num> {TRACK_AR[t]}</span>
+              ))}
+            </>}.
+            <br />
+            مسار كل طالب يُعدَّل من بطاقته، ولا مانع من اجتماع مسارات مختلفة هنا.
+            حذف الحلقة يفصل طلابها عنها ولا يحذف أحدًا.
           </p>
         )}
       </div>

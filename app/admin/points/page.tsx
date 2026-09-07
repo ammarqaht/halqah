@@ -11,8 +11,7 @@ import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import {
-  Coins, Search, Plus, Ticket, Inbox, X, ArrowDownUp, Printer, Undo2, Trophy, UploadCloud,
-} from 'lucide-react';
+  Coins, Search, Plus, Ticket, Inbox, X, ArrowDownUp, Printer, Undo2, Trophy, Home } from 'lucide-react';
 import { TopBar } from '@/components/TopBar';
 import { Sheet, SheetHead } from '@/components/Sheet';
 import { Btn, Empty, Chip, Modal, Field, INPUT, Segmented } from '@/components/ui';
@@ -131,9 +130,9 @@ function PointsScreen() {
         <div className="mx-auto max-w-column px-6 py-8">
           <Sheet className="rise">
             <Empty icon={Inbox} title="لا توجد أرصدة بعد"
-              body="النقاط تُبنى على قائمة الطلاب. ارفع قاعدة بيانات الحلقات أولًا، ثم ابدأ الشحن."
-              action={<Link href="/admin/students/import">
-                <Btn variant="primary" size="lg" icon={UploadCloud}>رفع ملف</Btn></Link>} />
+              body="النقاط تُبنى على قائمة الطلاب. ارفع ملفاتك من الصفحة الرئيسية أولًا، ثم ابدأ الشحن."
+              action={<Link href="/admin">
+                <Btn variant="primary" size="lg" icon={Home}>الصفحة الرئيسية</Btn></Link>} />
           </Sheet>
         </div>
       </>

@@ -55,6 +55,8 @@ model Halaqa {
   teacher   String
   mosque    String   @default("جامع محمد العبدالكريم — حي أُحد")
   timeSlot  String   @default("العصر") @map("time_slot")
+  // A default for newly added students only. The track is the STUDENT's — a
+  // halaqa may hold several — and this is never applied to an existing roster.
   track     Track?
   notes     String?
   active    Boolean  @default(true)

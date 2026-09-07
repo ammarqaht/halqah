@@ -12,6 +12,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { store } from './store';
 import type { Exam, Student } from './types';
+import { draftPlan } from './curriculum';
 
 const student = (over: Partial<Student> = {}): Student => ({
   id: 's1', fullName: 'عمر ناصر الزهراني', nationalId: '1080000000', nationalIdFlag: null,
@@ -24,7 +25,7 @@ const exam = (over: Partial<Exam> = {}): Exam => ({
   type: 'BADGE_DIAMOND', takenOn: '2026-08-31', level: 29, ajza: 2,
   errors: 3, warnings: 4, tajweedErrors: 2, score: 90, passed: true,
   pointsAwarded: 200, pointsPaid: true, note: '', examiner: '',
-  tajweedTopic: null, source: 'MANUAL', createdAt: '2026-08-31T10:00:00Z', ...over,
+  tajweedTopics: [], source: 'MANUAL', createdAt: '2026-08-31T10:00:00Z', ...over,
 });
 
 const ledgerFor = (id: string) => store.get().txns.filter((t) => t.refId === id);
@@ -119,5 +120,54 @@ describe('a re-import never disturbs what the ledger has paid', () => {
     store.replaceAll([student({ fullName: 'عمر ناصر الزهراني' })], [], 'ملف جديد.xlsx');
     expect(store.get().exams).toHaveLength(1);
     expect(balance('s1')).toBe(200);
+  });
+});
+
+describe('previewing a plan writes nothing', () => {
+  it('planFor never creates a row, and never touches currentLevel', () => {
+    store.reset();
+    const s: Student = { ...student(), id: 'st1', track: 'SILVER', currentLevel: 23 };
+    store.replaceAll([s], [], 'test.xlsx');
+
+    /* What the plans screen does on every keystroke and every name clicked. */
+    expect(store.planFor('st1', 'SILVER', 40)).toBeNull();
+    expect(store.get().plans).toHaveLength(0);
+    expect(store.get().students[0].currentLevel).toBe(23);
+
+    /* A draft is the same shape and is stored nowhere. */
+    const d = draftPlan({ studentId: 'st1', track: 'SILVER', level: 40, dailyAmount: 'نصف وجه' });
+    expect(d.level).toBe(40);
+    expect(store.get().plans).toHaveLength(0);
+    expect(store.get().students[0].currentLevel).toBe(23);
+
+    /* Printing is what commits — and only then does he move onto the level. */
+    const issued = store.issuePlan({
+      studentId: 'st1', track: 'SILVER', level: 40, dailyAmount: 'نصف وجه' });
+    expect(store.get().plans).toHaveLength(1);
+    expect(store.planFor('st1', 'SILVER', 40)?.id).toBe(issued.id);
+    store.markPrinted(issued.id);
+    expect(store.get().students[0].currentLevel).toBe(40);
+  });
+
+  it('creating the row does not promote — printing does', () => {
+    store.reset();
+    const s: Student = { ...student(), id: 'st2', track: 'SILVER', currentLevel: 23 };
+    store.replaceAll([s], [], 'test.xlsx');
+
+    /* Materialising a sheet to edit it must leave him where he was. */
+    const p = store.issuePlan({
+      studentId: 'st2', track: 'SILVER', level: 40, dailyAmount: 'نصف وجه' });
+    expect(store.get().plans).toHaveLength(1);
+    expect(store.get().students[0].currentLevel).toBe(23);
+
+    /* Handing him the paper is what moves him. */
+    store.markPrinted(p.id);
+    expect(store.get().students[0].currentLevel).toBe(40);
+    expect(store.get().plans[0].printedCount).toBe(1);
+
+    /* And a reprint of an already-issued sheet still puts him there. */
+    store.setLevel('st2', 12);
+    store.markPrinted(p.id);
+    expect(store.get().students[0].currentLevel).toBe(40);
   });
 });

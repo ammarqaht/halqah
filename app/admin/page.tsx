@@ -4,8 +4,7 @@
 import Link from 'next/link';
 import {
   Users, CircleDot, UploadCloud, AlertTriangle, FileText, ClipboardCheck, Ticket,
-  ArrowLeft, Inbox,
-} from 'lucide-react';
+  ArrowLeft, Inbox, Printer } from 'lucide-react';
 import { TopBar } from '@/components/TopBar';
 import { Sheet, SheetHead } from '@/components/Sheet';
 import { KPI, Split } from '@/components/Stat';
@@ -31,8 +30,8 @@ export default function OverviewPage() {
         <div className="mx-auto max-w-column px-6 py-8">
           <Sheet className="rise">
             <Empty icon={Inbox} title="لا توجد بيانات بعد"
-              body="ارفع تقرير رتل أو قاعدة بيانات الطلاب، وسيتعرّف النظام على شكل الملف بنفسه ويعرض عليك معاينة قبل الحفظ."
-              action={<Link href="/admin/students/import">
+              body="الرفع كلّه من هنا. اسحب ملفاتك — رتل، قاعدة الحلقات، الاختبارات، منهج الحفظ — دفعة واحدة، ويقرأ النظام كل ورقة فيها بنفسه وينشرها على شاشات الموقع كلّها بعد أن تراجع المعاينة."
+              action={<Link href="/admin/import">
                 <Btn variant="primary" size="lg" icon={UploadCloud}>رفع ملف</Btn></Link>} />
           </Sheet>
         </div>
@@ -40,13 +39,11 @@ export default function OverviewPage() {
     );
   }
 
-  const maxN = Math.max(...d.byHalaqa.map((h) => h.n), 1);
-
   return (
     <>
       <TopBar title="الرئيسية" crumbs={['حلقات جامع محمد العبدالكريم']} panelOpen={panelOpen}
         onOpenPanel={() => setPanelOpen(true)}
-        action={<Link href="/admin/students/import"><Btn variant="primary" icon={UploadCloud}>رفع ملف</Btn></Link>} />
+        action={<Link href="/admin/import"><Btn variant="primary" icon={UploadCloud}>رفع ملف</Btn></Link>} />
 
       <div className="mx-auto max-w-column px-6 py-8 pb-16">
         <header className="rise mb-9">
@@ -63,19 +60,6 @@ export default function OverviewPage() {
             sub={d.orphans ? 'يحتاجون إسنادًا' : 'الجميع مُسنَدون'} />
           <KPI label="تحتاج مراجعة" value={d.flagged} unit="سجلًا" icon={AlertTriangle} delay={180}
             sub="أرقام هوية قصيرة أو مكرّرة" />
-        </div>
-
-        <div className="mb-4 grid gap-4 md:grid-cols-3">
-          {[
-            { t: 'المسارات', d: d.tracks, c: ['bg-sage-500', 'bg-info-500', 'bg-warn-500'] },
-            { t: 'المراحل', d: d.stages, c: ['bg-brand-700', 'bg-brand-400', 'bg-sage-500', 'bg-ink-300'] },
-            { t: 'الجنسية', d: d.nationalities, c: ['bg-brand-700', 'bg-ink-300'] },
-          ].filter((b) => Object.keys(b.d).length).map((b, i) => (
-            <Sheet key={b.t} className="rise">
-              <h3 className="mb-4 text-xs2 font-medium text-ink-600">{b.t}</h3>
-              <Split data={b.d} colors={b.c} />
-            </Sheet>
-          ))}
         </div>
 
         <Sheet className="rise mb-4">
@@ -96,13 +80,7 @@ export default function OverviewPage() {
                   <tr key={h.id} className="border-b border-ink-150 last:border-0 transition-colors hover:bg-brand-50">
                     <td className="px-2 py-3 font-medium text-ink-900">{h.teacher}</td>
                     <td className="px-2 py-3">
-                      <div className="flex items-center gap-2">
-                        <span className="w-6 text-panel"><Num>{h.n}</Num></span>
-                        <span className="h-1.5 w-16 overflow-hidden rounded-full bg-ink-100">
-                          <span className="block h-full rounded-full bg-brand-400 transition-[width] duration-700 ease-brand"
-                            style={{ width: `${(h.n / maxN) * 100}%` }} />
-                        </span>
-                      </div>
+                      <span className="text-panel text-ink-700"><Num>{h.n}</Num></span>
                     </td>
                     <td className="px-2 py-3">
                       <div className="flex gap-1">
@@ -128,11 +106,25 @@ export default function OverviewPage() {
           </div>
         </Sheet>
 
-        <div className="rise grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="mb-4 grid gap-4 md:grid-cols-3">
           {[
-            { icon: UploadCloud, label: 'رفع ملف', href: '/admin/students/import' },
+            { t: 'المسارات', d: d.tracks, c: ['bg-sage-500', 'bg-info-500', 'bg-warn-500'] },
+            { t: 'المراحل', d: d.stages, c: ['bg-brand-700', 'bg-brand-400', 'bg-sage-500', 'bg-ink-300'] },
+            { t: 'الجنسية', d: d.nationalities, c: ['bg-brand-700', 'bg-ink-300'] },
+          ].filter((b) => Object.keys(b.d).length).map((b, i) => (
+            <Sheet key={b.t} className="rise">
+              <h3 className="mb-4 text-xs2 font-medium text-ink-600">{b.t}</h3>
+              <Split data={b.d} colors={b.c} />
+            </Sheet>
+          ))}
+        </div>
+
+        <div className="rise grid grid-cols-2 gap-3 lg:grid-cols-5">
+          {[
+            { icon: UploadCloud, label: 'رفع ملف', href: '/admin/import' },
             { icon: FileText, label: 'طباعة خطة لطالب', href: '/admin/plans' },
             { icon: ClipboardCheck, label: 'تسجيل اختبار', href: '/admin/exams' },
+            { icon: Printer, label: 'التقارير', href: '/admin/reports' },
             { icon: Ticket, label: 'إصدار أكواد نقاط', href: '/admin/points' },
           ].map((s) => (
             <Link key={s.label} href={s.href}
