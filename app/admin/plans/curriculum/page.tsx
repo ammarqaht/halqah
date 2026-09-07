@@ -180,8 +180,12 @@ export default function CurriculumImport() {
                     <table className="w-full min-w-[36rem] border-collapse text-panel">
                       <thead>
                         <tr className="border-b border-ink-200 bg-page/50 text-cap text-ink-500">
-                          {['المستوى', 'اليوم', 'المقرر', 'من سورة', 'آية', 'إلى سورة', 'آية'].map((h) => (
-                            <th key={h} className="px-3 py-2 text-start font-medium">{h}</th>))}
+                          {['المستوى', 'اليوم', 'المقرر', 'من سورة', 'آية', 'إلى سورة', 'آية'].map((h, i) => (
+                            /* «آية» heads two columns, the from and the to, so the label is
+                               not unique and cannot be the key it was used as — React is free
+                               to drop or duplicate a column. The list is static and never
+                               reorders, so the index is the honest key here. */
+                            <th key={i} className="px-3 py-2 text-start font-medium">{h}</th>))}
                         </tr>
                       </thead>
                       <tbody>

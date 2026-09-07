@@ -23,5 +23,8 @@ const SETTINGS = {
 for (const [key, value] of Object.entries(SETTINGS)) {
   await db.setting.upsert({ where: { key }, create: { key, value }, update: { value } });
 }
-console.log(`  ✓ ${Object.keys(SETTINGS).length} إعدادًا مزروعة`);
+/* Not «${n} إعدادًا»: three to ten take the plural, not the accusative
+   singular, and the count here is eight. Parenthesising the figure sidesteps
+   the agreement entirely and stays right however many settings there are. */
+console.log(`  ✓ الإعدادات مزروعة (${Object.keys(SETTINGS).length})`);
 await db.$disconnect();

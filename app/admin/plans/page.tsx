@@ -221,8 +221,12 @@ function PlansScreen() {
                 <table className="w-full min-w-[46rem] border-collapse text-body">
                   <thead>
                     <tr className="border-b border-ink-200 bg-page/50 text-cap text-ink-500">
-                      {['اليوم', 'المقرر', 'من سورة', 'آية', 'إلى سورة', 'آية', 'ملاحظة', ''].map((h) => (
-                        <th key={h} className="px-3 py-2.5 text-start font-medium">{h}</th>))}
+                      {['اليوم', 'المقرر', 'من سورة', 'آية', 'إلى سورة', 'آية', 'ملاحظة', ''].map((h, i) => (
+                        /* «آية» heads two columns, the from and the to, so the label is
+                           not unique and cannot be the key it was used as — React is free
+                           to drop or duplicate a column. The list is static and never
+                           reorders, so the index is the honest key here. */
+                        <th key={i} className="px-3 py-2.5 text-start font-medium">{h}</th>))}
                     </tr>
                   </thead>
                   <tbody>
