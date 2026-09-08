@@ -16,7 +16,8 @@ import { useDB } from '@/lib/store';
 import { shortName } from '@/lib/normalise';
 
 /** Where each report actually lives, once its choices are filled in. */
-function printHref(id: ReportId, halaqa: string, student: string, sections = ''): string | null {
+function printHref(id: ReportId, halaqa: string, student: string, sections = '',
+                   from = '', to = ''): string | null {
   switch (id) {
     case 'halaqa':      return halaqa ? `/print/halaqa/${halaqa}` : null;
     case 'student':     return student ? `/print/student/${student}` : null;
@@ -29,6 +30,10 @@ function printHref(id: ReportId, halaqa: string, student: string, sections = '')
     }
     case 'ready':       return halaqa ? `/print/ready?halaqa=${halaqa}` : '/print/ready';
     case 'honour':      return halaqa ? `/print/honour?halaqa=${halaqa}` : '/print/honour';
+    case 'period': {
+      const q = [from && `from=${from}`, to && `to=${to}`].filter(Boolean).join('&');
+      return `/print/period${q ? `?${q}` : ''}`;
+    }
     case 'pick-list':   return '/print/pick-list';
     case 'bookings':    return '/print/bookings';
     default:            return null;
@@ -44,7 +49,8 @@ function ReportsScreen() {
   const report = REPORTS.find((r) => r.id === id) ?? REPORTS[0];
   const halaqa = sp.get('halaqa') ?? '';
   const student = sp.get('student') ?? '';
-  const href = printHref(id, halaqa, student, sp.get('sections') ?? '');
+  const href = printHref(id, halaqa, student, sp.get('sections') ?? '',
+    sp.get('from') ?? '', sp.get('to') ?? '');
 
   const subject = useMemo(() => {
     if (report.needs === 'halaqa') {
@@ -53,6 +59,10 @@ function ReportsScreen() {
     }
     if (report.needs === 'student') {
       return db.students.find((x) => x.id === student)?.fullName ?? null;
+    }
+    if (report.needs === 'period') {
+      const f = sp.get('from'), t = sp.get('to');
+      return f && t ? `من ${f} إلى ${t}` : f ? `منذ ${f}` : t ? `حتى ${t}` : 'المدة كاملة';
     }
     return 'كل الحلقات';
   }, [report, halaqa, student, db]);

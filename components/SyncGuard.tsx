@@ -3,7 +3,8 @@
    not landing. Silence about a failed save is the worst outcome: the
    supervisor keeps working against a copy nobody else will ever see. */
 import { useEffect, useSyncExternalStore } from 'react';
-import { CloudOff, Loader2 } from 'lucide-react';
+import { CloudOff, Loader2, LogIn } from 'lucide-react';
+import { Btn } from '@/components/ui';
 import { store, hydrateFromServer, flushToServer, syncStatus } from '@/lib/store';
 
 export function SyncGuard() {
@@ -17,6 +18,25 @@ export function SyncGuard() {
     window.addEventListener('pagehide', flush);
     return () => window.removeEventListener('pagehide', flush);
   }, []);
+
+  if (state === 'unauthorized') {
+    return (
+      <div role="alert"
+        className="fade fixed inset-x-0 bottom-6 z-[88] flex justify-center px-4">
+        <div className="flex flex-wrap items-center gap-4 rounded-xl border border-risk-200 bg-paper px-5 py-4 shadow-pop">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-risk-100 text-risk-700">
+            <LogIn size={17} />
+          </span>
+          <p className="text-base2 text-ink-800">
+            انتهت الجلسة، فلم يصل الحفظ إلى الخادم. عملك محفوظ هنا — سجّل الدخول ليُرسَل.
+          </p>
+          <a href={`/login?reason=expired&next=${encodeURIComponent(location.pathname)}`}>
+            <Btn variant="primary">تسجيل الدخول</Btn>
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   if (state !== 'offline' && state !== 'saving') return null;
 

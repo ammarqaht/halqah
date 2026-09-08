@@ -99,7 +99,7 @@ const SYNCED = [
   'bookings', 'curriculum', 'plans', 'tajweedTopics',
 ] as const;
 
-type SyncState = 'idle' | 'saving' | 'saved' | 'offline';
+type SyncState = 'idle' | 'saving' | 'saved' | 'offline' | 'unauthorized';
 let syncState: SyncState = 'idle';
 let hydrated = false;
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -117,7 +117,11 @@ async function pushNow(): Promise<void> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(slice(db)),
     });
-    setSync(res.ok ? 'saved' : 'offline');
+    /* A lapsed session is NOT «offline». Reported as one, the supervisor is
+       told his work is safe and will send itself later — and it never does,
+       because nothing is wrong with the connection and nobody signs back in.
+       That is how an upload came back «تم الاستيراد» with an empty server. */
+    setSync(res.status === 401 ? 'unauthorized' : res.ok ? 'saved' : 'offline');
   } catch {
     /* No connection. The cache still holds it, and the next successful save
        carries everything — this is a whole-state PUT, not a diff. */
@@ -140,6 +144,7 @@ export async function hydrateFromServer(): Promise<void> {
   if (hydrated) return;
   try {
     const res = await fetch('/api/state');
+    if (res.status === 401) { setSync('unauthorized'); return; }
     if (!res.ok) { setSync('offline'); return; }
     const remote = await res.json();
     const cur = load();

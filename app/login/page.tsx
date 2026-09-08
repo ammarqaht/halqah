@@ -134,7 +134,7 @@ function LoginScreen() {
               {!err && reason && (
                 <p className="rounded-md border border-warn-200 bg-warn-100 px-3 py-2.5 text-panel text-warn-700">
                   {reason === 'idle'
-                    ? 'أُقفلت الجلسة تلقائيًا بعد خمس دقائق دون نشاط. سجّل الدخول للمتابعة.'
+                    ? 'أُقفلت الجلسة تلقائيًا بعد ثلاثين دقيقة دون نشاط. سجّل الدخول للمتابعة.'
                     : 'انتهت صلاحية الجلسة. سجّل الدخول للمتابعة.'}
                 </p>
               )}

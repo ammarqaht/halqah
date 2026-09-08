@@ -35,19 +35,6 @@ function SettingsScreen() {
   const local = derive(useDB());
   const router = useRouter();
 
-  /* The period to print. Kept here rather than in the URL: it is a scratch
-     choice on the way to a printed sheet, not a place to link anyone to. */
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
-  const iso = (d: Date) => d.toISOString().slice(0, 10);
-  const setPreset = (k: Preset) => {
-    const now = new Date();
-    const start = k === 'month' ? new Date(now.getFullYear(), now.getMonth(), 1)
-      : k === 'quarter' ? new Date(now.getFullYear(), now.getMonth() - 2, 1)
-      : new Date(now.getFullYear(), 0, 1);
-    setFrom(iso(start)); setTo(iso(now));
-  };
-  const range = [from && `from=${from}`, to && `to=${to}`].filter(Boolean).join('&');
 
   const [stats, setStats] = useState<Stats | null>(null);
   const [dbDown, setDbDown] = useState(false);
@@ -98,53 +85,6 @@ function SettingsScreen() {
         </>}
 
         {section === 'database' && <>
-        <Sheet className="rise mb-4">
-          <SheetHead title="طباعة بيانات فترة"
-            meta="ما حدث بين تاريخين — الاختبارات والخطط والنقاط" />
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="من تاريخ" hint="اتركه فارغًا ليبدأ من أول سجل">
-              <input type="date" className={INPUT} value={from}
-                onChange={(e) => setFrom(e.target.value)} />
-            </Field>
-            <Field label="إلى تاريخ" hint="اتركه فارغًا لينتهي عند آخر سجل">
-              <input type="date" className={INPUT} value={to}
-                onChange={(e) => setTo(e.target.value)} />
-            </Field>
-          </div>
-
-          {from && to && from > to && (
-            <p role="alert" className="mt-3 rounded-lg border border-risk-200 bg-risk-100 px-3.5 py-2.5 text-panel text-risk-700">
-              تاريخ البداية بعد تاريخ النهاية.
-            </p>
-          )}
-
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            {/* Two shapes of the same window: what HAPPENED in it, and the
-                association's own tally narrowed to it. */}
-            <a href={`/print/period${range ? `?${range}` : ''}`} target="_blank" rel="noreferrer">
-              <Btn variant="primary" icon={Printer} disabled={!!(from && to && from > to)}>
-                طباعة بيانات الفترة
-              </Btn>
-            </a>
-            <a href={`/print/association${range ? `?${range}` : ''}`} target="_blank" rel="noreferrer">
-              <Btn icon={Printer} disabled={!!(from && to && from > to)}>
-                إحصاءات الجمعية للفترة
-              </Btn>
-            </a>
-            {[
-              ['هذا الشهر', 'month'], ['آخر ٣ أشهر', 'quarter'], ['هذه السنة', 'year'],
-            ].map(([label, k]) => (
-              <Btn key={k} size="sm" onClick={() => setPreset(k as Preset)}>{label}</Btn>
-            ))}
-            {(from || to) && <Btn size="sm" onClick={() => { setFrom(''); setTo(''); }}>مسح</Btn>}
-          </div>
-
-          <p className="mt-3 text-panel text-ink-500">
-            الأرقام محسوبة من تواريخ الاختبارات والتسليم وحركات النقاط — فهي تصف ما حدث
-            في الفترة، لا من كان مقيَّدًا فيها.
-          </p>
-        </Sheet>
-
 
         <Sheet className="rise mb-4">
           <SheetHead title="قاعدة البيانات"

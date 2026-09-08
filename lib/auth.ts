@@ -18,8 +18,13 @@ const COOKIE = 'halqah_session';
  * Every request the supervisor makes while working re-issues it, so the clock
  * measures idleness rather than session length: he is never signed out
  * mid-sentence, and a laptop left open on the mosque desk is signed out.
+ *
+ * It was five. Reading four workbooks' previews before pressing «اعتماد» takes
+ * longer than that without touching the keyboard, so the token lapsed mid-task
+ * and the upload failed — quietly, because the failure was reported as being
+ * offline. Thirty still signs out a laptop left on the desk.
  */
-export const IDLE_MINUTES = 5;
+export const IDLE_MINUTES = 30;
 
 function secret() {
   const s = process.env.AUTH_SECRET;

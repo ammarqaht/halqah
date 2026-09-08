@@ -53,7 +53,7 @@ export default function ImportPage() {
   const [busy, setBusy] = useState(false);
   const [drag, setDrag] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
-  const [done, setDone] = useState<(Totals & { files: number; synced: boolean }) | null>(null);
+  const [done, setDone] = useState<(Totals & { files: number; synced: boolean; expired: boolean }) | null>(null);
   const [error, setError] = useState('');
 
   const addFiles = useCallback(async (list: FileList | File[]) => {
@@ -106,6 +106,11 @@ export default function ImportPage() {
   const commit = async () => {
     setBusy(true);
     let allSynced = true;
+    /* A lapsed session is its own failure, and the one that actually happens:
+       reading four previews takes longer than the idle window used to allow.
+       Reported as «offline» the screen said «تم الاستيراد» over an empty
+       server — the worst outcome this page can produce. */
+    let expired = false;
     for (const j of ready) {
       const p = j.read!.payload;
 
@@ -123,7 +128,7 @@ export default function ImportPage() {
             body: JSON.stringify({ students: p.students, halaqat: p.halaqat, fileName: j.name }),
           });
           if (res.ok) idMap = (await res.json()).idMap ?? {};
-          else synced = false;
+          else { synced = false; if (res.status === 401) expired = true; }
         } catch { synced = false; }
       }
       if (!synced) allSynced = false;
@@ -148,7 +153,7 @@ export default function ImportPage() {
        rather than left to the debounce, so «تم الاستيراد» means it landed. */
     await flushToServer();
     setBusy(false);
-    setDone({ ...totals, files: ready.length, synced: allSynced });
+    setDone({ ...totals, files: ready.length, synced: allSynced, expired });
   };
 
   const open = jobs.find((j) => j.id === openId) ?? null;
@@ -160,8 +165,11 @@ export default function ImportPage() {
         <TopBar title="رفع الملفات" panelOpen={panelOpen} onOpenPanel={() => setPanelOpen(true)} />
         <div className="mx-auto max-w-column px-6 py-8">
           <Sheet className="rise">
-            <Empty icon={CheckCircle2} title="تم الاستيراد"
-              body={`من ${done.files} ${done.files === 1 ? 'ملف' : 'ملفات'} — والبيانات ظهرت في كل الشاشات.`}
+            <Empty icon={done.synced ? CheckCircle2 : AlertTriangle}
+              title={done.synced ? 'تم الاستيراد' : 'قُرئت الملفات — ولم تصل الخادم'}
+              body={done.synced
+                ? `من ${done.files} ${done.files === 1 ? 'ملف' : 'ملفات'} — والبيانات ظهرت في كل الشاشات.`
+                : `قُرئت ${done.files} ${done.files === 1 ? 'ملف' : 'ملفات'} وحُفظت في هذا الجهاز وحده. لن يراها جهاز آخر حتى تصل.`}
               action={<div className="flex flex-wrap justify-center gap-2">
                 <Btn onClick={() => { setJobs([]); setDone(null); }}>رفع ملفات أخرى</Btn>
                 <Btn variant="primary" size="lg" onClick={() => router.push('/admin')}>
@@ -181,10 +189,26 @@ export default function ImportPage() {
             </div>
 
             {!done.synced && (
-              <p className="mt-4 flex items-start gap-2 rounded-xl border border-warn-200 bg-warn-100 p-3.5 text-panel text-warn-700">
-                <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-                حُفظت البيانات في هذا الجهاز، لكن تعذّر إرسال الطلاب إلى الخادم — أعد المحاولة حين يعود الاتصال ليراها بقية الأجهزة.
-              </p>
+              <div className="mt-4 rounded-xl border border-risk-200 bg-risk-100 p-4">
+                <p className="flex items-start gap-2 text-base2 text-risk-700">
+                  <AlertTriangle size={17} className="mt-0.5 shrink-0" />
+                  {done.expired
+                    ? 'انتهت الجلسة أثناء الرفع، فلم تصل البيانات إلى الخادم.'
+                    : 'تعذّر الاتصال بالخادم، فلم تصل البيانات إليه.'}
+                </p>
+                <p className="mt-2 text-panel text-risk-700/85">
+                  ما قرأه النظام محفوظ في هذا المتصفّح، ولن يراه أي جهاز آخر.
+                  {done.expired ? ' سجّل الدخول ثم ارفع الملفات مرة أخرى.' : ' أعد المحاولة حين يعود الاتصال.'}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {done.expired && (
+                    <a href="/login?reason=expired&next=%2Fadmin%2Fimport">
+                      <Btn variant="primary">تسجيل الدخول</Btn>
+                    </a>
+                  )}
+                  <Btn onClick={() => setDone(null)}>أعد المحاولة</Btn>
+                </div>
+              </div>
             )}
           </Sheet>
         </div>

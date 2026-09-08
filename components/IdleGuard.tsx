@@ -16,7 +16,7 @@ import { Num } from '@/components/Num';
 
 const KEY = 'halqah_last_activity';
 /** Kept a little under the server's five so the warning always precedes it. */
-const IDLE_MS = 5 * 60 * 1000;
+const IDLE_MS = 30 * 60 * 1000;
 const WARN_MS = 45 * 1000;
 /** The cookie is only re-issued this often, however busy he is. */
 const TOUCH_EVERY = 60 * 1000;

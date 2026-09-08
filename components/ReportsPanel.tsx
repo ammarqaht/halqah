@@ -5,6 +5,7 @@
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
   Users2, BarChart3, Award, Trophy, PackageCheck, ClipboardList, Coins, FileUser,
+  CalendarRange,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { PanelShell, PanelGroup, PanelItem } from '@/components/Panel';
@@ -15,7 +16,7 @@ import { shortName } from '@/lib/normalise';
 
 export type ReportId =
   | 'halaqa' | 'student' | 'association' | 'ready' | 'points' | 'honour'
-  | 'pick-list' | 'bookings';
+  | 'pick-list' | 'bookings' | 'period';
 
 /** The association sheet's five tables, each printable on its own. */
 export const ASSOC_SECTIONS: { id: string; label: string }[] = [
@@ -28,7 +29,7 @@ export const ASSOC_SECTIONS: { id: string; label: string }[] = [
 
 export const REPORTS: {
   id: ReportId; label: string; icon: LucideIcon;
-  needs?: 'halaqa' | 'student';
+  needs?: 'halaqa' | 'student' | 'period';
   /** Some reports read better across everyone; those allow an empty choice. */
   optional?: boolean;
 }[] = [
@@ -38,6 +39,7 @@ export const REPORTS: {
   { id: 'ready',       label: 'الجاهزون لاختبار الجمعية', icon: Award,        needs: 'halaqa', optional: true },
   { id: 'points',      label: 'قائمة نقاط الحلقة',       icon: Coins,         needs: 'halaqa' },
   { id: 'honour',      label: 'لوحة الشرف',              icon: Trophy,        needs: 'halaqa', optional: true },
+  { id: 'period',      label: 'بيانات فترة',             icon: CalendarRange, needs: 'period' },
   { id: 'pick-list',   label: 'قائمة تسليم الهدايا',     icon: PackageCheck },
   { id: 'bookings',    label: 'اختبارات اليوم',          icon: ClipboardList },
 ];
@@ -119,6 +121,42 @@ export function ReportsPanel({ onClose }: { onClose: () => void }) {
               </>
             );
           })()}
+        </PanelGroup>
+      )}
+
+      {/* بيانات فترة — the only report whose subject is a span of time. */}
+      {report.needs === 'period' && (
+        <PanelGroup label="الفترة">
+          <div className="space-y-2 px-1.5">
+            {([['from', 'من تاريخ'], ['to', 'إلى تاريخ']] as const).map(([k, label]) => (
+              <label key={k} className="block">
+                <span className="mb-1 block text-micro text-ink-500">{label}</span>
+                <input type="date" value={sp.get(k) ?? ''} onChange={(e) => set(k, e.target.value)}
+                  className="h-9 w-full rounded-lg border border-ink-200 bg-paper px-2 text-panel text-ink-800" />
+              </label>
+            ))}
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {([['month', 'هذا الشهر'], ['quarter', 'آخر ٣ أشهر'], ['year', 'هذه السنة']] as const)
+                .map(([k, label]) => (
+                <button key={k} onClick={() => {
+                  const now = new Date();
+                  const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                  const start = k === 'month' ? new Date(now.getFullYear(), now.getMonth(), 1)
+                    : k === 'quarter' ? new Date(now.getFullYear(), now.getMonth() - 2, 1)
+                    : new Date(now.getFullYear(), 0, 1);
+                  const p = new URLSearchParams(sp.toString());
+                  p.set('from', iso(start)); p.set('to', iso(now));
+                  router.replace(`/admin/reports?${p}`, { scroll: false });
+                }}
+                  className="rounded-lg border border-ink-200 bg-paper px-2 py-1 text-micro text-ink-600 transition-colors hover:border-brand-700 hover:bg-brand-50 hover:text-brand-800">
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="pt-1 text-micro leading-relaxed text-ink-500">
+              اتركهما فارغين للمدة كاملة. التقرير يصف ما حدث في الفترة، لا من كان مقيَّدًا فيها.
+            </p>
+          </div>
         </PanelGroup>
       )}
 
