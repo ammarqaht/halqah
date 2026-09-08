@@ -19,7 +19,7 @@ import { Fragment, Suspense, use, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Printer } from 'lucide-react';
 import { LogoMark, LogoJamiyah } from '@/components/Logo';
-import { Num, toArabicDigits } from '@/components/Num';
+import { Num } from '@/components/Num';
 import { Btn } from '@/components/ui';
 import { store, useDB } from '@/lib/store';
 import {
@@ -44,7 +44,7 @@ const BADGE_AR = { BADGE_GOLDEN: 'الوسام الذهبي', BADGE_DIAMOND: 'ا
 function RangeCells({ r, cell, bold = false }: {
   r: PlanRow | undefined; cell: string; bold?: boolean;
 }) {
-  const ay = (v: string | undefined) => (!v ? '' : v === 'آخر' ? v : toArabicDigits(v));
+  const ay = (v: string | undefined) => (!v ? '' : v === 'آخر' ? v : v);
   const from = r?.fromSurah ?? '';
   const to = r?.toSurah || (from ? from : '');
   const w = bold ? 'font-medium' : '';
@@ -115,7 +115,13 @@ function PlanSheetInner({ params }: { params: Promise<{ planId: string }> }) {
   /* Tighter, because seventeen columns cannot each afford six pixels a side.
      `truncate` is the guard of last resort: a surah name that still will not
      fit is clipped rather than allowed to widen its column. */
-  const tcell = 'border border-ink-300 px-1 py-1 text-center align-middle truncate';
+  /* Read at arm's length on a desk, often photocopied. Bumped a point and a
+     half and darkened: the printer's grey at 9.5px was the reason the sheet
+     looked washed out. `align-middle` centres each cell vertically — the
+     scoring boxes are taller than a line of text, so without it every entry
+     sat on the ceiling of its box. */
+  const tcell = 'border border-ink-400 px-1 py-1.5 text-center align-middle truncate '
+    + 'text-ink-900';
 
   return (
     <>
@@ -151,14 +157,14 @@ function PlanSheetInner({ params }: { params: Promise<{ planId: string }> }) {
               <th className={`${cell} bg-page/60 font-medium`}>المسار</th>
               <td className={cell}>{TRACK_AR[plan.track]}</td>
               <th className={`${cell} bg-page/60 font-medium`}>المستوى</th>
-              <td className={cell}><Num>{toArabicDigits(plan.level)}</Num></td>
+              <td className={cell}><Num>{plan.level}</Num></td>
               <th className={`${cell} bg-page/60 font-medium`}>المقرَّر اليومي</th>
               <td className={cell} colSpan={2}>{plan.dailyAmount}</td>
             </tr>
             <tr>
               <th className={`${cell} bg-page/60 font-medium`}>تاريخ التسليم</th>
               <td className={cell} colSpan={2}>
-                {plan.issuedAt ? <Num>{toArabicDigits(formatDate(plan.issuedAt))}</Num> : ''}
+                {plan.issuedAt ? <Num>{formatDate(plan.issuedAt)}</Num> : ''}
               </td>
               <th className={`${cell} bg-page/60 font-medium`}>الحلقة</th>
               <td className={cell} colSpan={3}>
@@ -175,7 +181,7 @@ function PlanSheetInner({ params }: { params: Promise<{ planId: string }> }) {
             per column is what keeps this one page: the browser stops measuring
             content and honours the numbers, so a long surah name ellipsises
             instead of pushing the sheet onto a second sheet. */}
-        <table className="w-full table-fixed border-collapse text-[9.5px]">
+        <table className="w-full table-fixed border-collapse text-[11px] font-medium">
           <colgroup>
             <col style={{ width: '4.4%' }} />{/* اليوم */}
             {[0, 1, 2].map((i) => (
@@ -196,13 +202,11 @@ function PlanSheetInner({ params }: { params: Promise<{ planId: string }> }) {
           <thead>
             <tr className="bg-page/60 text-[10px] text-ink-700">
               <th className={tcell} rowSpan={2}>اليوم</th>
-              {/* The order the teacher works in: today's lesson first, then
-                  what it revises, then the long revision behind it. */}
-              <th className={tcell} colSpan={4}>الدرس</th>
+              <th className={tcell} colSpan={4}>مراجعة كبرى</th>
               <th className={tcell} rowSpan={2}>درجة</th>
               <th className={tcell} colSpan={4}>مراجعة صغرى</th>
               <th className={tcell} rowSpan={2}>درجة</th>
-              <th className={tcell} colSpan={4}>مراجعة كبرى</th>
+              <th className={tcell} colSpan={4}>الدرس</th>
               <th className={tcell} rowSpan={2}>درجة</th>
               <th className={tcell} rowSpan={2}>ملاحظات</th>
             </tr>
@@ -222,8 +226,8 @@ function PlanSheetInner({ params }: { params: Promise<{ planId: string }> }) {
               if (d.examBadge) {
                 /* «يظهران في الورقة بصفّهما وخانة تاريخ … لا بمقرّر حفظ» */
                 return (
-                  <tr key={d.dayNo} className="keep h-[26px] bg-brand-50">
-                    <td className={`${tcell} font-medium`}><Num>{toArabicDigits(d.dayNo)}</Num></td>
+                  <tr key={d.dayNo} className="keep h-[28px] bg-brand-50">
+                    <td className={`${tcell} font-medium`}><Num>{d.dayNo}</Num></td>
                     {/* The badge spans everything but the last column, so the
                         date it asks for lands in the widest cell on the row
                         rather than in a scoring box too narrow to hold it. */}
@@ -243,13 +247,13 @@ function PlanSheetInner({ params }: { params: Promise<{ planId: string }> }) {
                 ? noted.map((r) => `${PLAN_KIND_AR[r.kind]}: ${r.note}`).join(' · ')
                 : (noted[0]?.note ?? '');
               return (
-                <tr key={d.dayNo} className="keep h-[26px]">
-                  <td className={`${tcell} font-medium`}><Num>{toArabicDigits(d.dayNo)}</Num></td>
-                  <RangeCells r={dars} cell={tcell} bold />
+                <tr key={d.dayNo} className="keep h-[28px]">
+                  <td className={`${tcell} font-medium`}><Num>{d.dayNo}</Num></td>
+                  <RangeCells r={mk} cell={tcell} />
                   <td className={tcell} />
                   <RangeCells r={ms} cell={tcell} />
                   <td className={tcell} />
-                  <RangeCells r={mk} cell={tcell} />
+                  <RangeCells r={dars} cell={tcell} bold />
                   <td className={tcell} />
                   <td className={`${tcell} text-start text-[8.5px]`}>
                     {/* Clamped: an unbounded note would grow the row and spill
@@ -282,9 +286,9 @@ function PlanSheetInner({ params }: { params: Promise<{ planId: string }> }) {
         </section>
 
         <p className="keep mt-3 text-center text-[9px] text-ink-500">
-          الدرجة من <Num>{toArabicDigits(10)}</Num> لكل مقرّر ·
-          يوما <Num>{toArabicDigits(plan.examDays.BADGE_GOLDEN)}</Num> و
-          <Num>{toArabicDigits(plan.examDays.BADGE_DIAMOND)}</Num> للاختبار
+          الدرجة من <Num>{10}</Num> لكل مقرّر ·
+          يوما <Num>{plan.examDays.BADGE_GOLDEN}</Num> و
+          <Num>{plan.examDays.BADGE_DIAMOND}</Num> للاختبار
         </p>
       </div>
     </>
