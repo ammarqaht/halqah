@@ -1,6 +1,7 @@
 'use client';
 /* الرئيسية — نظرة عامة  (SPEC.md §6.1 · إد-٢)
    Every figure is computed from what the supervisor imported. Nothing seeded. */
+import { useMemo } from 'react';
 import Link from 'next/link';
 import {
   Users, CircleDot, UploadCloud, AlertTriangle, FileText, ClipboardCheck, Ticket,
@@ -12,6 +13,7 @@ import { Btn, Empty, Chip } from '@/components/ui';
 import { Num } from '@/components/Num';
 import { usePanel } from '@/components/PanelState';
 import { useDB } from '@/lib/store';
+import { isoDate } from '@/lib/dates';
 import { derive } from '@/lib/derive';
 import { cx } from '@/lib/cx';
 
@@ -21,7 +23,14 @@ const TRACK_TONE: Record<string, string> = {
 
 export default function OverviewPage() {
   const { panelOpen, setPanelOpen } = usePanel();
-  const d = derive(useDB());
+  const db = useDB();
+  const d = derive(db);
+
+  /* Booked for today and not yet sat. */
+  const todaysBookings = useMemo(() => {
+    const today = isoDate(new Date());
+    return db.bookings.filter((b) => b.scheduledOn === today && b.status === 'BOOKED');
+  }, [db.bookings]);
 
   if (d.isEmpty) {
     return (
@@ -61,6 +70,40 @@ export default function OverviewPage() {
           <KPI label="تحتاج مراجعة" value={d.flagged} unit="سجلًا" icon={AlertTriangle} delay={180}
             sub="أرقام هوية قصيرة أو مكرّرة" />
         </div>
+
+        {/* اختبارات اليوم — the panel counts them, but the panel is closed
+            most of the time and a booking is a thing with a date on it. It
+            belongs where the supervisor lands. Absent when there are none:
+            an alert that shows a zero teaches him to stop reading it. */}
+        {todaysBookings.length > 0 && (
+          <Sheet className="rise mb-4 border-brand-200 bg-brand-50/40">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand-100 text-brand-800">
+                  <ClipboardCheck size={17} />
+                </span>
+                <div>
+                  <p className="text-lg2 font-medium text-ink-900">
+                    <Num>{todaysBookings.length}</Num>{' '}
+                    {todaysBookings.length === 1 ? 'اختبار اليوم'
+                      : todaysBookings.length === 2 ? 'اختباران اليوم' : 'اختبارات اليوم'}
+                  </p>
+                  <p className="mt-1 max-w-[42rem] text-panel text-ink-600">
+                    {todaysBookings.slice(0, 4).map((b) =>
+                      db.students.find((s) => s.id === b.studentId)?.fullName ?? '—').join(' · ')}
+                    {todaysBookings.length > 4 && <> وآخرون</>}
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Link href="/admin/exams/onsite"><Btn>الحجوزات</Btn></Link>
+                <a href="/print/bookings" target="_blank" rel="noreferrer">
+                  <Btn variant="primary" icon={Printer}>كشف اليوم</Btn>
+                </a>
+              </div>
+            </div>
+          </Sheet>
+        )}
 
         <Sheet className="rise mb-4">
           <SheetHead title="تقدّم الحلقات"

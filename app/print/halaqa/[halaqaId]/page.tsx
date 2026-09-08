@@ -26,6 +26,15 @@ export default function HalaqaReport({ params }: { params: Promise<{ halaqaId: s
     .sort((a, b) => a.student.fullName.localeCompare(b.student.fullName, 'ar')),
   [db, halaqaId]);
 
+  /* The halaqa's own attendance, averaged over the boys رتل actually reported
+     on — a student the file did not mention must not drag the figure down. */
+  const attTotal = (() => {
+    const marked = rows.filter((r) => r.student.attendedDays !== undefined);
+    if (!marked.length) return null;
+    const n = marked.reduce((a, r) => a + (r.student.attendedDays ?? 0), 0) / marked.length;
+    return Math.round(n * 10) / 10;
+  })();
+
   if (!halaqa) {
     return (
       <div className="sheet-a4 font-sans" dir="rtl">
@@ -45,7 +54,8 @@ export default function HalaqaReport({ params }: { params: Promise<{ halaqaId: s
 
       <div className="sheet-a4 font-sans" dir="rtl">
         <PrintHead title={`تقرير حلقة ${halaqa.teacher}`}
-          sub={`جامع محمد العبدالكريم — ${toArabicDigits(plural(rows.length, 'طالب واحد', 'طالبان', 'طلاب', 'طالبًا'))}`} />
+          sub={`جامع محمد العبدالكريم — ${toArabicDigits(plural(rows.length, 'طالب واحد', 'طالبان', 'طلاب', 'طالبًا'))}`
+            + (attTotal !== null ? ` · متوسّط الحضور ${toArabicDigits(attTotal)} ${attTotal === 1 ? 'يوم' : 'أيام'}` : '')} />
 
         {rows.length === 0 ? (
           <p className="py-12 text-center text-lg2 text-ink-500">لا طلاب نشطين في هذه الحلقة.</p>
@@ -53,7 +63,9 @@ export default function HalaqaReport({ params }: { params: Promise<{ halaqaId: s
           <table className="w-full border-collapse text-[11px]">
             <thead>
               <tr className="bg-page/60 text-[10px] text-ink-700">
-                {['#', 'الطالب', 'الصف', 'المسار', 'المستوى', 'آخر اختبار', 'جمعية', 'النقاط'].map((h) => (
+                {/* «أيام الحضور» comes straight from رتل's «الحضور» column in
+                    قاعدة بيانات الحلقات — the count the file already carries. */}
+                {['#', 'الطالب', 'الصف', 'المسار', 'المستوى', 'الحضور', 'آخر اختبار', 'جمعية', 'النقاط'].map((h) => (
                   <th key={h} className={PCELL}>{h}</th>))}
               </tr>
             </thead>
@@ -73,6 +85,10 @@ export default function HalaqaReport({ params }: { params: Promise<{ halaqaId: s
                     <td className={PCELL}>
                       {s.track === 'TALQEEN' ? '—'
                         : s.currentLevel != null ? <Num>{toArabicDigits(s.currentLevel)}</Num> : '—'}
+                    </td>
+                    <td className={PCELL}>
+                      {s.attendedDays === undefined ? '—'
+                        : <Num>{toArabicDigits(s.attendedDays)}</Num>}
                     </td>
                     <td className={`${PCELL} text-start`}>
                       {last
