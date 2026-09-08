@@ -143,6 +143,26 @@ export async function hydrateFromServer(): Promise<void> {
     if (!res.ok) { setSync('offline'); return; }
     const remote = await res.json();
     const cur = load();
+
+    /* A reset elsewhere empties this device too. Without it the next browser to
+       open would upload its stale copy straight back, and «تصفير» would only
+       ever hold until someone opened a laptop. */
+    const RESET_KEY = 'halqah_reset_at';
+    if (remote.resetAt) {
+      let seen: string | null = null;
+      try { seen = localStorage.getItem(RESET_KEY); } catch { /* private mode */ }
+      if (seen !== remote.resetAt) {
+        db = { ...EMPTY };
+        try {
+          localStorage.setItem(KEY, JSON.stringify(db));
+          localStorage.setItem(RESET_KEY, String(remote.resetAt));
+        } catch { /* private mode */ }
+        hydrated = true;
+        subs.forEach((f) => f());
+        setSync('saved');
+        return;
+      }
+    }
     /* The server is the record. A cache holding work this device made while
        signed out would be silently replaced, so anything the server does not
        have yet is kept and pushed straight back. */

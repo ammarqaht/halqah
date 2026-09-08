@@ -33,7 +33,12 @@ export async function GET() {
     db.tajweedTopic.findMany(),
   ]);
 
+  /* The stamp a reset leaves. A browser holding a copy from before it must
+     empty itself rather than upload it back. */
+  const resetAt = (await db.setting.findUnique({ where: { key: 'reset_at' } }))?.value ?? null;
+
   return NextResponse.json({
+    resetAt,
     txns: txns.map((t) => ({ ...t, createdAt: t.createdAt.toISOString() })),
     batches: batches.map((b) => ({
       ...b, expiresAt: iso(b.expiresAt), revokedAt: iso(b.revokedAt),

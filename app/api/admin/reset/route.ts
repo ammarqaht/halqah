@@ -10,6 +10,21 @@ const WIPE = [
   'halaqa_transfers',
   'import_runs',
   'audit_log',
+  /* The eleven that moved out of the browser. Five of them cascade from
+     students and would have gone anyway; the other six — the curriculum, the
+     gifts, the code batches and their cards, the tajweed topics — name no
+     student and would have quietly survived a «تصفير كامل». */
+  'point_txns',
+  'point_codes',
+  'point_code_batches',
+  'orders',
+  'gifts',
+  'exam_questions',
+  'exam_bookings',
+  'exams',
+  'student_plans',
+  'curriculum_days',
+  'tajweed_topics',
   'students',
   'halaqat',
 ] as const;
@@ -34,6 +49,16 @@ export async function POST() {
        any sequences, and the whole thing is atomic. */
     await db.$executeRawUnsafe(
       `TRUNCATE TABLE ${WIPE.map((t) => `"${t}"`).join(', ')} RESTART IDENTITY CASCADE;`);
+
+    /* A reset has to reach the OTHER devices too, and the server cannot push.
+       So it leaves a mark: each browser compares it against its own on the next
+       load and empties itself when the server's is newer. Without this, the
+       next device to open would helpfully upload its stale copy back. */
+    await db.setting.upsert({
+      where: { key: 'reset_at' },
+      create: { key: 'reset_at', value: new Date().toISOString() },
+      update: { value: new Date().toISOString() },
+    });
 
     await db.auditLog.create({
       data: {
