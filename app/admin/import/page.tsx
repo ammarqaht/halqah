@@ -128,6 +128,11 @@ export default function ImportPage() {
       }
       if (!synced) allSynced = false;
 
+      /* Everything ALREADY in this browser moves onto the server's ids too —
+         four hundred exams entered before this fix existed still name the id
+         the old parse minted, and would go on being dropped for ever. */
+      store.adoptIds(idMap);
+
       const to = (id: string | null) => (id && idMap[id]) || id;
       const mapped = {
         ...p,

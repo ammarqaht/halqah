@@ -249,6 +249,36 @@ export const store = {
     commit({ ...cur, students: [...byKey.values()], halaqat: [...halMap.values()],
              importedAt: new Date().toISOString(), sourceFile });
   },
+  /**
+   * Take the server's student ids, and carry everything that names one across.
+   *
+   * `merge` keeps the id this store already had, which is right when two
+   * uploads disagree and wrong when the SERVER disagrees: the server's id is
+   * the one every device reads, so a browser holding its own is a browser
+   * whose exams and plans are dropped on every save. Re-uploading did not heal
+   * it either — merge kept the old id all over again.
+   *
+   * The map comes from /api/import, which alone knows which id survived.
+   */
+  adoptIds(map: Record<string, string>) {
+    const ids = Object.keys(map);
+    if (!ids.length) return;
+    const cur = load();
+    const to = (id: string) => map[id] ?? id;
+    const toN = (id: string | null) => (id === null ? null : to(id));
+
+    commit({
+      ...cur,
+      students: cur.students.map((x) => (map[x.id] ? { ...x, id: to(x.id) } : x)),
+      exams:    cur.exams.map((x) => ({ ...x, studentId: to(x.studentId) })),
+      plans:    cur.plans.map((x) => ({ ...x, studentId: to(x.studentId) })),
+      txns:     cur.txns.map((x) => ({ ...x, studentId: to(x.studentId) })),
+      orders:   cur.orders.map((x) => ({ ...x, studentId: to(x.studentId) })),
+      bookings: cur.bookings.map((x) => ({ ...x, studentId: to(x.studentId) })),
+      codes:    cur.codes.map((x) => ({ ...x, redeemedBy: toN(x.redeemedBy) })),
+    });
+  },
+
   upsertHalaqa(h: Halaqa) {
     const cur = load();
     const i = cur.halaqat.findIndex((x) => x.id === h.id);

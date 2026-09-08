@@ -220,3 +220,36 @@ describe('deleting an exam takes back its points without erasing the ledger', ()
     expect(b.status).toBe('BOOKED');
   });
 });
+
+describe('adopting the server\'s student ids', () => {
+  it('carries every record that names him across, so nothing is orphaned', () => {
+    store.reset();
+    /* The state this browser is in today: its own id for a student the server
+       knows by a cuid, and four records hanging off it. */
+    store.upsertStudent(student({ id: 'br0wser1' }));
+    store.saveExam(exam({ id: 'e1', studentId: 'br0wser1', pointsAwarded: 200, pointsPaid: true }));
+    const b = store.book({ studentId: 'br0wser1', scheduledOn: '2026-09-08', level: 29,
+      badge: 'BADGE_DIAMOND', note: '' });
+    store.issuePlan({ studentId: 'br0wser1', track: 'GOLDEN', level: 29, dailyAmount: 'وجه' });
+
+    expect(balance('br0wser1')).toBe(200);
+
+    store.adoptIds({ br0wser1: 'cmtServerId' });
+
+    const d = store.get();
+    expect(d.students[0].id).toBe('cmtServerId');
+    expect(d.exams.every((e) => e.studentId === 'cmtServerId')).toBe(true);
+    expect(d.plans.every((p) => p.studentId === 'cmtServerId')).toBe(true);
+    expect(d.bookings.find((x) => x.id === b.id)!.studentId).toBe('cmtServerId');
+    /* The ledger moves with him — his balance is his, not his old id's. */
+    expect(balance('cmtServerId')).toBe(200);
+    expect(balance('br0wser1')).toBe(0);
+  });
+
+  it('leaves a student the map does not name alone', () => {
+    store.reset();
+    store.upsertStudent(student({ id: 'keepme' }));
+    store.adoptIds({ someoneElse: 'x' });
+    expect(store.get().students[0].id).toBe('keepme');
+  });
+});
