@@ -19,8 +19,16 @@ export function derive(db: DB) {
 
   const byHalaqa = db.halaqat.map((h) => {
     const list = s.filter((x) => x.halaqaId === h.id);
+    /* Both figures, because the client's own sheet carries the TOTAL and this
+       screen carried only the average — so «٢٠٨٫٦٦» in his file and «١٣٫٩١»
+       here described the same halaqa and looked like a contradiction. They are
+       the same number over fifteen students. */
+    const vals = (f: (x: Student) => number | undefined) =>
+      list.map(f).filter((n): n is number => typeof n === 'number');
+    const sum = (f: (x: Student) => number | undefined) =>
+      vals(f).reduce((a, b) => a + b, 0);
     const avg = (f: (x: Student) => number | undefined) => {
-      const v = list.map(f).filter((n): n is number => typeof n === 'number');
+      const v = vals(f);
       return v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0;
     };
     const marked = list.filter((x) => x.attendedDays !== undefined);
@@ -29,6 +37,10 @@ export function derive(db: DB) {
       n: list.length,
       hp: avg((x) => x.hifzPages),
       rp: avg((x) => x.reviewPages),
+      /** The totals, as رتل reports them — what the client's sheet shows. */
+      hpTotal: sum((x) => x.hifzPages),
+      rpTotal: sum((x) => x.reviewPages),
+      attTotal: list.reduce((n, x) => n + (x.attendedDays ?? 0), 0),
       /* Average DAYS attended. It used to be «what share of them showed up»
          computed from a yes/no that was itself wrong — the column is a count. */
       att: marked.length

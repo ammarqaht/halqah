@@ -9,7 +9,7 @@ import {
 import { TopBar } from '@/components/TopBar';
 import { Sheet, SheetHead } from '@/components/Sheet';
 import { KPI, Split } from '@/components/Stat';
-import { Btn, Empty, Chip } from '@/components/ui';
+import { Btn, Empty } from '@/components/ui';
 import { Num } from '@/components/Num';
 import { usePanel } from '@/components/PanelState';
 import { useDB } from '@/lib/store';
@@ -107,14 +107,14 @@ export default function OverviewPage() {
 
         <Sheet className="rise mb-4">
           <SheetHead title="تقدّم الحلقات"
-            meta="متوسّط أوجه الحفظ والمراجعة لكل طالب، من آخر ملف مرفوع"
+            meta="من آخر ملف رتل مرفوع — المجموع، ومتوسّطه لكل طالب تحته"
             action={<Link href="/admin/students" className="flex items-center gap-1 text-xs2 text-brand-800 hover:underline">
               الطلاب والحلقات <ArrowLeft size={14} strokeWidth={2} /></Link>} />
           <div className="-mx-2 overflow-x-auto">
             <table className="w-full min-w-[38rem] border-collapse text-body">
               <thead>
                 <tr className="border-b border-ink-200 text-cap text-ink-500">
-                  {['الحلقة', 'الطلاب', 'المسار', 'أوجه الحفظ', 'أوجه المراجعة', 'متوسّط الحضور'].map((h) => (
+                  {['الحلقة', 'الطلاب', 'المسار', 'أوجه الحفظ', 'أوجه المراجعة', 'أيام الحضور'].map((h) => (
                     <th key={h} className="px-2 pb-2.5 text-start font-medium">{h}</th>))}
                 </tr>
               </thead>
@@ -135,16 +135,34 @@ export default function OverviewPage() {
                         ))}
                       </div>
                     </td>
-                    <td className="px-2 py-3 text-panel text-ink-700"><Num>{h.hp.toFixed(2)}</Num></td>
-                    <td className="px-2 py-3 text-panel text-ink-700"><Num>{h.rp.toFixed(2)}</Num></td>
+                    {/* The total first, because that is the figure the client's
+                        own رتل sheet prints; the per-student average under it,
+                        because that is the one that compares two halaqat of
+                        different sizes. */}
+                    {([[h.hpTotal, h.hp], [h.rpTotal, h.rp]] as const).map(([total, mean], i) => (
+                      <td key={i} className="px-2 py-3">
+                        <span className="block text-panel text-ink-800">
+                          <Num>{total.toFixed(2)}</Num>
+                        </span>
+                        <span className="block text-micro text-ink-500">
+                          <Num>{mean.toFixed(2)}</Num> للطالب
+                        </span>
+                      </td>
+                    ))}
                     <td className="px-2 py-3">
                       {/* Days, not a percentage. When «الحضور» stopped being a
                           yes/no and became the count رتل actually reports, this
                           kept its «٪» and its 60/40 thresholds — so «حضر نصف
                           يوم» printed as «٠٫٥٪» and every halaqa read red. */}
                       {h.att === null ? <span className="text-micro text-ink-400">—</span> : (
-                        <Chip tone={h.att >= 3 ? 'ok' : h.att >= 1 ? 'warn' : 'risk'}>
-                          <Num>{h.att}</Num> {h.att === 1 ? 'يوم' : 'أيام'}</Chip>
+                        <span>
+                          <span className="block text-panel text-ink-800">
+                            <Num>{h.attTotal}</Num>
+                          </span>
+                          <span className="block text-micro text-ink-500">
+                            <Num>{h.att}</Num> للطالب
+                          </span>
+                        </span>
                       )}
                     </td>
                   </tr>
