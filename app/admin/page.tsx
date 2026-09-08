@@ -114,7 +114,7 @@ export default function OverviewPage() {
             <table className="w-full min-w-[38rem] border-collapse text-body">
               <thead>
                 <tr className="border-b border-ink-200 text-cap text-ink-500">
-                  {['الحلقة', 'الطلاب', 'المسار', 'أوجه الحفظ', 'أوجه المراجعة', 'الحضور'].map((h) => (
+                  {['الحلقة', 'الطلاب', 'المسار', 'أوجه الحفظ', 'أوجه المراجعة', 'متوسّط الحضور'].map((h) => (
                     <th key={h} className="px-2 pb-2.5 text-start font-medium">{h}</th>))}
                 </tr>
               </thead>
@@ -138,8 +138,13 @@ export default function OverviewPage() {
                     <td className="px-2 py-3 text-panel text-ink-700"><Num>{h.hp.toFixed(2)}</Num></td>
                     <td className="px-2 py-3 text-panel text-ink-700"><Num>{h.rp.toFixed(2)}</Num></td>
                     <td className="px-2 py-3">
+                      {/* Days, not a percentage. When «الحضور» stopped being a
+                          yes/no and became the count رتل actually reports, this
+                          kept its «٪» and its 60/40 thresholds — so «حضر نصف
+                          يوم» printed as «٠٫٥٪» and every halaqa read red. */}
                       {h.att === null ? <span className="text-micro text-ink-400">—</span> : (
-                        <Chip tone={h.att >= 60 ? 'ok' : h.att >= 40 ? 'warn' : 'risk'}><Num>{h.att}</Num>٪</Chip>
+                        <Chip tone={h.att >= 3 ? 'ok' : h.att >= 1 ? 'warn' : 'risk'}>
+                          <Num>{h.att}</Num> {h.att === 1 ? 'يوم' : 'أيام'}</Chip>
                       )}
                     </td>
                   </tr>
