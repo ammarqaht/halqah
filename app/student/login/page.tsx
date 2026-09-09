@@ -17,7 +17,6 @@ import { Loader2, ShieldCheck } from 'lucide-react';
 import { LogoFull, LogoJamiyah } from '@/components/Logo';
 import { Lattice } from '@/components/Lattice';
 import { Btn, Field, INPUT } from '@/components/ui';
-import { Num } from '@/components/Num';
 import { PinInput } from '@/components/student/PinInput';
 import { COPY, MOSQUE, NEIGHBOURHOOD } from '@/content/student';
 import { cx } from '@/lib/cx';
@@ -56,19 +55,24 @@ function LoginScreen() {
     <div className="min-h-screen bg-page md:grid md:min-h-screen md:grid-cols-[1fr_minmax(26rem,34rem)]">
       {/* the brand field — a band on a phone, the whole start half on a laptop */}
       <aside className="relative overflow-hidden bg-brand-900 px-6 py-9 md:flex md:flex-col md:justify-between md:px-12 md:py-14">
-        <Lattice />
-        <div className="relative flex items-center justify-between gap-4">
+        <Lattice className="pointer-events-none absolute inset-0 h-full w-full text-white"
+          opacity={0.07} />
+        {/* The same two soft fields the supervisor's panel carries — the panel
+            reads flat without them, which is what the client noticed. */}
+        <div className="pointer-events-none absolute -start-32 -top-32 h-[26rem] w-[26rem] rounded-full bg-white/[.035]" />
+        <div className="pointer-events-none absolute -bottom-40 -start-16 h-[30rem] w-[30rem] rounded-full bg-white/[.025]" />
+
+        <div className="relative flex items-center justify-between gap-4 md:gap-8">
           <LogoFull height={40} white className="md:h-[52px]" />
-          <LogoJamiyah height={34} className="opacity-90 md:h-[44px]" />
+          <span className="hidden h-10 w-px bg-white/15 md:block" />
+          <LogoJamiyah height={34} white className="opacity-70 md:h-[44px]" />
         </div>
 
         <div className="relative mt-8 md:mt-0">
-          <p
-            className="font-display text-xl2 leading-[1.9] text-white/95 md:text-d2"
-            style={{ fontFeatureSettings: '"ss01"' }}>
+          <p className="font-display text-xl2 leading-[1.9] text-white md:text-d2 md:leading-[1.9]">
             وَلَقَدْ يَسَّرْنَا الْقُرْآنَ لِلذِّكْرِ فَهَلْ مِن مُّدَّكِرٍ
           </p>
-          <p className="mt-3 text-panel text-brand-200">سورة القمر — الآية <Num>١٧</Num></p>
+          <cite className="mt-4 block text-sm2 not-italic text-white/55">سورة القمر — الآية ١٧</cite>
         </div>
 
         <div className="relative mt-8 hidden border-t border-white/12 pt-6 md:block">
