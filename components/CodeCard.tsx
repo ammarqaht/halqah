@@ -79,10 +79,13 @@ export function CodeCard({ value, purpose, code, qr, colour }: {
           letterSpacing: '.14em', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
         }}>{formatCode(code)}</bdi>
 
-        {/* one line, along the bottom — never wrapped */}
+        {/* one line, along the bottom — never wrapped.
+            The square now holds a link, so the boy's own camera opens the
+            portal with the code already in it. Saying so is the difference
+            between a card that gets scanned and one that gets typed. */}
         <span className="absolute inset-x-0 bottom-1.5 text-center"
           style={{ fontSize: 7.5, color: '#8D9894', whiteSpace: 'nowrap' }}>
-          تُشحن مرة واحدة فقط
+          وجّه كاميرا جوّالك · تُشحن مرة واحدة
         </span>
       </div>
     </article>

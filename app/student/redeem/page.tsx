@@ -4,21 +4,28 @@
    camera fails for reasons a boy in a mosque cannot fix (no HTTPS, no camera,
    a refused permission), and each of those gets a plain sentence rather than a
    dead button. */
-import { useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Loader2, Camera, Check, X, Ticket } from 'lucide-react';
 import { Sheet, SheetHead } from '@/components/Sheet';
 import { Btn, INPUT } from '@/components/ui';
 import { Num, pointWord } from '@/components/Num';
 import { useMe } from '@/components/student/Me';
 import { COPY } from '@/content/student';
-import { normaliseCode } from '@/lib/points';
+import { codeFromScan, normaliseCode } from '@/lib/points';
 import { cx } from '@/lib/cx';
 
 type Done = { value: number; balance: number };
 
-export default function Redeem() {
+function RedeemScreen() {
   const { me, reload } = useMe();
-  const [code, setCode] = useState('');
+  const sp = useSearchParams();
+  /* Arrived from the card's own QR: `…/student/redeem?code=…`. The phone's
+     camera brought him here, so the field is already filled and all that is
+     left is one tap. Deliberately NOT auto-submitted — he should see what he
+     is about to charge, and a page that spends a card on arrival is a page
+     that spends it on a stray refresh. */
+  const [code, setCode] = useState(() => codeFromScan(sp.get('code') ?? ''));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [done, setDone] = useState<Done | null>(null);
@@ -80,7 +87,11 @@ export default function Redeem() {
         const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
         text = jsQR(img.data, img.width, img.height)?.data ?? null;
       }
-      if (text) { setCode(normaliseCode(text)); stop(); return; }
+      /* A scan may hand back the card's URL or a bare code — both are read. */
+      if (text) {
+        const found = codeFromScan(text);
+        if (found) { setCode(found); stop(); return; }
+      }
       raf.current = requestAnimationFrame(tick);
     };
     raf.current = requestAnimationFrame(tick);
@@ -115,7 +126,8 @@ export default function Redeem() {
   return (
     <div className="mx-auto max-w-md space-y-4">
       <Sheet className="rise">
-        <SheetHead title={COPY.redeemTitle} meta={COPY.redeemHint} />
+        <SheetHead title={COPY.redeemTitle}
+          meta={sp.get('code') ? COPY.fromCard : COPY.redeemHint} />
 
         <form onSubmit={submit} className="space-y-4">
           <input value={code}
@@ -169,4 +181,8 @@ export default function Redeem() {
       </Sheet>
     </div>
   );
+}
+
+export default function Redeem() {
+  return <Suspense><RedeemScreen /></Suspense>;
 }

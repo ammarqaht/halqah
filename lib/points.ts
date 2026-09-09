@@ -144,6 +144,26 @@ export const formatCode = (code: string) => `${code.slice(0, 5)}-${code.slice(5)
 /** What the student typed becomes what we stored: case, spaces and dashes are noise. */
 export const normaliseCode = (raw: string) => raw.toUpperCase().replace(/[^A-Z0-9]/g, '');
 
+/**
+ * A scan can hand back either shape, so both are accepted.
+ *
+ * The printed cards encode a URL — `…/student/redeem?code=XXXXXXXXXX` — so a
+ * boy can point his phone's own camera at one and land on the screen with it
+ * filled in. Cards printed before that change hold the bare code, and the
+ * in-app scanner reads whichever it is given rather than caring which.
+ */
+export function codeFromScan(raw: string): string {
+  const text = String(raw ?? '').trim();
+  if (!text) return '';
+  /* A URL — take its `code`, wherever the origin points. */
+  const m = text.match(/[?&]code=([^&#\s]+)/i);
+  if (m) return normaliseCode(decodeURIComponent(m[1]));
+  /* Not a URL: the whole thing is the code. But a URL we failed to parse must
+     not be mashed into letters and submitted as one. */
+  if (/^https?:\/\//i.test(text)) return '';
+  return normaliseCode(text);
+}
+
 /** `quantity` fresh codes, unique among themselves and against `existing`. */
 export function generateCodes(quantity: number, existing: Iterable<string> = []): string[] {
   const seen = new Set(existing);

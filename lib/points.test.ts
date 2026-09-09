@@ -8,8 +8,7 @@ import {
   EXAM_POINTS, examPoints, earnsPoints, balances, balanceOf,
   generateCodes, formatCode, normaliseCode, codeState, batchState,
   giftAvailability, shortBy, isLowStock, purchaseBlock,
-  cardColour, CODE_ALPHABET,
-} from './points';
+  cardColour, CODE_ALPHABET, codeFromScan } from './points';
 import type { Gift, PointCode, PointCodeBatch, PointTxn } from './types';
 
 const txn = (studentId: string, delta: number, createdAt: string): PointTxn =>
@@ -290,5 +289,29 @@ describe('تخصيص النقاط — an override, never a second source of trut
     expect(examPoints('TALQEEN', 'BADGE_DIAMOND', custom)).toBe(0);
     expect(examPoints('SILVER', 'MOCK', custom)).toBe(0);
     expect(examPoints('SILVER', 'TAJWEED', custom)).toBeNull();
+  });
+});
+
+describe('reading a code off a scan', () => {
+  it('takes the code out of the printed card\'s URL', () => {
+    expect(codeFromScan('https://halqah.example.net/student/redeem?code=K7M2PQ9XTV'))
+      .toBe('K7M2PQ9XTV');
+    /* Whatever origin it was printed from. */
+    expect(codeFromScan('http://localhost:3000/student/redeem?code=k7m2pq9xtv'))
+      .toBe('K7M2PQ9XTV');
+    /* And with anything trailing it. */
+    expect(codeFromScan('https://x.net/student/redeem?code=K7M2PQ9XTV&from=card'))
+      .toBe('K7M2PQ9XTV');
+  });
+
+  it('still reads a bare code, as the older cards carry', () => {
+    expect(codeFromScan('K7M2PQ9XTV')).toBe('K7M2PQ9XTV');
+    expect(codeFromScan('k7m2p-q9xtv')).toBe('K7M2PQ9XTV');
+  });
+
+  it('refuses a URL it cannot find a code in, rather than inventing one', () => {
+    /* Mashing this into letters would submit «HTTPSEXAMPLECOM» as a code. */
+    expect(codeFromScan('https://example.com/')).toBe('');
+    expect(codeFromScan('')).toBe('');
   });
 });

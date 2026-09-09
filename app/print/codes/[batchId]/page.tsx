@@ -33,14 +33,28 @@ export default function CodeCards({ params }: { params: Promise<{ batchId: strin
     [db.codes, batchId]);
 
   /* The QR carries the bare code, not a URL: the portal's own camera scanner
-     (طا-٣) drops what it reads straight into the redeem field, and a bare code
-     needs no origin to be baked into paper that outlives a domain change. */
+     (طا-٣) drops what it reads straight into the redeem field.
+
+     It carries a URL now, not a bare code. A boy points his phone's own camera
+     at the card — the way he already knows how — and lands on the redeem screen
+     with the code filled in. A bare string leaves the camera showing him ten
+     characters and no idea what to do with them, which is a card nobody uses.
+
+     The origin is read at print time from the page itself, so the sheet always
+     carries wherever it was printed from. If the domain ever changes, cards
+     printed before it keep working by hand: the redeem field is the primary
+     path and the code is printed beside the square in full. */
   useEffect(() => {
     let cancelled = false;
+    const origin = window.location.origin;
     (async () => {
       const out: Record<string, string> = {};
       for (const c of codes) {
-        out[c.code] = await QRCode.toString(c.code, {
+        const url = `${origin}/student/redeem?code=${encodeURIComponent(c.code)}`;
+        out[c.code] = await QRCode.toString(url, {
+          /* A URL is longer than a bare code, so the square gains modules —
+             'M' still reads reliably at this print size, and 'Q' would make
+             each one visibly denser for no gain on paper this clean. */
           type: 'svg', margin: 0, errorCorrectionLevel: 'M',
           color: { dark: '#191E1C', light: '#0000' },
         });
@@ -111,6 +125,7 @@ export default function CodeCards({ params }: { params: Promise<{ batchId: strin
         )}
 
         <p className="keep mt-5 text-center text-[10px] text-ink-500">
+          يوجّه الطالب كاميرا جوّاله إلى المربّع فتفتح له بوابته والكود مكتوب — أو يكتبه بيده.
           كل بطاقة تُشحن مرة واحدة فقط · حلقات جامع محمد العبدالكريم — الدمام، حي أُحد
         </p>
       </div>
