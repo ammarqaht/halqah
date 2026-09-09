@@ -6,19 +6,20 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, ShieldCheck } from 'lucide-react';
 import { Sheet, SheetHead } from '@/components/Sheet';
-import { Btn, Field, INPUT } from '@/components/ui';
+import { Btn } from '@/components/ui';
+import { PinInput } from '@/components/student/PinInput';
 import { useMe } from '@/components/student/Me';
 import { COPY } from '@/content/student';
-import { cx } from '@/lib/cx';
 
-const PinField = ({ label, value, onChange, hint }: {
-  label: string; value: string; onChange: (v: string) => void; hint?: string;
+const PinField = ({ label, value, onChange, hint, autoFocus }: {
+  label: string; value: string; onChange: (v: string) => void;
+  hint?: string; autoFocus?: boolean;
 }) => (
-  <Field label={label} hint={hint}>
-    <input value={value} onChange={(e) => onChange(e.target.value.replace(/\D/g, '').slice(0, 5))}
-      inputMode="numeric" dir="ltr" aria-label={label}
-      className={cx(INPUT, 'h-14 text-center font-display text-d2 tracking-[.5em]')} />
-  </Field>
+  <div>
+    <span className="mb-2 block text-xs2 font-medium text-ink-700">{label}</span>
+    <PinInput value={value} onChange={onChange} label={label} autoFocus={autoFocus} />
+    {hint && <span className="mt-2 block text-center text-micro text-ink-500">{hint}</span>}
+  </div>
 );
 
 export default function ChangePin() {
@@ -53,7 +54,7 @@ export default function ChangePin() {
           meta={me?.mustChangePin ? COPY.mustChangeWhy : 'اختر رمزًا جديدًا من خمسة أرقام'} />
 
         <form onSubmit={submit} className="space-y-4">
-          <PinField label="الرمز الحالي" value={current} onChange={setCurrent} />
+          <PinField label="الرمز الحالي" value={current} onChange={setCurrent} autoFocus />
           <PinField label="الرمز الجديد" value={next} onChange={setNext}
             hint="خمسة أرقام — لا متتابعة ولا متشابهة" />
           <PinField label="أعد كتابته" value={again} onChange={setAgain}

@@ -148,6 +148,15 @@ function LoginScreen() {
               <Btn type="submit" variant="primary" size="xl" className="w-full" disabled={busy}>
                 {busy ? <><Loader2 size={17} className="animate-spin" />جارٍ الدخول…</> : 'دخول'}
               </Btn>
+              {/* Two portals, one domain. A student typing his national id here
+                  gets «غير صحيحة» and no idea why — this is the supervisor's
+                  door, and his is next to it. */}
+              <p className="pt-1 text-center text-xs2 text-ink-500">
+                طالب؟{' '}
+                <a href="/student/login" className="font-medium text-brand-800 hover:underline">
+                  ادخل من بوابة الطالب
+                </a>
+              </p>
             </form>
 
             <p className="mt-10 text-micro leading-relaxed text-ink-500">
