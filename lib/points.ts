@@ -74,11 +74,16 @@ export type Balance = {
   granted: number;
   /** Everything ever taken, as a positive figure — purchases and deductions. */
   redeemed: number;
+  /** Taken back by the supervisor rather than spent in the store — a
+      correction, or a penalty. Kept apart because «استُبدل» and «خُصم» are two
+      different facts about a boy, and one column was reporting both. */
+  deducted: number;
   lastAt: string | null;
   moves: number;
 };
 
-export const EMPTY_BALANCE: Balance = { balance: 0, granted: 0, redeemed: 0, lastAt: null, moves: 0 };
+export const EMPTY_BALANCE: Balance = {
+  balance: 0, granted: 0, redeemed: 0, deducted: 0, lastAt: null, moves: 0 };
 
 /** One pass over the whole ledger, not one pass per student. */
 export function balances(txns: PointTxn[]): Map<string, Balance> {
@@ -86,7 +91,9 @@ export function balances(txns: PointTxn[]): Map<string, Balance> {
   for (const t of txns) {
     const b = m.get(t.studentId) ?? { ...EMPTY_BALANCE };
     b.balance += t.delta;
-    if (t.delta >= 0) b.granted += t.delta; else b.redeemed += -t.delta;
+    if (t.delta >= 0) b.granted += t.delta;
+    else if (t.kind === 'PURCHASE') b.redeemed += -t.delta;
+    else b.deducted += -t.delta;
     b.moves += 1;
     if (!b.lastAt || t.createdAt > b.lastAt) b.lastAt = t.createdAt;
     m.set(t.studentId, b);

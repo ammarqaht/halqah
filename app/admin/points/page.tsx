@@ -84,11 +84,12 @@ function PointsScreen() {
 
   const totals = useMemo(() => {
     const scope = new Set(rows.map((r) => r.s.id));
-    let circulating = 0, granted = 0, redeemed = 0, moves = 0;
+    let circulating = 0, granted = 0, redeemed = 0, deducted = 0, moves = 0;
     for (const r of rows) {
-      circulating += r.b.balance; granted += r.b.granted; redeemed += r.b.redeemed; moves += r.b.moves;
+      circulating += r.b.balance; granted += r.b.granted; redeemed += r.b.redeemed;
+      deducted += r.b.deducted; moves += r.b.moves;
     }
-    return { circulating, granted, redeemed, moves, scope };
+    return { circulating, granted, redeemed, deducted, moves, scope };
   }, [rows]);
 
   const ledger = useMemo(() => {
@@ -208,6 +209,10 @@ function PointsScreen() {
                       <SortHead label="الرصيد" k="balance" sort={sort} onSort={setSort} align="end" />
                       <th className="px-3 py-3 text-start font-medium">مُنح</th>
                       <th className="px-3 py-3 text-start font-medium">استُبدل</th>
+                      {/* «خُصم» is not «استُبدل». One is a boy spending what he
+                          earned; the other is the supervisor taking it back.
+                          A single column reported both as the same fact. */}
+                      <th className="px-3 py-3 text-start font-medium">خُصم</th>
                       <SortHead label="آخر حركة" k="last" sort={sort} onSort={setSort} />
                     </tr>
                   </thead>
@@ -239,6 +244,11 @@ function PointsScreen() {
                         </td>
                         <td className="px-3 py-3"><Num className="text-panel text-ok-700">{b.granted || '—'}</Num></td>
                         <td className="px-3 py-3"><Num className="text-panel text-ink-600">{b.redeemed || '—'}</Num></td>
+                        <td className="px-3 py-3">
+                          {b.deducted
+                            ? <Num className="text-panel text-risk-700">−{b.deducted}</Num>
+                            : <span className="text-ink-400">—</span>}
+                        </td>
                         <td className="px-3 py-3 text-panel text-ink-500" title={formatDateTime(b.lastAt)}>
                           {relativeDay(b.lastAt)}
                         </td>

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { readSession } from '@/lib/auth';
+import { toStudent, toHalaqa } from '@/lib/serialize';
 import type { Prisma } from '@prisma/client';
 
 /* The whole working set, in one request and out in one.
@@ -18,8 +19,11 @@ const iso = (d: Date | null | undefined) => (d ? d.toISOString() : null);
 export async function GET() {
   if (!await readSession()) return NextResponse.json({ error: 'غير مصرّح' }, { status: 401 });
 
-  const [txns, batches, codes, gifts, orders, exams, questions, bookings,
+  const [students, halaqat,
+         txns, batches, codes, gifts, orders, exams, questions, bookings,
          curriculum, plans, topics] = await Promise.all([
+    db.student.findMany(),
+    db.halaqa.findMany(),
     db.pointTxn.findMany({ orderBy: { createdAt: 'asc' } }),
     db.pointCodeBatch.findMany(),
     db.pointCode.findMany(),
@@ -39,6 +43,12 @@ export async function GET() {
 
   return NextResponse.json({
     resetAt,
+    /* The roster comes DOWN too. It only ever went up — through /api/import —
+       so every browser showed its own copy of the students and disagreed with
+       the server about who they were and what رتل last said about them. That
+       is why «أوجه الحفظ» read 0.00 on screen while the database held 0.6. */
+    students: students.map(toStudent),
+    halaqat: halaqat.map(toHalaqa),
     txns: txns.map((t) => ({ ...t, createdAt: t.createdAt.toISOString() })),
     batches: batches.map((b) => ({
       ...b, expiresAt: iso(b.expiresAt), revokedAt: iso(b.revokedAt),

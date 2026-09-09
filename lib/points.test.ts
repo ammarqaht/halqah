@@ -81,12 +81,26 @@ describe('balances — §4.10, the sum of the ledger and nothing else', () => {
     txn('b', 200, '2026-08-02T10:00:00Z'),
   ];
 
-  it('sums signed deltas, and splits granted from redeemed', () => {
+  it('sums signed deltas, and splits granted from what left', () => {
     const a = balances(rows).get('a')!;
     expect(a.balance).toBe(-60);
     expect(a.granted).toBe(60);
-    expect(a.redeemed).toBe(120);
     expect(a.moves).toBe(3);
+    /* A movement that is not a PURCHASE is the supervisor taking points back,
+       not a boy spending them — «خُصم», not «استُبدل». */
+    expect(a.deducted).toBe(120);
+    expect(a.redeemed).toBe(0);
+  });
+
+  it('tells spending apart from being docked', () => {
+    const b = balances([
+      txn('c', 300, '2026-08-01T10:00:00Z'),
+      { ...txn('c', -100, '2026-08-02T10:00:00Z'), kind: 'PURCHASE' as const },
+      { ...txn('c', -40, '2026-08-03T10:00:00Z'), kind: 'CORRECTION' as const },
+    ]).get('c')!;
+    expect(b.balance).toBe(160);
+    expect(b.redeemed).toBe(100);   // spent in the store
+    expect(b.deducted).toBe(40);    // taken back
   });
 
   it('reports the newest movement regardless of insertion order', () => {

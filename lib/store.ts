@@ -190,6 +190,29 @@ export async function hydrateFromServer(): Promise<void> {
       if (server.length === 0 && local.length > 0) { carried += local.length; continue; }
       (merged as Record<string, unknown>)[k] = server;
     }
+
+    /* The roster comes down too. It only ever went up, so each browser kept its
+       own copy of the students and disagreed with the server about who they
+       were — «أوجه الحفظ» read 0.00 on screen while the database held 0.6.
+
+       A student the server does not have is KEPT, not dropped: he was added on
+       this device and has not been uploaded yet, and losing him here would lose
+       him for good. */
+    if (Array.isArray(remote.students) && remote.students.length) {
+      const byId = new Map<string, Student>(
+        (remote.students as Student[]).map((x) => [x.id, x]));
+      const byKey = new Map<string, Student>(
+        (remote.students as Student[]).filter((x) => x.dedupeKey).map((x) => [x.dedupeKey!, x]));
+      const local = cur.students.filter(
+        (x) => !byId.has(x.id) && !(x.dedupeKey && byKey.has(x.dedupeKey)));
+      merged.students = [...(remote.students as Student[]), ...local];
+      if (local.length) carried += local.length;
+    }
+    if (Array.isArray(remote.halaqat) && remote.halaqat.length) {
+      const names = new Set((remote.halaqat as Halaqa[]).map((h) => h.name));
+      merged.halaqat = [...(remote.halaqat as Halaqa[]),
+                        ...cur.halaqat.filter((h) => !names.has(h.name))];
+    }
     db = migrate(merged);
     hydrated = true;
     try { localStorage.setItem(KEY, JSON.stringify(db)); } catch { /* private mode */ }
