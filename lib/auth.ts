@@ -108,18 +108,36 @@ export async function authenticate(username: string, password: string) {
 const STUDENT_COOKIE = 'halqah_student';
 
 /**
- * A fortnight, re-issued on every authenticated request.
+ * Half a year, re-issued on every authenticated request — so in practice a boy
+ * signs in once and stays in.
  *
  * The supervisor's thirty minutes protects a laptop left open on a desk in a
- * public mosque. A boy's phone is in his pocket, and signing him out between
- * one halaqa and the next — asking a nine year old to re-enter a PIN he was
- * handed on paper — is how a portal stops being used.
+ * public mosque. A boy's phone is in his pocket, and asking a nine year old to
+ * re-enter his number between one halaqa and the next is how a portal stops
+ * being used. What guards a shared phone is the sign-out button, which is
+ * always one tap away — not an expiry that punishes everyone for it.
  */
-export const STUDENT_IDLE_DAYS = 14;
+export const STUDENT_IDLE_DAYS = 180;
 
-/** Five digits. Nothing else is accepted, on the way in or on the way out. */
-export const PIN_LENGTH = 5;
-export const isPin = (v: unknown) => new RegExp(`^\\d{${PIN_LENGTH}}$`).test(String(v ?? ''));
+/**
+ * Sign-in is a four-digit LOGIN NUMBER and the boy's own national id.
+ *
+ * The login number is short enough to hand a six year old and to type on a
+ * phone; the national id is a thing he already knows and cannot lose, which
+ * is the whole point — nothing to memorise and nothing to reissue.
+ *
+ * It is not a secret, and this file does not pretend it is: a teacher, a
+ * classmate and the roster all know a boy's national id. What it protects
+ * against is a boy opening another boy's page by guessing a number between
+ * 1001 and 1117 — which the lockout below makes impractical. Anything more
+ * sensitive than a boy's own level and points would need a real password.
+ */
+export const LOGIN_ID_LENGTH = 4;
+export const LOGIN_ID_FIRST = 1001;
+
+export const isLoginId = (v: unknown) => /^\d{4}$/.test(String(v ?? ''));
+/** The national id as the roster holds it — digits only, any length it uses. */
+export const isNationalId = (v: unknown) => /^\d{4,}$/.test(String(v ?? '').replace(/\D/g, ''));
 
 export type StudentSession = { sub: string; name: string; username: string };
 
@@ -219,4 +237,7 @@ export async function authenticateStudent(
   };
 }
 
-export const hashPin = (pin: string) => bcrypt.hash(pin, 12);
+export const hashPin = (secret: string) => bcrypt.hash(secret, 12);
+
+/** «١٠٠١، ١٠٠٢، …» — sequential, so a teacher can read a column of them out. */
+export const loginIdFor = (index: number) => String(LOGIN_ID_FIRST + index);

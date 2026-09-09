@@ -4,8 +4,12 @@
    brand panel is a band across the top on a small screen and the whole start
    half on a laptop, and the form never moves from under his thumb.
 
-   The PIN is five boxes rather than one field. He is reading it off a paper
-   slip, and one box per digit is the difference between keeping his place and
+   Sign-in is a four-digit LOGIN NUMBER and his own national id. Nothing to
+   memorise and nothing to lose: the number is on the sheet his teacher holds,
+   and the id is a thing he already knows.
+
+   The number is four boxes rather than one field. He is reading it off paper,
+   and one box per digit is the difference between keeping his place and
    starting over. */
 import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -24,26 +28,24 @@ function LoginScreen() {
   const next = sp.get('next') || '/student';
   const expired = sp.get('reason') === 'expired';
 
-  const [username, setUsername] = useState('');
-  const [pin, setPin] = useState('');
+  const [loginId, setLoginId] = useState('');
+  const [nationalId, setNationalId] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
 
-  const go = async (thePin = pin) => {
-    if (busy || !username.trim() || thePin.length !== 5) return;
+  const ready = loginId.length === 4 && nationalId.replace(/\D/g, '').length >= 4;
+
+  const go = async () => {
+    if (busy || !ready) return;
     setBusy(true); setErr('');
     try {
       const res = await fetch('/api/student/auth', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: username.trim(), pin: thePin }),
+        body: JSON.stringify({ username: loginId, pin: nationalId.replace(/\D/g, '') }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setErr(data.error ?? 'تعذّر الدخول. حاول مرة أخرى.');
-        setPin(''); setBusy(false);
-        return;
-      }
-      router.replace(data.mustChangePin ? '/student/pin' : next);
+      if (!res.ok) { setErr(data.error ?? 'تعذّر الدخول. حاول مرة أخرى.'); setBusy(false); return; }
+      router.replace(next);
     } catch {
       setErr('تعذّر الاتصال. تأكّد من الشبكة ثم أعد المحاولة.');
       setBusy(false);
@@ -80,22 +82,25 @@ function LoginScreen() {
         <div className="mx-auto w-full max-w-[24rem]">
           <p className="text-micro uppercase tracking-[.16em] text-brand-800">{COPY.portal}</p>
           <h1 className="mt-2 font-display text-d2 text-ink-900">{COPY.signInTitle}</h1>
-          <p className="mt-1.5 text-base2 text-ink-500">ادخل برقم هويتك والرمز الذي أعطاك إياه معلّمك.</p>
+          <p className="mt-1.5 text-base2 text-ink-500">
+            رقم دخولك من معلّمك، وكلمة المرور رقم هويتك.
+          </p>
 
           <form onSubmit={(e) => { e.preventDefault(); go(); }} className="mt-7 space-y-5">
-            <Field label={COPY.idLabel}>
-              <input value={username}
-                onChange={(e) => setUsername(e.target.value.replace(/[^\d-]/g, ''))}
-                inputMode="numeric" dir="ltr" autoComplete="username" autoFocus
-                className={cx(INPUT, 'h-14 text-center text-lg2 tracking-[.06em]')} />
-            </Field>
-
             <div>
-              <span className="mb-2 block text-xs2 font-medium text-ink-700">{COPY.pinLabel}</span>
-              <PinInput value={pin} onChange={setPin} label={COPY.pinLabel}
-                onComplete={(v) => go(v)} />
-              <span className="mt-2 block text-center text-micro text-ink-500">{COPY.pinHint}</span>
+              <span className="mb-2 block text-xs2 font-medium text-ink-700">{COPY.idLabel}</span>
+              <PinInput value={loginId} onChange={setLoginId} length={4} autoFocus
+                label={COPY.idLabel} />
+              <span className="mt-2 block text-center text-micro text-ink-500">{COPY.idHint}</span>
             </div>
+
+            <Field label={COPY.pinLabel} hint={COPY.pinHint}>
+              <input value={nationalId}
+                onChange={(e) => setNationalId(e.target.value.replace(/\D/g, '').slice(0, 12))}
+                inputMode="numeric" dir="ltr" autoComplete="current-password"
+                aria-label={COPY.pinLabel}
+                className={cx(INPUT, 'h-14 text-center text-lg2 tracking-[.10em]')} />
+            </Field>
 
             {expired && !err && (
               <p className="rounded-lg border border-warn-200 bg-warn-100 px-3.5 py-2.5 text-panel text-warn-700">
@@ -110,7 +115,7 @@ function LoginScreen() {
 
             <Btn type="submit" variant="primary" size="xl" className="w-full"
               icon={busy ? undefined : ShieldCheck}
-              disabled={busy || !username.trim() || pin.length !== 5}>
+              disabled={busy || !ready}>
               {busy ? <><Loader2 size={17} className="animate-spin" />{COPY.signingIn}</> : COPY.signIn}
             </Btn>
 

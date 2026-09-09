@@ -1,25 +1,20 @@
 import { NextResponse } from 'next/server';
-import { randomInt } from 'crypto';
 import { db } from '@/lib/db';
-import { readSession } from '@/lib/auth';
-import { hashPin, PIN_LENGTH } from '@/lib/auth';
+import { readSession, hashPin, loginIdFor, LOGIN_ID_FIRST } from '@/lib/auth';
 
-/* حسابات الطلاب — the PINs the supervisor prints and hands to the teachers.
+/* حسابات الطلاب.
 
-   The plaintext exists for exactly as long as this response: it is hashed on
-   the way into the database and shown once. A reset is the only way to see one
-   again, and a reset writes an audit row. */
+   Sign-in is a four-digit LOGIN NUMBER and the boy's own NATIONAL ID.
 
-/** Five digits, never all-same and never a run. `randomInt` is CSPRNG-backed. */
-function freshPin(): string {
-  for (;;) {
-    let pin = '';
-    for (let i = 0; i < PIN_LENGTH; i++) pin += randomInt(0, 10);
-    if (/^(\d)\1{4}$/.test(pin)) continue;
-    if ('0123456789'.includes(pin) || '9876543210'.includes(pin)) continue;
-    return pin;
-  }
-}
+   Nothing is generated and nothing is memorised: the number is sequential from
+   1001 so a teacher can read a column of them out, and the password is a thing
+   the boy already knows and cannot lose. There is no PIN to print, no PIN to
+   forget and no PIN to reset — which is the whole reason the client changed it.
+
+   What this is NOT is a secret. His teacher, his classmates and the roster all
+   know his national id. It stops a boy opening another boy's page by guessing a
+   number between 1001 and 1117, and the lockout makes even that impractical.
+   Nothing behind it is more sensitive than his own level and his own points. */
 
 export async function GET() {
   const s = await readSession();
@@ -33,8 +28,6 @@ export async function GET() {
   const byStudent = new Map(creds.map((c) => [c.studentId, c]));
   const halaqaName = new Map(halaqat.map((h) => [h.id, h.teacher || h.name]));
 
-  /* A national id shared by two boys is a real thing in this roster — the
-     schema says so — and it is surfaced, never silently merged. */
   const idCount = new Map<string, number>();
   for (const st of students) {
     if (st.nationalId) idCount.set(st.nationalId, (idCount.get(st.nationalId) ?? 0) + 1);
@@ -51,63 +44,68 @@ export async function GET() {
         nationalId: st.nationalId,
         username: c?.username ?? null,
         hasAccount: !!c,
-        mustChangePin: c?.mustChangePin ?? null,
         lastLoginAt: c?.lastLoginAt ? c.lastLoginAt.toISOString() : null,
         noNationalId: !st.nationalId,
+        /* Two boys under one national id can both sign in — each has his own
+           login number, and the shared id is only the password. Flagged
+           anyway, because the supervisor should know. */
         sharedNationalId: !!st.nationalId && (idCount.get(st.nationalId) ?? 0) > 1,
       };
     }),
   });
 }
 
-/** Create every missing account in one pass. Idempotent: a boy who already has
-    a PIN keeps it — running this twice must not invalidate a printed sheet. */
+/** Create every missing account. Idempotent: an existing login number is never
+    reissued, because a boy has it written down. */
 export async function POST(req: Request) {
   const s = await readSession();
   if (!s) return NextResponse.json({ error: 'غير مصرّح' }, { status: 401 });
 
   const { studentId } = await req.json().catch(() => ({}));
 
-  const students = await db.student.findMany({
-    where: studentId ? { id: String(studentId) } : { status: 'ACTIVE' },
-    orderBy: [{ dedupeKey: 'asc' }, { id: 'asc' }],
-  });
-  const existing = await db.studentCredential.findMany();
-  const have = new Set(existing.map((c) => c.studentId));
-  const takenUsernames = new Set(existing.map((c) => c.username));
+  const [students, existing] = await Promise.all([
+    db.student.findMany({
+      where: studentId ? { id: String(studentId) } : { status: 'ACTIVE' },
+      /* By halaqa then name, so 1001 upward runs down the sheet a teacher
+         actually holds rather than in whatever order the database returns. */
+      orderBy: [{ halaqaId: 'asc' }, { fullName: 'asc' }],
+    }),
+    db.studentCredential.findMany(),
+  ]);
 
-  const issued: { studentId: string; fullName: string; username: string; pin: string }[] = [];
+  const have = new Map(existing.map((c) => [c.studentId, c]));
+  const taken = new Set(existing.map((c) => c.username));
+  let next = LOGIN_ID_FIRST;
+  const nextFree = () => {
+    while (taken.has(String(next))) next++;
+    const id = String(next);
+    taken.add(id);
+    return id;
+  };
+
+  const issued: { studentId: string; fullName: string; username: string; nationalId: string }[] = [];
   let skipped = 0, noId = 0;
 
   for (const st of students) {
-    /* A reset (studentId given) rotates; a bulk run never touches an account
-       that exists, because someone has that PIN written down. */
-    if (have.has(st.id) && !studentId) { skipped++; continue; }
     if (!st.nationalId) { noId++; continue; }
+    const mine = have.get(st.id);
+    if (mine && !studentId) { skipped++; continue; }
 
-    /* Two boys, one id — the first keeps it bare, the next take a suffix. */
-    let username = st.nationalId;
-    if (!(have.has(st.id) && existing.find((c) => c.studentId === st.id)?.username === username)) {
-      let n = 2;
-      while (takenUsernames.has(username)) username = `${st.nationalId}-${n++}`;
-    }
-    takenUsernames.add(username);
-
-    const pin = freshPin();
-    const pinHash = await hashPin(pin);
+    const username = mine?.username ?? nextFree();
+    const pinHash = await hashPin(st.nationalId);
 
     await db.studentCredential.upsert({
       where: { studentId: st.id },
-      create: { studentId: st.id, username, pinHash, mustChangePin: true },
-      update: { pinHash, mustChangePin: true, failedAttempts: 0, lockedUntil: null },
+      create: { studentId: st.id, username, pinHash, mustChangePin: false },
+      update: { username, pinHash, mustChangePin: false, failedAttempts: 0, lockedUntil: null },
     });
-    issued.push({ studentId: st.id, fullName: st.fullName, username, pin });
+    issued.push({ studentId: st.id, fullName: st.fullName, username, nationalId: st.nationalId });
   }
 
   await db.auditLog.create({
     data: {
       actorId: s.sub,
-      action: studentId ? 'STUDENT_PIN_RESET' : 'STUDENT_CREDENTIALS_CREATE',
+      action: studentId ? 'STUDENT_CREDENTIAL_RESET' : 'STUDENT_CREDENTIALS_CREATE',
       entity: 'student_credential',
       entityId: studentId ? String(studentId) : `${issued.length} حساب`,
     },

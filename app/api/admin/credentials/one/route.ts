@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { readSession, hashPin, isPin } from '@/lib/auth';
+import { readSession, hashPin, isLoginId, isNationalId } from '@/lib/auth';
 
-/* Edit one boy's account: his username, his PIN, or shut it.
-   The supervisor sets the PIN himself here — a boy who forgot his is standing
-   in front of him, and «choose one for him now» beats «here is a random one,
-   memorise it». */
+/* Edit one boy's account: his login number, his password, or shut it.
+
+   The password is normally his national id and needs no managing — that is the
+   point of the scheme. This exists for the two cases it does not cover: a boy
+   whose roster id was wrong and has been corrected, and a login number the
+   supervisor wants to move. */
 export async function PATCH(req: Request) {
   const s = await readSession();
   if (!s) return NextResponse.json({ error: 'غير مصرّح' }, { status: 401 });
@@ -20,6 +22,9 @@ export async function PATCH(req: Request) {
 
   if (typeof username === 'string' && username.trim()) {
     const u = username.replace(/\s+/g, '').trim();
+    if (!isLoginId(u)) {
+      return NextResponse.json({ error: 'رقم الدخول أربعة أرقام.' }, { status: 400 });
+    }
     const clash = await db.studentCredential.findUnique({ where: { username: u } });
     if (clash && clash.studentId !== student.id) {
       return NextResponse.json(
@@ -29,11 +34,11 @@ export async function PATCH(req: Request) {
   }
 
   if (pin !== undefined && pin !== '') {
-    if (!isPin(pin)) return NextResponse.json({ error: 'الرمز خمسة أرقام.' }, { status: 400 });
-    data.pinHash = await hashPin(String(pin));
-    /* Set by the supervisor, so the boy is asked to replace it — the same rule
-       as a printed one, and for the same reason: someone else knows it. */
-    data.mustChangePin = true;
+    if (!isNationalId(pin)) {
+      return NextResponse.json({ error: 'كلمة المرور رقم الهوية — أربعة أرقام فأكثر.' }, { status: 400 });
+    }
+    data.pinHash = await hashPin(String(pin).replace(/\D/g, ''));
+    data.mustChangePin = false;
     data.failedAttempts = 0;
     data.lockedUntil = null;
   }
@@ -43,15 +48,19 @@ export async function PATCH(req: Request) {
 
   const existing = await db.studentCredential.findUnique({ where: { studentId: student.id } });
   if (!existing) {
-    if (!data.username) data.username = student.nationalId ?? student.id;
-    if (!data.pinHash) return NextResponse.json(
-      { error: 'هذا الطالب بلا حساب — اكتب له رمزًا لإنشائه.' }, { status: 400 });
+    if (!data.username) return NextResponse.json(
+      { error: 'هذا الطالب بلا حساب — اكتب له رقم دخول لإنشائه.' }, { status: 400 });
+    if (!data.pinHash) {
+      if (!student.nationalId) return NextResponse.json(
+        { error: 'هذا الطالب بلا رقم هوية — اكتب كلمة مرور بنفسك.' }, { status: 400 });
+      data.pinHash = await hashPin(student.nationalId);
+    }
     await db.studentCredential.create({
       data: {
         studentId: student.id,
         username: String(data.username),
         pinHash: String(data.pinHash),
-        mustChangePin: true,
+        mustChangePin: false,
       },
     });
   } else {

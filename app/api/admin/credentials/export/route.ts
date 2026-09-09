@@ -1,26 +1,14 @@
 import { NextResponse } from 'next/server';
-import { randomInt } from 'crypto';
 import * as XLSX from 'xlsx';
 import { db } from '@/lib/db';
-import { readSession, hashPin, PIN_LENGTH } from '@/lib/auth';
+import { readSession, hashPin, LOGIN_ID_FIRST } from '@/lib/auth';
 
-/* ملف حسابات الطلاب — the one place a PIN exists in the clear.
-   Everywhere else it is a bcrypt hash and therefore unrecoverable by design:
-   nobody, including this system, can read a boy's PIN back. So a sheet of them
-   can only be produced by SETTING them, which is what this does — it mints a
-   fresh PIN for every account and hands the workbook back once.
-   Every PIN it prints is therefore live, and every PIN printed before it is
-   dead. That is stated on the screen that calls this. */
+/* ملف حسابات الطلاب — الحلقة · الطالب · رقم الدخول · كلمة المرور.
 
-function freshPin(): string {
-  for (;;) {
-    let pin = '';
-    for (let i = 0; i < PIN_LENGTH; i++) pin += randomInt(0, 10);
-    if (/^(\d)\1{4}$/.test(pin)) continue;
-    if ('0123456789'.includes(pin) || '9876543210'.includes(pin)) continue;
-    return pin;
-  }
-}
+   Nothing here is a generated secret, so producing the file changes nothing:
+   the login number is the one already stored, and the password is the boy's own
+   national id. This can be exported a hundred times and every sheet stays
+   valid — which is the point of the scheme the client asked for. */
 
 export async function POST() {
   const s = await readSession();
@@ -33,7 +21,12 @@ export async function POST() {
   ]);
   const halaqaName = new Map(halaqat.map((h) => [h.id, h.teacher || h.name]));
   const existing = new Map(creds.map((c) => [c.studentId, c]));
-  const taken = new Set<string>();
+  const taken = new Set(creds.map((c) => c.username));
+  let next = LOGIN_ID_FIRST;
+  const nextFree = () => {
+    while (taken.has(String(next))) next++;
+    const id = String(next); taken.add(id); return id;
+  };
 
   const rows: Record<string, string | number>[] = [];
 
@@ -42,38 +35,29 @@ export async function POST() {
       rows.push({
         'الحلقة': st.halaqaId ? halaqaName.get(st.halaqaId) ?? '' : '',
         'الطالب': st.fullName,
-        'اسم الدخول': '— بلا رقم هوية —',
-        'الرمز': '',
-        'ملاحظة': 'يحتاج رقم هوية قبل إنشاء حسابه',
+        'رقم الدخول': '—',
+        'كلمة المرور': '—',
+        'ملاحظة': 'بلا رقم هوية — يحتاج تعيينه قبل إنشاء حسابه',
       });
       continue;
     }
 
-    /* Two boys under one national id is a real thing in this roster. The first
-       keeps it bare; the rest take a suffix, and the sheet says so. */
-    let username = existing.get(st.id)?.username ?? st.nationalId;
-    if (!existing.has(st.id)) {
-      let n = 2;
-      while (taken.has(username) || creds.some((c) => c.username === username && c.studentId !== st.id)) {
-        username = `${st.nationalId}-${n++}`;
-      }
+    /* An existing login number is never reissued — a boy has it written down. */
+    const mine = existing.get(st.id);
+    const username = mine?.username ?? nextFree();
+    if (!mine) {
+      await db.studentCredential.create({
+        data: { studentId: st.id, username, pinHash: await hashPin(st.nationalId),
+                mustChangePin: false },
+      });
     }
-    taken.add(username);
-
-    const pin = freshPin();
-    await db.studentCredential.upsert({
-      where: { studentId: st.id },
-      create: { studentId: st.id, username, pinHash: await hashPin(pin), mustChangePin: true },
-      update: { username, pinHash: await hashPin(pin), mustChangePin: true,
-                failedAttempts: 0, lockedUntil: null },
-    });
 
     rows.push({
       'الحلقة': st.halaqaId ? halaqaName.get(st.halaqaId) ?? '' : 'بلا حلقة',
       'الطالب': st.fullName,
-      'اسم الدخول': username,
-      'الرمز': pin,
-      'ملاحظة': username === st.nationalId ? '' : 'هوية مشتركة — أُضيف رقم للتمييز',
+      'رقم الدخول': username,
+      'كلمة المرور': st.nationalId,
+      'ملاحظة': '',
     });
   }
 
@@ -84,7 +68,7 @@ export async function POST() {
 
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.json_to_sheet(rows);
-  ws['!cols'] = [{ wch: 30 }, { wch: 32 }, { wch: 16 }, { wch: 10 }, { wch: 28 }];
+  ws['!cols'] = [{ wch: 30 }, { wch: 32 }, { wch: 12 }, { wch: 16 }, { wch: 34 }];
   XLSX.utils.book_append_sheet(wb, ws, 'حسابات الطلاب');
   const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
 

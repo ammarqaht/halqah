@@ -4,12 +4,14 @@
    surface: a boy holding a phone in a mosque has one thumb and four places
    to be. */
 import Link from 'next/link';
+import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { Home, Ticket, Store, BookOpen, LogOut } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { LogoMark } from '@/components/Logo';
 import { TABS } from '@/content/student';
 import { useMe } from '@/components/student/Me';
+import { Btn, Modal } from '@/components/ui';
 import { cx } from '@/lib/cx';
 
 const ICONS: Record<string, LucideIcon> = {
@@ -21,6 +23,8 @@ export function StudentNav() {
   const path = usePathname();
   const { me } = useMe();
   const active = (href: string) => (href === '/student' ? path === href : path.startsWith(href));
+
+  const [confirm, setConfirm] = useState(false);
 
   const signOut = async () => {
     await fetch('/api/student/auth', { method: 'DELETE' }).catch(() => {});
@@ -50,12 +54,25 @@ export function StudentNav() {
           </nav>
           <div className="flex shrink-0 items-center gap-3">
             <span className="max-w-[14rem] truncate text-panel text-ink-600">{me?.fullName ?? ''}</span>
-            <button onClick={signOut} aria-label="تسجيل الخروج"
+            <button onClick={() => setConfirm(true)} aria-label="تسجيل الخروج"
               className="rounded-lg p-2 text-ink-400 transition-colors hover:bg-risk-100 hover:text-risk-700">
               <LogOut size={17} />
             </button>
           </div>
         </div>
+      </header>
+
+      {/* phone — a slim bar carrying the mark, his name, and the way out.
+          A shared phone is the whole reason this button exists: two brothers on
+          one handset need one tap to swap, and a session that lasts half a year
+          would otherwise trap the first one in it. */}
+      <header className="sticky top-0 z-40 flex items-center gap-3 border-b border-ink-150 bg-paper/90 px-4 py-2.5 backdrop-blur-md md:hidden">
+        <LogoMark height={24} white={false} />
+        <span className="min-w-0 flex-1 truncate text-panel text-ink-700">{me?.fullName ?? ''}</span>
+        <button onClick={() => setConfirm(true)} aria-label="تسجيل الخروج"
+          className="press -me-1 flex min-h-[40px] items-center gap-1.5 rounded-lg px-2.5 text-panel text-ink-500 transition-colors active:bg-risk-100 active:text-risk-700">
+          <LogOut size={16} />خروج
+        </button>
       </header>
 
       {/* phone */}
@@ -81,6 +98,17 @@ export function StudentNav() {
           })}
         </ul>
       </nav>
+      {/* Asked, not assumed: he stays signed in for months, so leaving is a
+          deliberate act — usually to hand the phone to his brother. */}
+      <Modal open={confirm} onClose={() => setConfirm(false)} title="تسجيل الخروج"
+        footer={<>
+          <Btn onClick={() => setConfirm(false)}>ابقَ</Btn>
+          <Btn variant="danger" icon={LogOut} onClick={signOut}>اخرج</Btn>
+        </>}>
+        <p className="text-base2 leading-relaxed text-ink-700">
+          ستحتاج رقم دخولك ورقم هويتك للعودة. اخرج إن كان الجهاز مشتركًا مع غيرك.
+        </p>
+      </Modal>
     </>
   );
 }

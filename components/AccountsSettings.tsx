@@ -2,11 +2,10 @@
 /* حسابات الطلاب — under الإعدادات, where the supervisor changes things rather
    than looks at them.
 
-   A PIN cannot be read back. It is stored as a bcrypt hash, which is one-way
-   by design, so «what is his PIN?» has no answer anywhere in this system — not
-   for him, not for me. What the supervisor can do is SET one, and that is what
-   this screen offers: a boy who forgot his is standing in front of you, and
-   choosing one for him now beats handing him a random string to memorise. */
+   Sign-in is a four-digit login number and the boy's own national id, so there
+   is nothing to generate, nothing to memorise and nothing to reset. This screen
+   exists for the two cases that scheme does not cover: a roster id that was
+   wrong and has been corrected, and a login number the supervisor wants moved. */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   KeyRound, Loader2, Search, Check, X, FileSpreadsheet, AlertTriangle, Download,
@@ -89,7 +88,7 @@ export function AccountsSettingsCard() {
     <Sheet className="rise mb-4" pad={false}>
       <div className="p-6 pb-0">
         <SheetHead title="حسابات الطلاب"
-          meta="اسم الدخول والرمز — للتعديل، ولإخراج ملف يُسلَّم للمعلّمين" />
+          meta="رقم الدخول وكلمة المرور — للتعديل، ولإخراج ملف يُسلَّم للمعلّمين" />
 
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <div className="relative min-w-[14rem] flex-1">
@@ -107,8 +106,8 @@ export function AccountsSettingsCard() {
 
         <p className="mb-4 flex items-start gap-2.5 rounded-lg bg-info-100 px-3.5 py-3 text-panel text-info-700">
           <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-          الرمز يُخزَّن مشفَّرًا باتجاه واحد، فلا يمكن لأحد قراءته — ولا للنظام نفسه.
-          مَن نسي رمزه، اكتب له رمزًا جديدًا من هنا.
+          يدخل الطالب برقم دخوله (أربعة أرقام) وكلمة المرور رقم هويته. لا شيء يُحفَظ ولا
+          شيء يُنسى — ومَن نسي رقم دخوله يجده في ملف الحسابات.
         </p>
       </div>
 
@@ -140,8 +139,7 @@ export function AccountsSettingsCard() {
                   <td className="px-3 py-2.5">
                     {r.noNationalId ? <Chip tone="risk">بلا رقم هوية</Chip>
                       : !r.hasAccount ? <Chip tone="warn">بلا حساب</Chip>
-                      : r.mustChangePin ? <Chip tone="ink">لم يغيّر رمزه</Chip>
-                      : <Chip tone="ok">غيّر رمزه</Chip>}
+                      : <Chip tone="ok">جاهز</Chip>}
                     {r.sharedNationalId && <Chip tone="warn">هوية مشتركة</Chip>}
                   </td>
                   <td className="px-3 py-2.5 text-panel text-ink-500">
@@ -167,22 +165,22 @@ export function AccountsSettingsCard() {
         </>}>
         <div className="space-y-4">
           <label className="block">
-            <span className="mb-1.5 block text-xs2 font-medium text-ink-700">اسم الدخول</span>
-            <input value={username} onChange={(e) => setUsername(e.target.value)}
-              dir="ltr" className={cx(INPUT, 'text-center')} />
+            <span className="mb-1.5 block text-xs2 font-medium text-ink-700">رقم الدخول</span>
+            <input value={username}
+              onChange={(e) => setUsername(e.target.value.replace(/\D/g, '').slice(0, 4))}
+              dir="ltr" inputMode="numeric" className={cx(INPUT, 'h-14 text-center text-lg2 tracking-[.3em]')} />
             <span className="mt-1 block text-micro text-ink-500">
-              رقم الهوية عادةً — وإذا تشارك طالبان رقمًا واحدًا، أضِف لأحدهما لاحقة.
+              أربعة أرقام، من ١٠٠١ فأعلى. لا يتكرّر بين طالبين.
             </span>
           </label>
 
           <label className="block">
-            <span className="mb-1.5 block text-xs2 font-medium text-ink-700">رمز جديد</span>
-            <input value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 5))}
-              inputMode="numeric" dir="ltr" placeholder="—————"
-              className={cx(INPUT, 'h-14 text-center font-display text-d2 tracking-[.5em]')} />
+            <span className="mb-1.5 block text-xs2 font-medium text-ink-700">كلمة المرور</span>
+            <input value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 12))}
+              inputMode="numeric" dir="ltr" placeholder="رقم الهوية"
+              className={cx(INPUT, 'h-14 text-center text-lg2 tracking-[.10em]')} />
             <span className="mt-1 block text-micro text-ink-500">
-              خمسة أرقام. اتركه فارغًا إن كنت تغيّر اسم الدخول وحده.
-              وسيُطلب من الطالب تغييره في أول دخول، لأنك تعرفه الآن.
+              رقم هويته. اتركه فارغًا إن كنت تغيّر رقم الدخول وحده.
             </span>
           </label>
 
@@ -199,21 +197,21 @@ export function AccountsSettingsCard() {
         title="ملف حسابات الطلاب"
         footer={<>
           <Btn onClick={() => setConfirmExport(false)} disabled={exporting}>تراجع</Btn>
-          <Btn variant="danger" icon={exporting ? undefined : Download}
+          <Btn variant="primary" icon={exporting ? undefined : Download}
             onClick={exportAll} disabled={exporting}>
             {exporting ? <><Loader2 size={16} className="animate-spin" /> جارٍ…</> : 'ولّد الملف'}
           </Btn>
         </>}>
         <div className="space-y-3">
           <p className="text-base2 text-ink-700">
-            الرموز مخزَّنة مشفَّرة ولا تُقرأ، فالملف يُنتَج بأن <strong>يُعيّن رموزًا جديدة</strong> للجميع.
+            الملف يحوي: الحلقة · الطالب · رقم الدخول · كلمة المرور.
           </p>
-          <p className="rounded-lg bg-warn-100 px-3.5 py-3 text-panel text-warn-700">
-            كل رمز قديم يتوقّف فورًا. لا تفعلها إن كان الطلاب قد استلموا رموزهم ودخلوا بها.
+          <p className="rounded-lg bg-info-100 px-3.5 py-3 text-panel text-info-700">
+            لا شيء يتغيّر بإنشائه — أرقام الدخول هي المحفوظة، وكلمة المرور رقم الهوية.
+            يمكنك إخراجه متى شئت، ونسخه القديمة تبقى صالحة.
           </p>
           <p className="text-panel text-ink-500">
-            الملف يحوي: الحلقة · الطالب · اسم الدخول · الرمز · ملاحظة عند اشتراك الهوية.
-            احفظه في مكان آمن — فيه رموز كل الطلاب بنص صريح.
+            ومع ذلك فيه أسماء الطلاب وأرقام هوياتهم — احفظه في مكان آمن.
           </p>
         </div>
       </Modal>
