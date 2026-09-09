@@ -1,139 +1,183 @@
 'use client';
-/* طا-٤ المتجر — what I can buy, and what I am still short of. */
-import { useState } from 'react';
-import { Store as StoreIcon, CheckCircle2 } from 'lucide-react';
-import { Sheet } from '@/components/Sheet';
+/* طا-٤ المتجر — and «طلباتي» as a section of the same screen, because the
+   approved navigation fixes four destinations and both can be true.
+
+   An unaffordable gift stays VISIBLE and dimmed with the gap named:
+   «لا يُخفى، ليكون حافزًا». Hiding it would remove the reason to earn. */
+import { useCallback, useEffect, useState } from 'react';
+import { Loader2, Store as StoreIcon, PackageCheck, Check } from 'lucide-react';
+import { Sheet, SheetHead } from '@/components/Sheet';
 import { Btn, Chip, Empty, Modal } from '@/components/ui';
-import { Num } from '@/components/Num';
-import { store, useDB } from '@/lib/store';
-import { useStudentId, StudentPicker } from '@/components/StudentGate';
-import { balanceOf, earnsPoints } from '@/lib/points';
-import { ORDER_STATUS_AR, type Gift } from '@/lib/types';
+import { Num, pointWord, orderWord } from '@/components/Num';
+import { useMe } from '@/components/student/Me';
+import { COPY } from '@/content/student';
 import { formatDate } from '@/lib/dates';
 import { cx } from '@/lib/cx';
 
-export default function StudentStore() {
-  const db = useDB();
-  const [id, setId] = useStudentId();
-  const me = db.students.find((s) => s.id === id) ?? null;
+type Gift = {
+  id: string; name: string; description: string; image: string | null;
+  pointsCost: number; availability: 'BUYABLE' | 'OUT_OF_STOCK' | 'CANNOT_AFFORD' | 'HIDDEN';
+  shortBy: number;
+};
+type Order = {
+  number: number; giftNameSnapshot: string; pointsSpent: number;
+  status: string; statusAr: string; createdAt: string;
+};
+
+export default function StoreScreen() {
+  const { me, reload } = useMe();
+  const [gifts, setGifts] = useState<Gift[] | null>(null);
+  const [balance, setBalance] = useState(0);
+  const [orders, setOrders] = useState<Order[] | null>(null);
   const [confirm, setConfirm] = useState<Gift | null>(null);
-  const [done, setDone] = useState<{ n: string; ref: number } | null>(null);
+  const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [placed, setPlaced] = useState<{ number: number; gift: string } | null>(null);
 
-  if (!me) return <StudentPicker onPick={setId} />;
+  const load = useCallback(() => {
+    fetch('/api/student/store').then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d) { setGifts(d.gifts ?? []); setBalance(d.balance ?? 0); } })
+      .catch(() => setGifts([]));
+    fetch('/api/student/orders').then((r) => (r.ok ? r.json() : { orders: [] }))
+      .then((d) => setOrders(d.orders ?? [])).catch(() => setOrders([]));
+  }, []);
+  useEffect(load, [load]);
 
-  if (!earnsPoints(me)) {
+  const buy = async () => {
+    if (!confirm || busy) return;
+    setBusy(true); setErr('');
+    const res = await fetch('/api/student/orders', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ giftId: confirm.id }),
+    }).catch(() => null);
+    const data = await res?.json().catch(() => ({}));
+    setBusy(false);
+    if (!res?.ok) { setErr(data?.error ?? 'تعذّر إتمام الطلب.'); return; }
+    setPlaced({ number: data.number, gift: confirm.name });
+    setConfirm(null); load(); reload();
+  };
+
+  if (me && !me.eligibleForPoints) {
     return (
-      <div className="mx-auto max-w-lg px-5 py-10">
-        <Empty icon={StoreIcon} title="المتجر لطلاب المسارات"
-          body="طلاب التلقين خارج نظام النقاط والمتجر." />
-      </div>
+      <Sheet className="rise">
+        <SheetHead title="المتجر" />
+        <p className="text-base2 leading-relaxed text-ink-600">{COPY.talqeenPoints}</p>
+      </Sheet>
     );
   }
 
-  const balance = balanceOf(db.txns, me.id);
-  const gifts = db.gifts.filter((g) => g.status === 'VISIBLE');
-  const mine = db.orders.filter((o) => o.studentId === me.id)
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-
-  const buy = (g: Gift) => {
-    const r = store.purchase(me.id, g.id);
-    setConfirm(null);
-    if (r.ok) { setDone({ n: g.name, ref: r.order.number }); setErr(''); }
-    else setErr(r.block === 'INSUFFICIENT_BALANCE' ? 'رصيدك لا يكفي.'
-      : r.block === 'OUT_OF_STOCK' ? 'نفدت الكمية.'
-      : r.block === 'HIDDEN' ? 'هذه الهدية لم تعد معروضة.'
-      : 'هذا الحساب لا يستقبل نقاطًا.');
-  };
-
   return (
-    <div className="mx-auto max-w-lg px-5 py-6">
-      <div className="flex items-baseline justify-between gap-3">
-        <h1 className="font-display text-d2 text-ink-900">المتجر</h1>
-        <p className="text-panel text-ink-600">
-          رصيدك <Num className="font-medium text-ink-900">{balance}</Num>
+    <div className="space-y-6">
+      <div className="rise flex flex-wrap items-baseline justify-between gap-3 rounded-2xl border border-ink-150 bg-paper px-5 py-4 shadow-soft">
+        <h1 className="font-display text-t1 text-ink-900">المتجر</h1>
+        <p className="text-base2 text-ink-600">
+          رصيدك <Num className="font-display text-lg2 text-brand-800">{balance}</Num> {pointWord(balance)}
         </p>
       </div>
 
-      {done && (
-        <Sheet className="fade mt-5 border-ok-200 bg-ok-100">
-          <div className="flex items-start gap-3">
-            <CheckCircle2 size={22} className="mt-0.5 shrink-0 text-ok-700" />
-            <div>
-              <p className="text-lg2 font-medium text-ok-700">تم شراء {done.n}</p>
-              <p className="mt-1 text-base2 text-ink-700">
-                رقم طلبك <Num className="font-medium">{done.ref}</Num> — اعرضه عند الاستلام.
-              </p>
-            </div>
-          </div>
-        </Sheet>
-      )}
-      {err && (
-        <p className="fade mt-5 rounded-xl border border-risk-200 bg-risk-100 px-4 py-3 text-base2 text-risk-700">{err}</p>
-      )}
-
-      {gifts.length === 0 ? (
-        <Sheet className="mt-5">
-          <Empty icon={StoreIcon} title="لا هدايا معروضة الآن" body="اسأل معلّمك متى تُعرض هدايا جديدة." />
-        </Sheet>
+      {gifts === null ? (
+        <div className="grid grid-cols-2 gap-3">
+          {[0, 1, 2, 3].map((i) => <div key={i} className="skel h-44 rounded-2xl" />)}
+        </div>
+      ) : gifts.length === 0 ? (
+        <Sheet className="rise"><Empty icon={StoreIcon} title="لا هدايا الآن" body={COPY.noGifts} /></Sheet>
       ) : (
-        <div className="mt-5 grid grid-cols-2 gap-3">
+        <ul className="grid grid-cols-2 gap-3 md:grid-cols-4">
           {gifts.map((g) => {
-            const short = g.pointsCost - balance;
-            const out = g.quantity <= 0;
-            const can = !out && short <= 0;
+            const can = g.availability === 'BUYABLE';
             return (
-              <button key={g.id} disabled={!can} onClick={() => setConfirm(g)}
-                className={cx('flex flex-col rounded-xl border bg-paper p-3 text-start transition-all',
-                  can ? 'border-ink-150 hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-soft'
-                      : 'border-ink-150 opacity-60')}>
-                <div className="mb-3 flex aspect-square items-center justify-center overflow-hidden rounded-lg bg-ink-100">
+              <li key={g.id}
+                className={cx('overflow-hidden rounded-2xl border border-ink-150 bg-paper shadow-soft transition-opacity',
+                  !can && 'opacity-70')}>
+                <div className="aspect-square w-full bg-ink-100">
                   {g.image
                     ? <img src={g.image} alt="" className="h-full w-full object-cover" />
-                    : <StoreIcon size={26} className="text-ink-300" />}
+                    : <span className="grid h-full place-items-center text-ink-300"><StoreIcon size={28} /></span>}
                 </div>
-                <p className="text-body font-medium text-ink-900">{g.name}</p>
-                <p className="mt-1 text-panel text-brand-800"><Num>{g.pointsCost}</Num> نقطة</p>
-                {out
-                  ? <Chip tone="ink">غير متوفّر</Chip>
-                  : short > 0 && <Chip tone="warn">تحتاج <Num>{short}</Num> نقطة</Chip>}
-              </button>
+                <div className="p-3">
+                  <p className="truncate text-body font-medium text-ink-900" title={g.name}>{g.name}</p>
+                  <p className="mt-1"><Chip tone="brand"><Num>{g.pointsCost}</Num> {pointWord(g.pointsCost)}</Chip></p>
+                  {g.availability === 'CANNOT_AFFORD' && (
+                    <p className="mt-1.5 text-micro text-warn-700">
+                      تحتاج <Num>{g.shortBy}</Num> {pointWord(g.shortBy)} إضافية
+                    </p>
+                  )}
+                  {g.availability === 'OUT_OF_STOCK' && (
+                    <p className="mt-1.5 text-micro text-ink-500">غير متوفّر حاليًا</p>
+                  )}
+                  <Btn size="sm" variant={can ? 'primary' : undefined} disabled={!can}
+                    className="mt-2.5 w-full" onClick={() => setConfirm(g)}>
+                    {can ? 'اشترِ' : '—'}
+                  </Btn>
+                </div>
+              </li>
             );
           })}
-        </div>
+        </ul>
       )}
 
-      {mine.length > 0 && (
-        <Sheet className="mt-6">
-          <h2 className="mb-3 text-lg2 font-bold text-ink-900">طلباتي</h2>
+      <Sheet pad={false} className="rise">
+        <div className="border-b border-ink-150 px-5 py-4">
+          <h2 className="text-lg2 font-bold text-ink-900">
+            طلباتي {orders?.length ? <span className="text-ink-500">
+              (<Num>{orders.length}</Num> {orderWord(orders.length)})</span> : null}
+          </h2>
+        </div>
+        {orders === null ? (
+          <div className="space-y-2 p-5">{[0, 1].map((i) => <div key={i} className="skel h-10 rounded-lg" />)}</div>
+        ) : orders.length === 0 ? (
+          <div className="p-5"><Empty icon={PackageCheck} title="لا طلبات بعد" body={COPY.noOrders} /></div>
+        ) : (
           <ul className="divide-y divide-ink-150">
-            {mine.map((o) => (
-              <li key={o.id} className="flex items-center gap-3 py-2.5">
+            {orders.map((o) => (
+              <li key={o.number} className="flex items-center gap-3 px-5 py-3.5">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-brand-50 font-display text-body text-brand-800">
+                  <Num>{o.number}</Num>
+                </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-body text-ink-900">{o.giftNameSnapshot}</span>
-                  <span className="block text-micro text-ink-500">
-                    طلب رقم <Num>{o.number}</Num> · <Num>{formatDate(o.createdAt)}</Num>
+                  <span className="mt-0.5 block text-micro text-ink-500">
+                    <Num>{o.pointsSpent}</Num> {pointWord(o.pointsSpent)} · <Num>{formatDate(o.createdAt.slice(0, 10))}</Num>
                   </span>
                 </span>
-                <Chip tone={o.status === 'DELIVERED' ? 'ok' : o.status === 'CANCELLED' ? 'risk' : 'warn'}>
-                  {ORDER_STATUS_AR[o.status]}
+                <Chip tone={o.status === 'DELIVERED' ? 'ok' : o.status === 'CANCELLED' ? 'ink' : 'warn'}>
+                  {o.statusAr}
                 </Chip>
               </li>
             ))}
           </ul>
-        </Sheet>
-      )}
+        )}
+      </Sheet>
 
-      <Modal open={confirm !== null} onClose={() => setConfirm(null)} title="تأكيد الشراء"
+      <Modal open={confirm !== null} onClose={() => !busy && setConfirm(null)} title="تأكيد الشراء"
         footer={<>
-          <Btn onClick={() => setConfirm(null)}>إلغاء</Btn>
-          <Btn variant="primary" onClick={() => confirm && buy(confirm)}>نعم، اشترِ</Btn>
+          <Btn onClick={() => setConfirm(null)} disabled={busy}>تراجع</Btn>
+          <Btn variant="primary" onClick={buy} disabled={busy}>
+            {busy ? <><Loader2 size={16} className="animate-spin" /> جارٍ…</> : 'أكمل الشراء'}
+          </Btn>
         </>}>
         {confirm && (
-          <p className="text-base2 text-ink-800">
-            ستُخصم <Num className="font-medium">{confirm.pointsCost}</Num> نقطة مقابل «{confirm.name}»،
-            فيبقى رصيدك <Num className="font-medium">{balance - confirm.pointsCost}</Num>.
-          </p>
+          <div className="space-y-3">
+            <p className="text-base2 text-ink-700">{COPY.buyConfirm(confirm.pointsCost, confirm.name)}</p>
+            <p className="text-panel text-ink-500">
+              رصيدك بعدها <Num className="font-medium text-ink-800">{balance - confirm.pointsCost}</Num> {pointWord(balance - confirm.pointsCost)}.
+            </p>
+            {err && <p role="alert" className="rounded-lg bg-risk-100 px-3.5 py-2.5 text-panel text-risk-700">{err}</p>}
+          </div>
+        )}
+      </Modal>
+
+      <Modal open={placed !== null} onClose={() => setPlaced(null)} title="تم الطلب"
+        footer={<Btn variant="primary" onClick={() => setPlaced(null)}>تمام</Btn>}>
+        {placed && (
+          <div className="text-center">
+            <span className="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-full bg-ok-100 text-ok-700">
+              <Check size={22} strokeWidth={2.6} />
+            </span>
+            <p className="text-base2 text-ink-700">{placed.gift}</p>
+            <p className="mt-3 font-display text-d1 text-brand-800"><Num>{placed.number}</Num></p>
+            <p className="mt-2 text-panel text-ink-600">{COPY.orderDone}</p>
+          </div>
         )}
       </Modal>
     </div>

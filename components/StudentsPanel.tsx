@@ -49,6 +49,7 @@ export function StudentsPanel({ onClose }: { onClose: () => void }) {
         onClose={onClose}>
 
         <PanelGroup label="الحلقات">
+        <PanelItem onClick={() => router.push('/admin/students/accounts')}>حسابات الطلاب</PanelItem>
           <button onClick={() => setEditing('new')}
             className="mb-1.5 flex w-full items-center gap-2 rounded-md border border-dashed border-ink-300 px-2 py-2 text-panel text-ink-600 transition-colors hover:border-brand-400 hover:bg-brand-50 hover:text-brand-800">
             <Plus size={15} strokeWidth={2} /> إضافة حلقة

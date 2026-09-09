@@ -108,6 +108,7 @@ model Student {
   @@index([nationalId])
   @@map("students")
   /* Everything a student accumulates, now that it lives in the database. */
+  credential  StudentCredential?
   txns        PointTxn[]
   orders      Order[]
   exams       Exam[]
@@ -378,4 +379,38 @@ model TajweedTopic {
   active Boolean @default(true)
 
   @@map("tajweed_topics")
+}
+
+
+/**
+ * A student's own sign-in.
+ *
+ * Created from the roster, never self-registered: «النظام يُنشئ حسابات الطلاب
+ * تلقائيًا عند استيراد ملف الحلقات». He signs in with his national id and a
+ * five-digit PIN the supervisor prints and hands to his teacher.
+ *
+ * A PIN, not a password, because the boy may be six years old and is typing it
+ * on a phone in a mosque. Five digits is 100,000 combinations — thin on its
+ * own, which is why the lockout below is not optional: five wrong tries and the
+ * account is shut for ten minutes, so an attacker gets thirty guesses an hour
+ * against an account that has no email, no payment and no personal data behind
+ * it beyond what his own teacher already knows.
+ */
+model StudentCredential {
+  id                 String    @id @default(cuid())
+  studentId          String    @unique @map("student_id")
+  student            Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  /** What the boy types. His national id — suffixed when two boys share one. */
+  username           String    @unique
+  pinHash            String    @map("pin_hash")
+  /** True until he replaces the printed PIN with one of his own. */
+  mustChangePin      Boolean   @default(true) @map("must_change_pin")
+  active             Boolean   @default(true)
+  failedAttempts     Int       @default(0) @map("failed_attempts")
+  lockedUntil        DateTime? @map("locked_until")
+  lastLoginAt        DateTime? @map("last_login_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  @@map("student_credentials")
 }

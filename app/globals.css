@@ -88,3 +88,38 @@
 /* A sheet previewed inside the reports screen borrows that screen's chrome:
    its own print button would be the second one on the page. */
 .embedded .no-print{display:none!important}
+
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   The student portal. Everything here is scoped under `.student-body` so it
+   cannot leak into the admin screens — the surfaces share a palette and a
+   typeface, not a look.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* The student card is an OBJECT, not a surface: DESIGN.md §1.3 names the rail
+   and the sign-in panel as the product's deep fields, and this is the third
+   and last. A card you could put in a wallet, not a region of the page. */
+.student-body .card-field{
+  background:linear-gradient(135deg,#0A403C 0%,#0B5F59 55%,#0E8D83 140%);
+  position:relative;overflow:hidden}
+/* Film grain, so a large flat teal does not band on a cheap phone screen. */
+.student-body .card-field::before{
+  content:'';position:absolute;inset:0;pointer-events:none;opacity:.055;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E")}
+/* One corner glow. One. */
+.student-body .card-field::after{
+  content:'';position:absolute;inset-inline-end:-18%;top:-42%;width:78%;aspect-ratio:1;
+  border-radius:50%;pointer-events:none;
+  background:radial-gradient(circle,rgba(93,209,199,.30) 0%,rgba(93,209,199,0) 68%)}
+
+/* A jewel tile: hairline, a 3px accent along the top, a lift on hover.
+   `inset-inline` and not `left`, or it mirrors wrong in RTL. */
+.student-body .tile{position:relative;transition:transform .2s cubic-bezier(.22,.61,.36,1),
+  box-shadow .2s cubic-bezier(.22,.61,.36,1)}
+.student-body .tile::before{content:'';position:absolute;inset-inline:0;top:0;height:3px;
+  border-start-start-radius:16px;border-start-end-radius:16px;background:var(--tile-accent,#0E8D83)}
+@media (hover:hover){.student-body .tile:hover{transform:translateY(-2px)}}
+
+/* Every tap target on a phone. */
+.student-body a,.student-body button{-webkit-tap-highlight-color:transparent}
+.student-body .press:active{transform:scale(.985)}

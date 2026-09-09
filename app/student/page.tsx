@@ -1,130 +1,152 @@
 'use client';
-/* طا-٢ الرئيسية — how many points do I have, where am I, what did I do. */
+/* طا-٢ الرئيسية — card, tiles, progress, last exams, ledger.
+   Every figure here came from /api/student/*, scoped to this boy by his
+   cookie. Nothing on this screen knows another student exists. */
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useMemo } from 'react';
-import { Ticket, Store, TrendingUp, CheckCircle2, XCircle } from 'lucide-react';
+import {
+  Layers, BookOpen, TrendingUp, ClipboardCheck, ArrowLeft, Check, X,
+} from 'lucide-react';
 import { Sheet, SheetHead } from '@/components/Sheet';
-import { Btn, Chip, Empty } from '@/components/ui';
-import { Num, juzPhrase } from '@/components/Num';
-import { useDB } from '@/lib/store';
-import { useStudentId, StudentPicker } from '@/components/StudentGate';
-import { balanceOf, earnsPoints, EXAM_TYPE_AR, type ExamType } from '@/lib/points';
-import { ajzaForLevel } from '@/lib/exams';
-import { TRACK_AR, TXN_KIND_AR } from '@/lib/types';
+import { Empty } from '@/components/ui';
+import { Num, juzPhrase, pointWord } from '@/components/Num';
+import { useMe } from '@/components/student/Me';
+import { StudentCard } from '@/components/student/Card';
+import { Tile, ProgressRail } from '@/components/student/Tiles';
+import { COPY, LEDGER_ON_HOME } from '@/content/student';
 import { formatDate } from '@/lib/dates';
+import { levelsFor } from '@/lib/types';
+import { cx } from '@/lib/cx';
+
+type ExamRow = {
+  id: string; typeAr: string; takenOn: string; level: number | null;
+  score: number | null; scoreMax: number; passed: boolean | null; type: string;
+};
+type Move = { id: string; delta: number; kindAr: string; reason: string; createdAt: string };
 
 export default function StudentHome() {
-  const db = useDB();
-  const [id, setId] = useStudentId();
-  const me = db.students.find((s) => s.id === id) ?? null;
+  const { me } = useMe();
+  const [exams, setExams] = useState<ExamRow[] | null>(null);
+  const [moves, setMoves] = useState<Move[] | null>(null);
 
-  const plan = useMemo(() => [...db.plans]
-    .filter((p) => p.studentId === id)
-    .sort((a, b) => b.issuedAt.localeCompare(a.issuedAt))[0] ?? null, [db.plans, id]);
+  useEffect(() => {
+    fetch('/api/student/exams').then((r) => (r.ok ? r.json() : { exams: [] }))
+      .then((d) => setExams(d.exams ?? [])).catch(() => setExams([]));
+    if (me?.eligibleForPoints) {
+      fetch(`/api/student/points?limit=${LEDGER_ON_HOME}`)
+        .then((r) => (r.ok ? r.json() : { moves: [] }))
+        .then((d) => setMoves(d.moves ?? [])).catch(() => setMoves([]));
+    } else setMoves([]);
+  }, [me?.eligibleForPoints]);
 
-  const exams = useMemo(() => db.exams
-    .filter((e) => e.studentId === id)
-    .sort((a, b) => b.takenOn.localeCompare(a.takenOn)).slice(0, 5), [db.exams, id]);
+  if (!me) return null;
 
-  const moves = useMemo(() => db.txns
-    .filter((t) => t.studentId === id)
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 8), [db.txns, id]);
-
-  if (!me) return <StudentPicker onPick={setId} />;
-
-  const level = me.currentLevel ?? plan?.level ?? null;
-  const ajza = ajzaForLevel(me.track, level);
-  const total = me.track === 'GOLDEN' ? 30 : 60;
-  const pct = level ? Math.round(((total - level) / total) * 100) : 0;
-  const balance = balanceOf(db.txns, me.id);
-  const eligible = earnsPoints(me);
+  const levelled = me.track && me.track !== 'TALQEEN';
+  const passed = (exams ?? []).filter((e) => e.passed === true).length;
+  const span = levelled ? levelsFor(me.track as 'SILVER' | 'GOLDEN') : [];
 
   return (
-    <div className="mx-auto max-w-lg px-5 py-6">
-      <p className="text-xs2 text-ink-500">أهلًا</p>
-      <h1 className="mt-0.5 font-display text-d2 text-ink-900">{me.fullName}</h1>
+    <div className="space-y-6">
+      <StudentCard me={me} />
 
-      {eligible ? (
-        <Sheet className="mt-5 border-brand-200 bg-brand-50">
-          <p className="text-xs2 text-brand-800">رصيدي من النقاط</p>
-          <p className="mt-1 font-display text-d0 leading-none text-brand-900"><Num>{balance}</Num></p>
-          <div className="mt-5 grid grid-cols-2 gap-2">
-            <Link href="/student/redeem"><Btn variant="primary" size="lg" icon={Ticket} className="w-full">شحن كود</Btn></Link>
-            <Link href="/student/store"><Btn size="lg" icon={Store} className="w-full">المتجر</Btn></Link>
+      {levelled && (
+        <>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <Tile label="المستوى" value={me.currentLevel ?? 0} icon={Layers} accent="#3F4A45" />
+            <Tile label="الأجزاء" value={me.ajza ?? 0} icon={BookOpen} accent="#6B8F71" delay={60} />
+            <Tile label="ما أنجزته" value={me.progressPct} unit="٪" icon={TrendingUp} accent="#1F7A4C" delay={120} />
+            <Tile label="اجتزتها" value={passed} unit="اختبارًا" icon={ClipboardCheck} accent="#0B5F59" delay={180} />
           </div>
-        </Sheet>
-      ) : (
-        <Sheet className="mt-5">
-          <p className="text-base2 text-ink-600">
-            أنت في مسار التلقين، وطلابه خارج نظام النقاط والمتجر.
-          </p>
-        </Sheet>
-      )}
 
-      {level !== null && (
-        <Sheet className="mt-4">
-          <SheetHead title="مستواي"
-            meta={me.track ? `المسار ${TRACK_AR[me.track]}` : undefined} />
-          <div className="flex items-baseline gap-3">
-            <span className="font-display text-d1 text-ink-900"><Num>{level}</Num></span>
-            {ajza !== null && <Chip tone="brand">{juzPhrase(ajza)}</Chip>}
-          </div>
-          <div className="mt-4 h-2 overflow-hidden rounded-full bg-ink-100">
-            <div className="h-full rounded-full bg-brand-600 transition-[width] duration-700 ease-brand"
-              style={{ width: `${pct}%` }} />
-          </div>
-          <p className="mt-2 text-micro text-ink-500">
-            أنجزت <Num>{pct}</Num>٪ من مسارك · المستوى ينزل من <Num>{total}</Num> إلى <Num>١</Num>
-          </p>
+          <ProgressRail pct={me.progressPct}
+            from={span[0] ?? 0} to={span[span.length - 1] ?? 1} />
+
           <Link href="/student/my-level"
-            className="mt-4 block text-panel text-brand-800 hover:underline">خطتي وما عليّ اليوم ←</Link>
-        </Sheet>
+            className="press flex items-center justify-between rounded-2xl border border-ink-150 bg-paper px-5 py-4 shadow-soft transition-colors hover:border-brand-200">
+            <span>
+              <span className="block text-body font-medium text-ink-900">خطتي وما عليّ اليوم</span>
+              <span className="mt-0.5 block text-panel text-ink-500">
+                {me.ajza != null ? juzPhrase(me.ajza) : 'مستواك وخطتك كاملة'}
+              </span>
+            </span>
+            <ArrowLeft size={18} className="shrink-0 text-brand-800" />
+          </Link>
+        </>
       )}
 
-      {exams.length > 0 && (
-        <Sheet className="mt-4">
-          <SheetHead title="آخر اختباراتي" />
+      {/* آخر اختباراتي — pass and fail carry a SHAPE as well as a colour, so the
+          row survives a greyscale printer and a colour-blind reader. */}
+      <Sheet pad={false} className="rise">
+        <div className="border-b border-ink-150 px-5 py-4">
+          <h2 className="text-lg2 font-bold text-ink-900">آخر اختباراتي</h2>
+        </div>
+        {exams === null ? (
+          <div className="space-y-2 p-5">
+            {[0, 1, 2].map((i) => <div key={i} className="skel h-10 rounded-lg" />)}
+          </div>
+        ) : exams.length === 0 ? (
+          <div className="p-5"><Empty icon={ClipboardCheck} title="لا اختبارات بعد" body={COPY.noExams} /></div>
+        ) : (
           <ul className="divide-y divide-ink-150">
-            {exams.map((e) => (
-              <li key={e.id} className="flex items-center gap-3 py-2.5">
-                {e.passed
-                  ? <CheckCircle2 size={16} className="shrink-0 text-ok-500" />
-                  : <XCircle size={16} className="shrink-0 text-risk-500" />}
-                <span className="min-w-0 flex-1 truncate text-body text-ink-900">
-                  {EXAM_TYPE_AR[e.type as ExamType] ?? e.type}
+            {exams.slice(0, 5).map((e) => (
+              <li key={e.id} className="flex items-center gap-3 px-5 py-3.5">
+                <span className={cx('grid h-7 w-7 shrink-0 place-items-center rounded-full',
+                  e.passed === true ? 'bg-ok-100 text-ok-700'
+                    : e.passed === false ? 'bg-risk-100 text-risk-700' : 'bg-ink-100 text-ink-400')}>
+                  {e.passed === true ? <Check size={14} strokeWidth={2.6} />
+                    : e.passed === false ? <X size={14} strokeWidth={2.6} /> : '—'}
                 </span>
-                <Num className="shrink-0 text-micro text-ink-500">{formatDate(e.takenOn)}</Num>
-                <Num className="w-10 shrink-0 text-end text-panel font-medium text-ink-900">{e.score ?? '—'}</Num>
+                <span className="min-w-0 flex-1">
+                  <span className={cx('block truncate text-body',
+                    e.type === 'ASSOCIATION' ? 'text-assoc-700' : 'text-ink-900')}>{e.typeAr}</span>
+                  <span className="mt-0.5 block text-micro text-ink-500">
+                    <Num>{formatDate(e.takenOn)}</Num>
+                    {e.level != null && <> · المستوى <Num>{e.level}</Num></>}
+                  </span>
+                </span>
+                {e.score != null && (
+                  <span className="shrink-0 text-panel text-ink-700">
+                    <Num className="font-medium text-ink-900">{e.score}</Num>
+                    <span className="text-ink-400"> / <Num>{e.scoreMax}</Num></span>
+                  </span>
+                )}
               </li>
             ))}
           </ul>
+        )}
+      </Sheet>
+
+      {me.eligibleForPoints && (
+        <Sheet pad={false} className="rise">
+          <div className="border-b border-ink-150 px-5 py-4">
+            <h2 className="text-lg2 font-bold text-ink-900">سجلّ نقاطي</h2>
+          </div>
+          {moves === null ? (
+            <div className="space-y-2 p-5">
+              {[0, 1, 2].map((i) => <div key={i} className="skel h-10 rounded-lg" />)}
+            </div>
+          ) : moves.length === 0 ? (
+            <div className="p-5"><Empty icon={TrendingUp} title="لا حركة بعد" body={COPY.noMoves} /></div>
+          ) : (
+            <ul className="divide-y divide-ink-150">
+              {moves.map((m) => (
+                <li key={m.id} className="flex items-center gap-3 px-5 py-3.5">
+                  <span className={cx('shrink-0 font-display text-lg2 tabular-nums',
+                    m.delta >= 0 ? 'text-ok-700' : 'text-risk-700')}>
+                    <Num>{m.delta >= 0 ? `+${m.delta}` : m.delta}</Num>
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-body text-ink-900">{m.reason || m.kindAr}</span>
+                    <span className="mt-0.5 block text-micro text-ink-500">
+                      <Num>{formatDate(m.createdAt.slice(0, 10))}</Num>
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </Sheet>
       )}
-
-      {eligible && moves.length > 0 && (
-        <Sheet className="mt-4">
-          <SheetHead title="حركة نقاطي" />
-          <ul className="divide-y divide-ink-150">
-            {moves.map((t) => (
-              <li key={t.id} className="flex items-center gap-3 py-2.5">
-                <TrendingUp size={15}
-                  className={t.delta >= 0 ? 'shrink-0 text-ok-500' : 'shrink-0 rotate-180 text-risk-500'} />
-                <span className="min-w-0 flex-1 truncate text-panel text-ink-700">
-                  {t.reason || TXN_KIND_AR[t.kind]}
-                </span>
-                <span className={t.delta >= 0 ? 'text-body font-medium text-ok-700' : 'text-body font-medium text-risk-700'}>
-                  {t.delta >= 0 ? '+' : '−'}<Num>{Math.abs(t.delta)}</Num>
-                </span>
-              </li>
-            ))}
-          </ul>
-        </Sheet>
-      )}
-
-      <button onClick={() => setId('')}
-        className="mt-8 w-full text-center text-micro text-ink-400 hover:text-ink-700">
-        لست {me.fullName}؟ تغيير
-      </button>
     </div>
   );
 }
