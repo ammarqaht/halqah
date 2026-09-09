@@ -11,6 +11,7 @@ import { store, useDB } from '@/lib/store';
 import { derive } from '@/lib/derive';
 import { PointsSettingsCard } from '@/components/PointsSettings';
 import { BandsSettingsCard } from '@/components/BandsSettings';
+import { AccountsSettingsCard } from '@/components/AccountsSettings';
 import { SETTINGS_SECTIONS, type SettingsSection } from '@/components/SettingsPanel';
 
 type Stats = { students: number; halaqat: number; imports: number; audit: number; bytes: number };
@@ -83,6 +84,8 @@ function SettingsScreen() {
           <PointsSettingsCard />
           <BandsSettingsCard />
         </>}
+
+        {section === 'accounts' && <AccountsSettingsCard />}
 
         {section === 'database' && <>
 
