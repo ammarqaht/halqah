@@ -63,29 +63,38 @@ function clampDigits(raw: string, max: number, opts: { decimal?: boolean } = {})
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 
 /* ── the questions he asked ────────────────────────────────────────────────
-   The sheet he fills at the desk: one line per question, and the two counters
-   that decide the score are counted per question rather than tallied in his
-   head. The totals below add them up, so «إجمالي الأخطاء» is a sum he can see
-   the working of instead of a number he arrived at with a pen.
+   The sheet he fills at the desk: one line per question, and the THREE
+   counters that decide the score are counted per question rather than tallied
+   in his head. The totals below add them up, so «إجمالي الأخطاء» is a sum he
+   can see the working of instead of a number he arrived at with a pen.
+
+   Tajweed errors belong on the line too. They were only a total, so a mistake
+   in the second passage and one in the fifth arrived as «٢» with nothing
+   saying where — and «ألّا تُعيد عليه المواضع نفسها» needs to know where.
 
    Five blank lines to start — the usual sitting — and «إضافة سؤال» for a
    longer one. A line nobody typed anything into is not a question and is
    dropped on save rather than stored as an empty row. */
 type QRow = {
   id: string; surah: string; ayahFrom: string;
-  errors: string; warnings: string; note: string;
+  errors: string; warnings: string; tajweed: string; note: string;
 };
+
+/** The three counters, named once so a label and its aria-label cannot drift. */
+const COUNTER_AR = {
+  errors: 'الأخطاء', warnings: 'التنبيهات', tajweed: 'الأخطاء التجويدية',
+} as const;
 
 const STARTING_ROWS = 5;
 const blankRow = (): QRow =>
-  ({ id: uid(), surah: '', ayahFrom: '', errors: '', warnings: '', note: '' });
+  ({ id: uid(), surah: '', ayahFrom: '', errors: '', warnings: '', tajweed: '', note: '' });
 const freshRows = () => Array.from({ length: STARTING_ROWS }, blankRow);
 /* A line is blank until something is actually on it. The counters are tapped,
    so a row he raised to one and put back to zero reads «0» rather than «» —
    and a zero is not a question any more than an empty box is. */
 const isBlankRow = (q: QRow) =>
   !q.surah.trim() && !q.ayahFrom.trim() && !q.note.trim()
-  && !(Number(q.errors) > 0) && !(Number(q.warnings) > 0);
+  && !(Number(q.errors) > 0) && !(Number(q.warnings) > 0) && !(Number(q.tajweed) > 0);
 
 type Saved = { exam: Exam; studentName: string; nextLevel: number | null };
 
@@ -104,7 +113,7 @@ function RecordExam() {
   /** Null while a total is following the questions; a string once he types. */
   const [errorsOverride, setErrorsOverride] = useState<string | null>(null);
   const [warningsOverride, setWarningsOverride] = useState<string | null>(null);
-  const [tajweedErrors, setTajweedErrors] = useState('');
+  const [tajweedOverride, setTajweedOverride] = useState<string | null>(null);
   /** Null while the score is following the counters; a number once he types. */
   const [scoreOverride, setScoreOverride] = useState<string | null>(null);
   const [passOverride, setPassOverride] = useState<boolean | null>(null);
@@ -185,18 +194,21 @@ function RecordExam() {
     (a, q) => ({
       errors: a.errors + (Number(q.errors) || 0),
       warnings: a.warnings + (Number(q.warnings) || 0),
+      tajweed: a.tajweed + (Number(q.tajweed) || 0),
     }),
-    { errors: 0, warnings: 0 }), [asked]);
+    { errors: 0, warnings: 0, tajweed: 0 }), [asked]);
 
   /* Editing any question re-syncs the totals: touching a row is the clearest
      statement that the sum is what he means, so it takes the override back. */
   const patchQuestion = (id: string, p: Partial<QRow>) => {
     setQuestions((rows) => rows.map((q) => (q.id === id ? { ...q, ...p } : q)));
-    setErrorsOverride(null); setWarningsOverride(null); setScoreOverride(null);
+    setErrorsOverride(null); setWarningsOverride(null); setTajweedOverride(null);
+    setScoreOverride(null);
   };
   const dropQuestion = (id: string) => {
     setQuestions((rows) => (rows.length > 1 ? rows.filter((q) => q.id !== id) : rows));
-    setErrorsOverride(null); setWarningsOverride(null); setScoreOverride(null);
+    setErrorsOverride(null); setWarningsOverride(null); setTajweedOverride(null);
+    setScoreOverride(null);
   };
 
   /* The totals follow the questions and stay typable — §11, «النظام يقترح،
@@ -204,6 +216,7 @@ function RecordExam() {
      kept only the two totals and not the questions behind them. */
   const errors = errorsOverride ?? (asked.length ? String(askedTotals.errors) : '');
   const warnings = warningsOverride ?? (asked.length ? String(askedTotals.warnings) : '');
+  const tajweedErrors = tajweedOverride ?? (asked.length ? String(askedTotals.tajweed) : '');
 
   const counts = {
     errors: Number(errors) || 0,
@@ -318,8 +331,8 @@ function RecordExam() {
 
   const reset = () => {
     setStudentId(''); setType('BADGE_GOLDEN'); setTakenOn(isoDate(new Date()));
-    setLevel(''); setAjza(''); setQuestions(freshRows()); setTajweedErrors('');
-    setErrorsOverride(null); setWarningsOverride(null);
+    setLevel(''); setAjza(''); setQuestions(freshRows());
+    setErrorsOverride(null); setWarningsOverride(null); setTajweedOverride(null);
     setScoreOverride(null); setPassOverride(null); setPointsOverride(null);
     setPointsPaid(true); setTopics([]); setNote(''); setExaminer(''); setSaved(null);
   };
@@ -357,7 +370,7 @@ function RecordExam() {
       surah: q.surah.trim(), ayahFrom: q.ayahFrom.trim(), ayahTo: '',
       errors: Number(q.errors) || 0,
       warnings: Number(q.warnings) || 0,
-      tajweedErrors: 0,
+      tajweedErrors: Number(q.tajweed) || 0,
       note: q.note.trim(),
     })));
     /* Settle the appointment in the same action. Without this the sitting is in
@@ -630,7 +643,7 @@ function RecordExam() {
                     <table className="w-full min-w-[52rem] border-collapse text-body">
                       <thead>
                         <tr className="border-b border-ink-200 bg-page/50 text-cap text-ink-500">
-                          {['#', 'السورة', 'من آية', 'الأخطاء', 'التنبيهات', 'ملاحظة', ''].map((h) => (
+                          {['#', 'السورة', 'من آية', 'الأخطاء', 'التنبيهات', 'تجويد', 'ملاحظة', ''].map((h) => (
                             <th key={h} className="px-2.5 py-2.5 text-start font-medium">{h}</th>))}
                         </tr>
                       </thead>
@@ -652,12 +665,12 @@ function RecordExam() {
                                 on-site sheet, for the same reason: he is
                                 listening, and a hand that is following a
                                 recitation cannot go hunting for a keyboard. */}
-                            {(['errors', 'warnings'] as const).map((f) => (
+                            {(['errors', 'warnings', 'tajweed'] as const).map((f) => (
                               <td key={f} className="px-1.5 py-1.5">
                                 <div className="flex items-center gap-1">
                                   <button type="button"
                                     onClick={() => patchQuestion(q.id, { [f]: String((Number(q[f]) || 0) + 1) })}
-                                    aria-label={`زيادة ${f === 'errors' ? 'الأخطاء' : 'التنبيهات'} للسؤال ${i + 1}`}
+                                    aria-label={`زيادة ${COUNTER_AR[f]} للسؤال ${i + 1}`}
                                     className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-ink-100 text-ink-700 transition-colors hover:bg-brand-100 hover:text-brand-800 active:scale-95">
                                     <Plus size={16} strokeWidth={2.4} />
                                   </button>
@@ -667,7 +680,7 @@ function RecordExam() {
                                   </span>
                                   <button type="button" disabled={!(Number(q[f]) > 0)}
                                     onClick={() => patchQuestion(q.id, { [f]: String(Math.max(0, (Number(q[f]) || 0) - 1)) })}
-                                    aria-label={`إنقاص ${f === 'errors' ? 'الأخطاء' : 'التنبيهات'} للسؤال ${i + 1}`}
+                                    aria-label={`إنقاص ${COUNTER_AR[f]} للسؤال ${i + 1}`}
                                     className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-ink-400 transition-colors hover:bg-ink-100 hover:text-ink-800 active:scale-95 disabled:opacity-30">
                                     <Minus size={16} strokeWidth={2.4} />
                                   </button>
@@ -706,7 +719,7 @@ function RecordExam() {
                   {([
                     ['إجمالي الأخطاء', errors, setErrorsOverride, '٢ درجة لكل خطأ', true],
                     ['إجمالي التنبيهات', warnings, setWarningsOverride, 'نصف درجة لكل تنبيه', true],
-                    ['الأخطاء التجويدية', tajweedErrors, setTajweedErrors, 'درجة واحدة لكل خطأ', false],
+                    ['الأخطاء التجويدية', tajweedErrors, setTajweedOverride, 'درجة واحدة لكل خطأ', true],
                   ] as const).map(([label, val, set, hint, summed]) => (
                     <Field key={label} label={label}
                       hint={summed && asked.length > 0
