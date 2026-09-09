@@ -53,7 +53,23 @@ export default function StudentHome() {
         <>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             <Tile label="المستوى" value={me.currentLevel ?? 0} icon={Layers} accent="#3F4A45" />
-            <Tile label="الأجزاء" value={me.ajza ?? 0} icon={BookOpen} accent="#6B8F71" delay={60} />
+            {/* A count-up cannot say «نصف جزء», so a fractional value is shown
+                as the phrase it is rather than rounded to a wrong integer. */}
+            {me.ajza != null && !Number.isInteger(me.ajza) ? (
+              <div className="tile rise overflow-hidden rounded-2xl border border-ink-150 bg-paper p-4 shadow-soft"
+                style={{ ['--tile-accent' as string]: '#6B8F71', animationDelay: '60ms' }}>
+                <span className="mb-3 inline-grid h-8 w-8 place-items-center rounded-lg"
+                  style={{ background: '#6B8F711A', color: '#6B8F71' }}>
+                  <BookOpen size={16} strokeWidth={1.9} />
+                </span>
+                <p className="text-micro text-ink-500">الأجزاء</p>
+                <p className="mt-0.5 font-display text-lg2 leading-tight text-ink-900">
+                  {juzPhrase(me.ajza)}
+                </p>
+              </div>
+            ) : (
+              <Tile label="الأجزاء" value={me.ajza ?? 0} icon={BookOpen} accent="#6B8F71" delay={60} />
+            )}
             <Tile label="ما أنجزته" value={me.progressPct} unit="٪" icon={TrendingUp} accent="#1F7A4C" delay={120} />
             <Tile label="اجتزتها" value={passed} unit="اختبارًا" icon={ClipboardCheck} accent="#0B5F59" delay={180} />
           </div>

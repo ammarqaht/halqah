@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { scope } from '../_scope';
 import { balanceOf, earnsPoints } from '@/lib/points';
-import { ajzaForLevel } from '@/lib/exams';
+import { ajzaExact, ajzaForLevel } from '@/lib/exams';
 import { TRACK_AR, LEVEL_MAX, type Track } from '@/lib/types';
 import { halaqaLabel, shortName } from '@/lib/normalise';
 import { levelsFor } from '@/lib/types';
@@ -29,7 +29,16 @@ export async function GET() {
     ? await db.pointTxn.findMany({ where: { studentId: student.id }, select: { delta: true } })
     : [];
 
-  const level = student.currentLevel;
+  /* His level, or the newest sheet he was handed. The roster's «المستوى الحالي»
+     column is empty in the client's file, so the plan is often the only record
+     of it — and a page that shows «المستوى 0» to a boy on level 60 is worse
+     than one that shows nothing. */
+  let level = student.currentLevel;
+  if (level == null) {
+    const newest = await db.studentPlan.findFirst({
+      where: { studentId: student.id }, orderBy: { issuedAt: 'desc' }, select: { level: true } });
+    level = newest?.level ?? null;
+  }
   const total = track && track !== 'TALQEEN' ? levelsFor(track).length : 0;
   /* The level counts DOWN — 60 is the start of the silver track and 1 its end —
      so progress is how far the number has fallen, not how high it has risen. */
@@ -46,7 +55,11 @@ export async function GET() {
     grade: student.grade || null,
     stage: student.stage || null,
     currentLevel: level,
-    ajza: ajzaForLevel(track, level),
+    /* `ajzaForLevel` returns null on a silver EVEN level because §4.8 gates
+       association readiness on a WHOLE juz and must not round. For a boy
+       reading his own page, «نصف جزء» is the true answer and «—» is not. */
+    ajza: ajzaExact(track, level),
+    ajzaWhole: ajzaForLevel(track, level),
     levelTotal: total,
     progressPct: total ? Math.round((done / total) * 100) : 0,
     eligibleForPoints: eligible,

@@ -165,6 +165,34 @@ export async function PUT(req: Request) {
       if (bookings.length) await tx.examBooking.createMany({ data: bookings.map((b) => ({
         ...b, createdAt: d(b.createdAt) ?? new Date() })) as Prisma.ExamBookingCreateManyInput[] });
 
+      /* «المستوى الحالي» is empty in the roster file, so a student's level is
+         only ever known from the newest sheet he was handed. The browser store
+         derives it on ingest; the server never did — so every one of the 117
+         had `currentLevel: null` here while the plans beside them said 60, and
+         the student portal showed «المستوى 0».
+
+         Derived here, from the same rule: the newest plan a boy holds is the
+         level he is on. Only for students who have none — a level set by hand
+         on the students screen is a decision and must not be overwritten. */
+      if (plans.length) {
+        const newest = new Map<string, { level: number; issuedAt: string }>();
+        for (const pl of plans) {
+          const cur = newest.get(pl.studentId as string);
+          const issuedAt = String(pl.issuedAt ?? '');
+          if (!cur || issuedAt > cur.issuedAt) {
+            newest.set(pl.studentId as string, { level: Number(pl.level), issuedAt });
+          }
+        }
+        const blank = await tx.student.findMany({
+          where: { id: { in: [...newest.keys()] }, currentLevel: null },
+          select: { id: true },
+        });
+        for (const st of blank) {
+          await tx.student.update({
+            where: { id: st.id }, data: { currentLevel: newest.get(st.id)!.level } });
+        }
+      }
+
       if (s.curriculum?.length) await tx.curriculumDay.createMany({ data: s.curriculum });
       if (s.tajweedTopics?.length) await tx.tajweedTopic.createMany({ data: s.tajweedTopics });
     }, { timeout: 30_000 });

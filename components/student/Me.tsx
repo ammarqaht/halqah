@@ -10,7 +10,7 @@ export type Me = {
   halaqaName: string | null; teacher: string | null;
   track: 'SILVER' | 'GOLDEN' | 'TALQEEN' | null; trackAr: string | null;
   grade: string | null; stage: string | null;
-  currentLevel: number | null; ajza: number | null;
+  currentLevel: number | null; ajza: number | null; ajzaWhole: number | null;
   levelTotal: number; progressPct: number;
   eligibleForPoints: boolean; balance: number;
   mustChangePin: boolean; attendedDays: number | null;
