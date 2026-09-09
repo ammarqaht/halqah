@@ -3,14 +3,19 @@ import { db } from '@/lib/db';
 import { scope } from '../_scope';
 import { resolvePlan, dailyAmountFor } from '@/lib/curriculum';
 import { ajzaForLevel, nextLevel } from '@/lib/exams';
-import { estimateCurrentDay } from '@/lib/studentDay';
-import { HALAQA_WEEKDAYS } from '@/content/student';
 import type { CurriculumDay, ExamDayMap, StudentPlan, Track } from '@/lib/types';
 
 /* مستواي وخطتي — طا-٥.
    A talqeen student, or one who has not been handed a sheet yet, gets
    `{ plan: null }` and a 200. The UI shows an intentional empty state; an
-   error would be a lie about what happened. */
+   error would be a lie about what happened.
+
+   NO «today». The system does not record which day a boy actually reached —
+   attendance and recitation live in Ratel — so any figure here would be a
+   guess, and a guess on this screen sends a child to the wrong passage on the
+   system's authority. The sheet is shown whole and he finds his place on it,
+   the way he does on paper. `lib/studentDay.ts` holds the working-day counting
+   for when the teacher's screen records attendance and this can be exact. */
 export async function GET() {
   const g = await scope();
   if (!g.ok) return g.res;
@@ -47,7 +52,6 @@ export async function GET() {
       dailyAmount: plan.dailyAmount || dailyAmountFor(track),
     },
     days,
-    currentDayNo: estimateCurrentDay(plan.issuedAt, plan.dayCount, HALAQA_WEEKDAYS),
     nextLevel: next,
     nextAjza: ajzaForLevel(track, next),
   });

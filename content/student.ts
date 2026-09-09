@@ -14,8 +14,15 @@ export const TABS = [
   { href: '/student/my-level', label: 'مستواي وخطتي' },
 ] as const;
 
-/** Which weekdays the halaqa runs — 0 is Sunday. Used to estimate today's day
-    in the plan, and nothing else. Sunday to Thursday. */
+/**
+ * Which weekdays the halaqa runs — 0 is Sunday, so Sunday to Thursday.
+ *
+ * Not used yet. The student's plan deliberately points at no «today»: nothing
+ * records which day a boy actually reached, and a guess there sends a child to
+ * the wrong passage. This waits for the teacher's screen, where attendance is
+ * recorded and the same working-day counting becomes exact rather than
+ * plausible.
+ */
 export const HALAQA_WEEKDAYS = [0, 1, 2, 3, 4];
 
 /** How many ledger movements the home screen and the API return by default. */
@@ -52,7 +59,5 @@ export const COPY = {
   buyConfirm: (n: number, gift: string) => `ستُخصم ${n} نقطة مقابل «${gift}». متأكد؟`,
   orderDone: 'اعرض هذا الرقم عند الاستلام.',
 
-  todayEstimate: 'يومك اليوم — تقديريًا',
-  todayWhy: 'محسوب من تاريخ تسليم الورقة، لا من حضورك — اضغط أي يوم آخر لتراه.',
   levelDown: 'المستوى ينزل — كلما نقص الرقم اقتربت من الختم.',
 } as const;

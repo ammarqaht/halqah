@@ -1,6 +1,12 @@
 /**
  * Which day of his plan a student is probably on.
  *
+ * NOT WIRED TO ANYTHING YET, and deliberately. The estimate was on the
+ * student's screen and is off it again: nothing records which day a boy
+ * actually reached, so it was a guess, and a guess there sends a child to the
+ * wrong passage on the system's authority. This waits for the teacher's screen
+ * to record attendance, at which point the same counting becomes exact.
+ *
  * NOTHING in the system records which day a boy actually reached — attendance
  * and recitation live in Ratel, not here. So this counts the halaqa's working
  * days elapsed since the sheet was handed to him, and the UI labels it
