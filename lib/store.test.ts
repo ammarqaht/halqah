@@ -253,3 +253,32 @@ describe('adopting the server\'s student ids', () => {
     expect(store.get().students[0].id).toBe('keepme');
   });
 });
+
+describe('deleting an exam reaches the ledger', () => {
+  it('takes back what it paid, without erasing a row', () => {
+    store.reset();
+    store.upsertStudent(student({ id: 'dx', track: 'SILVER' }));
+    const e = exam({ id: 'ex1', studentId: 'dx', pointsAwarded: 200, pointsPaid: true,
+      track: 'SILVER' });
+    store.saveExam(e);
+    expect(balance('dx')).toBe(200);
+    expect(store.get().exams).toHaveLength(1);
+
+    store.removeExam('ex1');
+
+    expect(store.get().exams).toHaveLength(0);
+    expect(balance('dx')).toBe(0);
+    /* The award and its reversal both stand: §3.5 forbids editing a row. */
+    expect(store.get().txns.filter((t) => t.refId === 'ex1')).toHaveLength(2);
+  });
+
+  it('leaves the balance alone when nothing was paid', () => {
+    store.reset();
+    store.upsertStudent(student({ id: 'dy', track: 'SILVER' }));
+    store.saveExam(exam({ id: 'ex2', studentId: 'dy', pointsAwarded: 0, pointsPaid: false,
+      track: 'SILVER' }));
+    store.removeExam('ex2');
+    expect(store.get().exams).toHaveLength(0);
+    expect(store.get().txns.filter((t) => t.refId === 'ex2')).toHaveLength(0);
+  });
+});

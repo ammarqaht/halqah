@@ -82,7 +82,6 @@ function ExamsScreen() {
      reversal rather than deleting the ledger row, because §3.5 makes the
      ledger append-only. So the confirmation has to say what the balance does,
      not only that a row disappears. */
-  const [doomed, setDoomed] = useState<Exam | null>(null);
   const [toDelete, setToDelete] = useState<Exam | null>(null);
   /** The sitting whose full record is open. Null while the log is just a log. */
   const [detail, setDetail] = useState<Exam | null>(null);
@@ -283,6 +282,41 @@ function ExamsScreen() {
       <ExamDetail exam={detail} onClose={() => setDetail(null)}
         studentName={detail ? nameOf(detail.studentId) : ''}
         halaqaName={detail ? halaqaOf(detail.halaqaId) : ''} />
+
+      <Modal open={toDelete !== null} onClose={() => setToDelete(null)} title="حذف الاختبار"
+        footer={
+          <>
+            <Btn onClick={() => setToDelete(null)}>تراجع</Btn>
+            <Btn variant="danger" icon={Trash2} onClick={() => {
+              if (toDelete) store.removeExam(toDelete.id);
+              setToDelete(null);
+            }}>تأكيد الحذف</Btn>
+          </>
+        }>
+        {toDelete && (
+          <div className="space-y-3">
+            <p className="text-base2 text-ink-700">
+              سيُحذف <span className="font-medium">
+                {EXAM_TYPE_AR[toDelete.type as ExamType] ?? toDelete.type}</span>
+              {' '}المسجَّل لـ<span className="font-medium">{nameOf(toDelete.studentId)}</span>
+              {' '}بتاريخ <Num>{formatDate(toDelete.takenOn)}</Num>
+              {toDelete.score !== null && <> بدرجة <Num>{toDelete.score}</Num></>}.
+            </p>
+            {toDelete.pointsAwarded > 0 && toDelete.pointsPaid ? (
+              <p className="rounded-lg bg-warn-100 px-3.5 py-3 text-panel text-warn-700">
+                تُسترجع <Num className="font-medium">{toDelete.pointsAwarded}</Num>{' '}
+                {pointWord(toDelete.pointsAwarded)} من رصيده — بحركةِ تصحيح تُضاف إلى السجل،
+                فالسجل لا يُمحى.
+              </p>
+            ) : (
+              <p className="rounded-lg bg-info-100 px-3.5 py-3 text-panel text-info-700">
+                لم تُصرف نقاط على هذا الاختبار، فالرصيد لا يتغيّر.
+              </p>
+            )}
+            <p className="text-panel text-ink-500">لا يمكن التراجع عن الحذف.</p>
+          </div>
+        )}
+      </Modal>
     </>
   );
 }

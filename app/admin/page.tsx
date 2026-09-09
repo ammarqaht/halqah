@@ -52,7 +52,7 @@ export default function OverviewPage() {
     <>
       <TopBar title="الرئيسية" crumbs={['حلقات جامع محمد العبدالكريم']} panelOpen={panelOpen}
         onOpenPanel={() => setPanelOpen(true)}
-        action={<Link href="/admin/import"><Btn variant="primary" icon={UploadCloud}>رفع ملف</Btn></Link>} />
+        />
 
       <div className="mx-auto max-w-column px-6 py-8 pb-16">
         <header className="rise mb-9">
@@ -185,9 +185,8 @@ export default function OverviewPage() {
           ))}
         </div>
 
-        <div className="rise grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <div className="rise grid grid-cols-2 gap-3 lg:grid-cols-4">
           {[
-            { icon: UploadCloud, label: 'رفع ملف', href: '/admin/import' },
             { icon: FileText, label: 'طباعة خطة لطالب', href: '/admin/plans' },
             { icon: ClipboardCheck, label: 'تسجيل اختبار', href: '/admin/exams' },
             { icon: Printer, label: 'التقارير', href: '/admin/reports' },

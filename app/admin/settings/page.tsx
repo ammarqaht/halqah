@@ -5,6 +5,7 @@ import { Database, Trash2, AlertTriangle, FlaskConical, Loader2, CheckCircle2, W
 import { TopBar } from '@/components/TopBar';
 import { Sheet, SheetHead } from '@/components/Sheet';
 import { Btn, Modal, Field, INPUT } from '@/components/ui';
+import { cx } from '@/lib/cx';
 import { Num } from '@/components/Num';
 import { usePanel } from '@/components/PanelState';
 import { store, useDB } from '@/lib/store';
@@ -40,6 +41,10 @@ function SettingsScreen() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [dbDown, setDbDown] = useState(false);
   const [confirm, setConfirm] = useState(false);
+  /* A second pair of hands on a lever with no undo. Verified on the server, so
+     it cannot be skipped by calling the endpoint directly. */
+  const [phrase, setPhrase] = useState('');
+  const [resetErr, setResetErr] = useState('');
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<{ ms: number } | null>(null);
 
@@ -53,12 +58,16 @@ function SettingsScreen() {
   useEffect(() => { load(); }, [load]);
 
   const reset = async () => {
-    setBusy(true);
+    setBusy(true); setResetErr('');
     try {
-      const r = await fetch('/api/admin/reset', { method: 'POST' });
+      const r = await fetch('/api/admin/reset', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phrase }),
+      });
       const d = await r.json().catch(() => ({}));
+      if (!r.ok) { setResetErr(d.error ?? 'تعذّر التصفير.'); return; }
       store.reset();                       // the browser copy goes too
-      setConfirm(false);
+      setConfirm(false); setPhrase('');
       setDone({ ms: d.ms ?? 0 });
       await load();
       router.refresh();
@@ -161,7 +170,8 @@ function SettingsScreen() {
       <Modal open={confirm} onClose={() => !busy && setConfirm(false)} title="تصفير البيانات"
         footer={<>
           <Btn onClick={() => setConfirm(false)} disabled={busy}>إلغاء</Btn>
-          <Btn variant="primary" className="!bg-risk-700 hover:!bg-risk-700/90" onClick={reset} disabled={busy}>
+          <Btn variant="primary" className="!bg-risk-700 hover:!bg-risk-700/90"
+            onClick={reset} disabled={busy || phrase.trim().length < 4}>
             {busy ? <><Loader2 size={16} className="animate-spin" />جارٍ المسح…</> : 'نعم، صفّر'}
           </Btn>
         </>}>
@@ -179,6 +189,22 @@ function SettingsScreen() {
               ومعها نسخة المتصفّح (<Num>{local.students}</Num> طالبًا).
               لا يمكن التراجع — لكن ملفات الإكسل عندك سليمة فترفعها متى شئت.
             </p>
+
+            <label className="mt-4 block">
+              <span className="mb-1.5 block text-xs2 font-medium text-ink-700">
+                اكتب الرمز السرّي للتأكيد
+              </span>
+              <input value={phrase} onChange={(e) => setPhrase(e.target.value)}
+                inputMode="numeric" dir="ltr" autoComplete="off"
+                aria-label="الرمز السرّي للتصفير"
+                className={cx(INPUT, 'h-12 text-center tracking-[.4em]')} />
+            </label>
+
+            {resetErr && (
+              <p role="alert" className="mt-3 rounded-lg border border-risk-200 bg-risk-100 px-3.5 py-2.5 text-panel text-risk-700">
+                {resetErr}
+              </p>
+            )}
           </div>
         </div>
       </Modal>

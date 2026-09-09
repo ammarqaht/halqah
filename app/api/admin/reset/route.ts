@@ -32,9 +32,22 @@ const WIPE = [
 /* Deliberately NOT wiped: admin_users (you would lock yourself out) and
    settings (the decided rules from §13, which are configuration, not data). */
 
-export async function POST() {
+/* The confirmation the client asked for.
+
+   Checked on the SERVER, not in the dialog: a check that lives only in the
+   browser is a check anyone can skip by calling the endpoint directly, and
+   this endpoint truncates every table in the system. It is not a secret — it
+   is a second pair of hands on a lever that has no undo. */
+const RESET_PHRASE = process.env.RESET_PHRASE || '2026';
+
+export async function POST(req: Request) {
   const session = await readSession();
   if (!session) return NextResponse.json({ error: 'غير مصرّح' }, { status: 401 });
+
+  const { phrase } = await req.json().catch(() => ({}));
+  if (String(phrase ?? '').trim() !== RESET_PHRASE) {
+    return NextResponse.json({ error: 'الرمز غير صحيح.' }, { status: 403 });
+  }
 
   const started = Date.now();
   try {
