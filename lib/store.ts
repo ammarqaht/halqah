@@ -105,7 +105,13 @@ let hydrated = false;
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let inFlight: Promise<void> | null = null;
 
-const slice = (d: DB) => Object.fromEntries(SYNCED.map((k) => [k, d[k]]));
+/* The students ride along — not to be written (that is /api/import's job) but
+   so the server can recognise a boy this browser names by an id it minted
+   itself. Without them a stale cache's exams are unidentifiable and dropped. */
+const slice = (d: DB) => ({
+  ...Object.fromEntries(SYNCED.map((k) => [k, d[k]])),
+  students: d.students.map((s) => ({ id: s.id, dedupeKey: s.dedupeKey })),
+});
 
 function setSync(s: SyncState) { syncState = s; subs.forEach((f) => f()); }
 
@@ -122,6 +128,11 @@ async function pushNow(): Promise<void> {
        because nothing is wrong with the connection and nobody signs back in.
        That is how an upload came back «تم الاستيراد» with an empty server. */
     setSync(res.status === 401 ? 'unauthorized' : res.ok ? 'saved' : 'offline');
+    /* If the server could not place some rows, say so — a save that keeps two
+       thirds of what it was given must not read as a clean save. */
+    if (res.ok) {
+      try { lastOrphaned = (await res.json())?.orphaned ?? 0; } catch { lastOrphaned = 0; }
+    }
   } catch {
     /* No connection. The cache still holds it, and the next successful save
        carries everything — this is a whole-state PUT, not a diff. */
@@ -197,7 +208,10 @@ export async function flushToServer(): Promise<void> {
   if (hydrated) await pushNow();
 }
 
+let lastOrphaned = 0;
 export const syncStatus = () => syncState;
+/** Rows the last save could not attach to any student it knows. */
+export const orphanedOnLastSave = () => lastOrphaned;
 
 /* Gift images pushed this store from kilobytes into megabytes, and a browser
    caps an origin near 5 MB. A silently swallowed quota error would leave the

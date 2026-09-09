@@ -62,6 +62,7 @@ export async function PUT(req: Request) {
 
   const s = await req.json();
   const started = Date.now();
+  let dropped = 0;
 
   /* Rows are keyed by ids the browser already minted, so this is a replace
      rather than a merge — and it happens inside ONE transaction, so a device
@@ -69,12 +70,39 @@ export async function PUT(req: Request) {
      intact rather than half of two. */
   try {
     await db.$transaction(async (tx) => {
-      const known = new Set((await tx.student.findMany({ select: { id: true } })).map((r) => r.id));
-      /* A row pointing at a student this database does not have would fail the
-         foreign key and take the whole save down with it. Those rows belong to
-         a roster that was never imported here; they are dropped, not invented. */
-      const mine = <T extends { studentId: string }>(rows: T[]): T[] =>
-        rows.filter((r) => known.has(r.studentId));
+      const roster = await tx.student.findMany({ select: { id: true, dedupeKey: true } });
+      const known = new Set(roster.map((r) => r.id));
+
+      /* Every parse mints its own student ids, so a browser that imported
+         before its ids were reconciled sends rows naming a student under an id
+         this database has never used — the SAME boy, under another name for
+         him. Dropping them silently is how a save reported success over an
+         empty table; refusing the save outright would lose the work.
+
+         So the boy is looked up by the id the ROW carries, and by the dedupe
+         key if the payload names one, before anything is discarded. What is
+         still unrecognisable belongs to a roster that was never imported here,
+         and that is reported rather than invented. */
+      /* Read only. This route never writes a student — that is /api/import's
+         job, and a save must not be able to invent a roster. */
+      const byDedupe = new Map(roster.filter((r) => r.dedupeKey).map((r) => [r.dedupeKey!, r.id]));
+      const keyFor = new Map<string, string>();
+      for (const st of (s.students ?? []) as { id: string; dedupeKey?: string }[]) {
+        const kept = st.dedupeKey ? byDedupe.get(st.dedupeKey) : undefined;
+        if (kept) keyFor.set(st.id, kept);
+      }
+
+      const countOrphan = () => { dropped++; };
+      const mine = <T extends { studentId: string }>(rows: T[]): T[] => {
+        const out: T[] = [];
+        for (const r of rows) {
+          if (known.has(r.studentId)) { out.push(r); continue; }
+          const kept = keyFor.get(r.studentId);
+          if (kept) { out.push({ ...r, studentId: kept }); continue; }
+          countOrphan();
+        }
+        return out;
+      };
 
       await tx.examQuestion.deleteMany();
       await tx.pointCode.deleteMany();
@@ -136,5 +164,7 @@ export async function PUT(req: Request) {
       { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, ms: Date.now() - started });
+  /* Named, not swallowed. A save that quietly kept two thirds of what it was
+     given is the failure this whole endpoint exists to avoid. */
+  return NextResponse.json({ ok: true, ms: Date.now() - started, orphaned: dropped });
 }
