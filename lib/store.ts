@@ -127,7 +127,12 @@ async function pushNow(): Promise<void> {
        told his work is safe and will send itself later — and it never does,
        because nothing is wrong with the connection and nobody signs back in.
        That is how an upload came back «تم الاستيراد» with an empty server. */
-    setSync(res.status === 401 ? 'unauthorized' : res.ok ? 'saved' : 'offline');
+    /* 409 is the server refusing to be emptied by a device that has nothing.
+       It is not an error to show the supervisor — it is the guard working —
+       but it must not read as «saved» either. */
+    setSync(res.status === 401 ? 'unauthorized'
+      : res.status === 409 ? 'idle'
+      : res.ok ? 'saved' : 'offline');
     /* If the server could not place some rows, say so — a save that keeps two
        thirds of what it was given must not read as a clean save. */
     if (res.ok) {

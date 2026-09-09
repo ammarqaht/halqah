@@ -74,6 +74,38 @@ export async function PUT(req: Request) {
   const started = Date.now();
   let dropped = 0;
 
+  /* A SAVE MUST NOT BE ABLE TO EMPTY THE SYSTEM.
+
+     This endpoint replaces every list wholesale, which is right for a device
+     reporting what it holds and catastrophic for one that holds nothing yet: a
+     browser that has not finished hydrating, or that emptied itself after a
+     reset stamp, sends `{exams: []}` and 394 exams are gone. That is exactly
+     what happened — the roster survived because it is written by /api/import,
+     and everything this route owns did not.
+
+     So a payload that is empty where the database is not is refused. Wiping is
+     a deliberate act with its own endpoint and its own confirmation phrase;
+     it is not something a save should ever do by omission. */
+  const HELD = ['exams', 'plans', 'txns', 'orders', 'curriculum'] as const;
+  const sending = Object.fromEntries(
+    HELD.map((k) => [k, Array.isArray(s[k]) ? (s[k] as unknown[]).length : 0]));
+  if (HELD.some((k) => sending[k] === 0)) {
+    const held = {
+      exams: await db.exam.count(),
+      plans: await db.studentPlan.count(),
+      txns: await db.pointTxn.count(),
+      orders: await db.order.count(),
+      curriculum: await db.curriculumDay.count(),
+    };
+    const wouldLose = HELD.filter((k) => sending[k] === 0 && held[k] > 0);
+    if (wouldLose.length) {
+      return NextResponse.json({
+        error: 'حفظ فارغ — رُفض حتى لا تُمحى البيانات.',
+        refused: Object.fromEntries(wouldLose.map((k) => [k, held[k]])),
+      }, { status: 409 });
+    }
+  }
+
   /* Rows are keyed by ids the browser already minted, so this is a replace
      rather than a merge — and it happens inside ONE transaction, so a device
      that loses its connection half-way through leaves the previous state
