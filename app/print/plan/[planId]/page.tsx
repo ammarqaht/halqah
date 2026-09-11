@@ -41,8 +41,8 @@ const BADGE_AR = { BADGE_GOLDEN: 'الوسام الذهبي', BADGE_DIAMOND: 'ا
  * empty slot stays empty, and «إلى سورة» repeats the surah when the range sits
  * inside one, because a blank there would read on paper as «nothing set».
  */
-function RangeCells({ r, cell, bold = false }: {
-  r: PlanRow | undefined; cell: string; bold?: boolean;
+function RangeCells({ r, cell, ayahCell, bold = false }: {
+  r: PlanRow | undefined; cell: string; ayahCell: string; bold?: boolean;
 }) {
   const ay = (v: string | undefined) => (!v ? '' : v === 'آخر' ? v : v);
   const from = r?.fromSurah ?? '';
@@ -51,9 +51,9 @@ function RangeCells({ r, cell, bold = false }: {
   return (
     <>
       <td className={`${cell} text-start ${w}`}>{from}</td>
-      <td className={cell}>{ay(r?.fromAyah)}</td>
+      <td className={ayahCell}>{ay(r?.fromAyah)}</td>
       <td className={`${cell} text-start ${w}`}>{to}</td>
-      <td className={cell}>{ay(r?.toAyah)}</td>
+      <td className={ayahCell}>{ay(r?.toAyah)}</td>
     </>
   );
 }
@@ -122,6 +122,11 @@ function PlanSheetInner({ params }: { params: Promise<{ planId: string }> }) {
      sat on the ceiling of its box. */
   const tcell = 'border border-ink-400 px-1 py-1.5 text-center align-middle truncate '
     + 'text-ink-900';
+  /* Ayah cells never truncate. «٤…» is not a shortened 45 — it is a different
+     number, on a sheet a child recites from. The column is wide enough for
+     three digits, and a fourth would shrink rather than be cut. */
+  const acell = 'border border-ink-400 px-0.5 py-1.5 text-center align-middle '
+    + 'whitespace-nowrap text-ink-900';
 
   return (
     <>
@@ -183,17 +188,17 @@ function PlanSheetInner({ params }: { params: Promise<{ planId: string }> }) {
             instead of pushing the sheet onto a second sheet. */}
         <table className="w-full table-fixed border-collapse text-[11px] font-medium">
           <colgroup>
-            <col style={{ width: '4.4%' }} />{/* اليوم */}
+            <col style={{ width: '3.8%' }} />{/* اليوم */}
             {[0, 1, 2].map((i) => (
               <Fragment key={i}>
-                <col style={{ width: '8.7%' }} />{/* من سورة */}
-                <col style={{ width: '3.3%' }} />{/* آية */}
-                <col style={{ width: '8.7%' }} />{/* إلى سورة */}
-                <col style={{ width: '3.3%' }} />{/* آية */}
-                <col style={{ width: '5.4%' }} />{/* الدرجة — written in by hand */}
+                <col style={{ width: '8.2%' }} />{/* من سورة */}
+                <col style={{ width: '4.6%' }} />{/* آية — ثلاث خانات تسع «٢٨٦» كاملة */}
+                <col style={{ width: '8.2%' }} />{/* إلى سورة */}
+                <col style={{ width: '4.6%' }} />{/* آية — ثلاث خانات تسع «٢٨٦» كاملة */}
+                <col style={{ width: '4.6%' }} />{/* الدرجة — written in by hand */}
               </Fragment>
             ))}
-            <col style={{ width: '7.2%' }} />{/* ملاحظات */}
+            <col style={{ width: '5.5%' }} />{/* ملاحظات */}
           </colgroup>
           {/* Two header rows: the مقرّر spans its four columns, and each names
               what goes under it. «الحديد ١-٥» in one cell was compact but not
@@ -214,9 +219,9 @@ function PlanSheetInner({ params }: { params: Promise<{ planId: string }> }) {
               {[0, 1, 2].map((i) => (
                 <Fragment key={i}>
                   <th className={tcell}>من سورة</th>
-                  <th className={tcell}>آية</th>
+                  <th className={acell}>آية</th>
                   <th className={tcell}>إلى سورة</th>
-                  <th className={tcell}>آية</th>
+                  <th className={acell}>آية</th>
                 </Fragment>
               ))}
             </tr>
@@ -249,11 +254,11 @@ function PlanSheetInner({ params }: { params: Promise<{ planId: string }> }) {
               return (
                 <tr key={d.dayNo} className="keep h-[28px]">
                   <td className={`${tcell} font-medium`}><Num>{d.dayNo}</Num></td>
-                  <RangeCells r={mk} cell={tcell} />
+                  <RangeCells r={mk} cell={tcell} ayahCell={acell} />
                   <td className={tcell} />
-                  <RangeCells r={ms} cell={tcell} />
+                  <RangeCells r={ms} cell={tcell} ayahCell={acell} />
                   <td className={tcell} />
-                  <RangeCells r={dars} cell={tcell} bold />
+                  <RangeCells r={dars} cell={tcell} ayahCell={acell} bold />
                   <td className={tcell} />
                   <td className={`${tcell} text-start text-[8.5px]`}>
                     {/* Clamped: an unbounded note would grow the row and spill
