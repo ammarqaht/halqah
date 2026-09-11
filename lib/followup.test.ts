@@ -217,3 +217,42 @@ describe('حان موعد اختباره — the appointment the supervisor set 
     ], NOW)).toBe(2);
   });
 });
+
+describe('«آخر اختبار» on a day that carries two', () => {
+  const at = (over: Partial<Exam>): Exam => ({
+    id: Math.random().toString(36).slice(2), studentId: 's1', halaqaId: null,
+    track: 'SILVER', type: 'BADGE_GOLDEN', takenOn: '2026-09-09', level: 59, ajza: 1,
+    errors: null, warnings: null, tajweedErrors: null, score: 95, passed: true,
+    pointsAwarded: 0, pointsPaid: false, note: '', examiner: '', tajweedTopics: [],
+    source: 'MANUAL', createdAt: '2026-09-09T10:00:00Z', ...over,
+  });
+
+  it('names the diamond, not whichever was typed second', () => {
+    /* A boy sits both on one day and the golden is entered after. The ready
+       list was showing «الوسام الذهبي» next to a readiness the diamond earned. */
+    const rows = followUpRows({
+      students: [student({ id: 's1', track: 'SILVER', currentLevel: 59 })],
+      plans: [],
+      exams: [
+        at({ type: 'BADGE_DIAMOND', createdAt: '2026-09-09T09:00:00Z' }),
+        at({ type: 'BADGE_GOLDEN', createdAt: '2026-09-09T11:00:00Z' }),
+      ],
+      txns: [],
+    });
+    expect(rows[0].lastInternal?.type).toBe('BADGE_DIAMOND');
+    expect(rows[0].ready.ready).toBe(true);
+  });
+
+  it('still prefers the newer DATE over the weightier exam', () => {
+    const rows = followUpRows({
+      students: [student({ id: 's1', track: 'SILVER', currentLevel: 59 })],
+      plans: [],
+      exams: [
+        at({ type: 'BADGE_DIAMOND', takenOn: '2026-09-01' }),
+        at({ type: 'TAJWEED', takenOn: '2026-09-09' }),
+      ],
+      txns: [],
+    });
+    expect(rows[0].lastInternal?.type).toBe('TAJWEED');
+  });
+});

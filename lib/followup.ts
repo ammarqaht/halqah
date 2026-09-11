@@ -42,8 +42,31 @@ export type FollowUpRow = {
 };
 
 /** `b` when it postdates `a` — ties broken by insertion time, like the exam log. */
-const later = (a: Exam | null, b: Exam): Exam =>
-  !a || b.takenOn > a.takenOn || (b.takenOn === a.takenOn && b.createdAt > a.createdAt) ? b : a;
+/**
+ * Which of two exams is «the latest».
+ *
+ * Date first. But a boy often sits his golden and his diamond on ONE day, and
+ * ordering those by entry time picks whichever was typed second — so the ready
+ * list showed «آخر اختبار داخلي: الوسام الذهبي» beside a student whose
+ * readiness came from the diamond, and read like a bug in the rule. It was a
+ * bug in the tie-break.
+ *
+ * Same day: the weightier exam wins. The diamond is what advances a student
+ * and what the association's readiness turns on, so on a day carrying both it
+ * is the one worth naming.
+ */
+const WEIGHT: Record<string, number> = {
+  BADGE_DIAMOND: 4, ASSOCIATION: 3, BADGE_GOLDEN: 2, TAJWEED: 1, MOCK: 0,
+};
+const heavier = (a: Exam, b: Exam) => (WEIGHT[b.type] ?? 0) - (WEIGHT[a.type] ?? 0);
+
+const later = (a: Exam | null, b: Exam): Exam => {
+  if (!a) return b;
+  if (b.takenOn !== a.takenOn) return b.takenOn > a.takenOn ? b : a;
+  const w = heavier(a, b);
+  if (w !== 0) return w > 0 ? b : a;
+  return b.createdAt > a.createdAt ? b : a;
+};
 
 export function followUpRows(
   db: { students: Student[]; plans: StudentPlan[]; exams: Exam[]; txns: PointTxn[] },
