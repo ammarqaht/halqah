@@ -26,6 +26,7 @@ import { usePanel } from '@/components/PanelState';
 import { store, useDB } from '@/lib/store';
 import { incompleteDays, DEFAULT_DAY_COUNT, coverage } from '@/lib/curriculum';
 import { ajzaExact } from '@/lib/exams';
+import { ASSOCIATION_NOTE } from '@/lib/importers/curriculum';
 import {
   PLAN_KIND_AR, TRACK_AR, levelsFor,
   type CurriculumDay, type PlanKind, type Track,
@@ -156,6 +157,29 @@ function LevelCurriculumEditor({ onToast }: { onToast: (s: string) => void }) {
   const edit = (dayNo: number, kind: PlanKind, field: typeof FIELDS[number], v: string) =>
     setDraft((p) => p.map((d) => (d.dayNo === dayNo && d.kind === kind ? { ...d, [field]: v } : d)));
 
+  /* «اختبار الجمعية» lives in the note of that day's م.ك row — the same place
+     the client's own workbook puts it — so the sheet, the student's plan and
+     the importer all keep reading one field. Anything else the supervisor
+     wrote in that note is preserved either way. */
+  /** The days this level marks — shown above the table so he can see them at
+      a glance instead of scrolling twenty-four rows to find the tick. */
+  const assocDays = draft
+    .filter((d) => d.kind === 'MURAJAA_KUBRA' && d.note.includes(ASSOCIATION_NOTE))
+    .map((d) => d.dayNo).sort((a, b) => a - b);
+
+  const hasAssociation = (dayNo: number) =>
+    (draft.find((d) => d.dayNo === dayNo && d.kind === 'MURAJAA_KUBRA')?.note ?? '')
+      .includes(ASSOCIATION_NOTE);
+
+  const setAssociation = (dayNo: number, on: boolean) =>
+    setDraft((p) => p.map((d) => {
+      if (d.dayNo !== dayNo || d.kind !== 'MURAJAA_KUBRA') return d;
+      const rest = d.note.split('·').map((x) => x.trim())
+        .filter((x) => x && x !== ASSOCIATION_NOTE);
+      const parts = on ? [...rest, ASSOCIATION_NOTE] : rest;
+      return { ...d, note: parts.join(' · ') };
+    }));
+
   const affected = levelNum === null ? 0
     : db.students.filter((s) => s.track === track && s.currentLevel === levelNum).length;
 
@@ -244,6 +268,13 @@ function LevelCurriculumEditor({ onToast }: { onToast: (s: string) => void }) {
               <Num className="font-medium text-ink-900">{dayCount}</Num> يوم عمل ·{' '}
               <Num className="font-medium text-ink-900">{draft.length}</Num> سطرًا
               {gaps.length === 0 && <span className="text-ok-700"> · مكتمل</span>}
+              {assocDays.length > 0 && (
+                <span className="text-assoc-700">
+                  {' '}· اختبار الجمعية يوم{' '}
+                  {assocDays.map((d) => <Num key={d}>{d}</Num>)
+                    .reduce((a, b) => <>{a}، {b}</>)}
+                </span>
+              )}
             </p>
             <Btn variant="primary" icon={Save} disabled={!dirty} onClick={() => setConfirm(true)}>
               حفظ المنهج
@@ -275,8 +306,21 @@ function LevelCurriculumEditor({ onToast }: { onToast: (s: string) => void }) {
                       return (
                         <tr key={`${dayNo}-${kind}`} className="border-b border-ink-150">
                           {i === 0 ? (
-                            <td className="px-3 py-2.5 align-top font-medium text-ink-900" rowSpan={3}>
-                              <Num>{dayNo}</Num>
+                            <td className="px-3 py-2.5 align-top" rowSpan={3}>
+                              <span className="block font-medium text-ink-900"><Num>{dayNo}</Num></span>
+                              {/* Which day carries «اختبار الجمعية» is the
+                                  client's to set: the file marks some and the
+                                  halaqa may move one. It is stored where the
+                                  file stores it — the note on that day's
+                                  م.ك row — so nothing else has to learn a new
+                                  place to look. */}
+                              <label className="mt-1.5 flex cursor-pointer items-start gap-1.5"
+                                title="يوم اختبار الجمعية">
+                                <input type="checkbox" checked={hasAssociation(dayNo)}
+                                  onChange={(e) => setAssociation(dayNo, e.target.checked)}
+                                  className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded-sm border-ink-300 accent-assoc-700" />
+                                <span className="text-[10px] leading-tight text-ink-500">جمعية</span>
+                              </label>
                             </td>
                           ) : null}
                           <td className="px-3 py-2.5 text-panel text-ink-600">{PLAN_KIND_AR[kind]}</td>

@@ -233,3 +233,30 @@ describe('«اختبار الجمعية» on the day the file marks it', () => {
     expect(resolvePlan(plan(59), []).every((d) => !d.association)).toBe(true);
   });
 });
+
+describe('turning «اختبار الجمعية» on and off', () => {
+  /* The editor writes into the note of that day's م.ك row — the same field the
+     client's workbook uses — so nothing downstream learns a second place to
+     look. These assert the round trip the checkbox performs. */
+  const note = (n: string): CurriculumDay => ({
+    track: 'SILVER', level: 59, dayNo: 24, kind: 'MURAJAA_KUBRA',
+    fromSurah: '', fromAyah: '', toSurah: '', toAyah: '', note: n,
+  });
+  const plan59: StudentPlan = {
+    id: 'p', studentId: 's', track: 'SILVER', level: 59, issuedAt: '2026-09-01',
+    issuedBy: null, dayCount: 24, examDays: { BADGE_GOLDEN: 12, BADGE_DIAMOND: 24 },
+    dailyAmount: 'وجه', printedCount: 0, createdAt: '2026-09-01T00:00:00Z',
+  };
+  const on = (d: CurriculumDay[]) =>
+    resolvePlan(plan59, d).find((x) => x.dayNo === 24)!.association;
+
+  it('is on when the note carries it, alone or beside something else', () => {
+    expect(on([note('اختبار الجمعية')])).toBe(true);
+    expect(on([note('يحضر وليّ الأمر · اختبار الجمعية')])).toBe(true);
+  });
+
+  it('is off when the note is empty or says something else', () => {
+    expect(on([note('')])).toBe(false);
+    expect(on([note('يحضر وليّ الأمر')])).toBe(false);
+  });
+});
