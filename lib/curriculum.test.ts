@@ -164,7 +164,10 @@ describe('parsing «منهج الحفظ» — §5.4', () => {
 
   it('reads an exam row as a badge, not as a recitation range', () => {
     const p = parseCurriculumSheet(sheet(), 'ذهبي', 'GOLDEN');
-    expect(p.examDays).toEqual([{ level: 30, dayNo: 12, badge: 'BADGE_GOLDEN' }]);
+    /* `association` rides along now — the file marks some diamond days as
+       carrying the association exam too, and this one does not. */
+    expect(p.examDays).toEqual([
+      { level: 30, dayNo: 12, badge: 'BADGE_GOLDEN', association: false }]);
     expect(p.days.some((d) => d.dayNo === 12)).toBe(false);
   });
 
@@ -199,5 +202,34 @@ describe('naming the days a level has not filled in', () => {
   it('a level with every line filled has no gaps', () => {
     const days = [1, 2].flatMap((n) => PLAN_KIND_ORDER.map((k) => line(n, k, 'الملك')));
     expect(incompleteDays(days, 2)).toEqual([]);
+  });
+});
+
+describe('«اختبار الجمعية» on the day the file marks it', () => {
+  const rows = (level: number, note: string): CurriculumDay[] => ([
+    { track: 'SILVER', level, dayNo: 24, kind: 'MURAJAA_KUBRA',
+      fromSurah: '', fromAyah: '', toSurah: '', toAyah: '', note },
+  ]);
+  const plan = (level: number): StudentPlan => ({
+    id: 'p', studentId: 's', track: 'SILVER', level, issuedAt: '2026-09-01',
+    issuedBy: null, dayCount: 24, examDays: { BADGE_GOLDEN: 12, BADGE_DIAMOND: 24 },
+    dailyAmount: 'وجه', printedCount: 0, createdAt: '2026-09-01T00:00:00Z',
+  });
+
+  it('marks the diamond day when the curriculum says so', () => {
+    const days = resolvePlan(plan(59), rows(59, 'اختبار الجمعية'));
+    const d24 = days.find((d) => d.dayNo === 24)!;
+    expect(d24.examBadge).toBe('BADGE_DIAMOND');
+    expect(d24.association).toBe(true);
+  });
+
+  it('leaves it off a level the file does not mark', () => {
+    /* Silver 60 does not end a juz, and the file does not mark it. */
+    const days = resolvePlan(plan(60), rows(60, ''));
+    expect(days.find((d) => d.dayNo === 24)!.association).toBe(false);
+  });
+
+  it('never invents it — a level with no curriculum row carries nothing', () => {
+    expect(resolvePlan(plan(59), []).every((d) => !d.association)).toBe(true);
   });
 });

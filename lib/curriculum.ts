@@ -53,6 +53,10 @@ export type PlanDay = {
   dayNo: number;
   /** An exam day carries a date box instead of ranges (§9). */
   examBadge: 'BADGE_GOLDEN' | 'BADGE_DIAMOND' | null;
+  /** «واختبار الجمعية معه» — true only on the levels the client's own file
+      marks. Read from the curriculum, never derived: the golden track's
+      pattern has no formula behind it. */
+  association: boolean;
   rows: PlanRow[];
 };
 
@@ -128,12 +132,20 @@ export function resolvePlan(
       : dayNo === plan.examDays.BADGE_DIAMOND ? 'BADGE_DIAMOND' as const
       : null;
 
+    /* Where the file put the association marker, on whatever day it put it.
+       Read, not assumed: golden level 13 carries it on day 14 while its badges
+       sit on 12 and 24, and a sheet that silently relocated it to 24 would be
+       telling a teacher something the client's own file does not say. */
+    const association = (base.get(`${dayNo}:MURAJAA_KUBRA`)?.note ?? '')
+      .includes('اختبار الجمعية');
+
     /* An exam day has no recitation rows at all — «لا بمقرّر حفظ». */
-    if (examBadge) { days.push({ dayNo, examBadge, rows: [] }); continue; }
+    if (examBadge) { days.push({ dayNo, examBadge, association, rows: [] }); continue; }
 
     days.push({
       dayNo,
       examBadge: null,
+      association,
       rows: PLAN_KIND_ORDER.map((kind) => {
         const src = base.get(`${dayNo}:${kind}`) ?? EMPTY_ROW;
         return {

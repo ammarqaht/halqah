@@ -18,7 +18,11 @@ import { PLAN_KIND_AR, type PlanKind } from '@/lib/types';
 import { cx } from '@/lib/cx';
 
 type Row = { kind: PlanKind; fromSurah: string; fromAyah: string; toSurah: string; toAyah: string; note: string };
-type Day = { dayNo: number; rows: Row[]; examBadge?: 'BADGE_GOLDEN' | 'BADGE_DIAMOND' | null };
+type Day = {
+  dayNo: number; rows: Row[];
+  examBadge?: 'BADGE_GOLDEN' | 'BADGE_DIAMOND' | null;
+  association?: boolean;
+};
 type Data = {
   plan: { level: number; trackAr: string; ajza: number | null; issuedAt: string;
           dayCount: number; dailyAmount: string } | null;
@@ -103,8 +107,11 @@ export default function MyLevel() {
                   </span>
                   <span className="min-w-0 flex-1">
                     {day.examBadge ? (
-                      <span className="flex items-center gap-1.5 text-body font-medium text-warn-700">
+                      <span className="flex flex-wrap items-center gap-1.5 text-body font-medium text-warn-700">
                         <Award size={15} />{BADGE_AR[day.examBadge]}
+                        {day.association && (
+                          <span className="text-assoc-700">· اختبار الجمعية</span>
+                        )}
                       </span>
                     ) : (
                       <span className="block truncate text-body text-ink-800">

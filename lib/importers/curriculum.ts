@@ -15,6 +15,9 @@ import { collapse, foldArabic } from '@/lib/normalise';
 export const CURRICULUM_SHEETS: Record<string, Track> = { 'فضي': 'SILVER', 'ذهبي': 'GOLDEN' };
 
 /** The two rows that mark an exam instead of a recitation range (§5.4). */
+/** What the file writes beside the diamond on the levels that end a juz. */
+export const ASSOCIATION_NOTE = 'اختبار الجمعية';
+
 const EXAM_MARKERS: Record<string, 'BADGE_GOLDEN' | 'BADGE_DIAMOND'> = {
   'الوسام الذهبي': 'BADGE_GOLDEN',
   'الوسام الماسي': 'BADGE_DIAMOND',
@@ -42,7 +45,7 @@ export type CurriculumParse = {
   sheet: string;
   track: Track;
   days: CurriculumDay[];
-  examDays: { level: number; dayNo: number; badge: string }[];
+  examDays: { level: number; dayNo: number; badge: string; association: boolean }[];
   levels: number[];
   rowCount: number;
   issues: CurriculumIssue[];
@@ -103,8 +106,17 @@ export function parseCurriculumSheet(rows: unknown[][], sheet: string, track: Tr
     const fromSurahRaw = collapse(r[col.fromSurah]);
     const badge = EXAM_MARKERS[fromSurahRaw];
     if (badge) {
-      /* An exam row carries no ranges — the sheet prints a date box here. */
-      examDays.push({ level, dayNo, badge });
+      /* An exam row carries no ranges — the sheet prints a date box here.
+
+         Some of them also say «اختبار الجمعية», and which ones is NOT a rule
+         anyone can derive: on the silver track it is every odd level, which
+         happens to be every whole-juz level, but on the golden track the
+         file marks 30–25, then 21, 19, 17, 15, then 12, 10, 8, 6, 4, 2, 1 —
+         a pattern with no formula behind it. So it is READ, never computed,
+         and carried on the day row rather than re-derived on the sheet. */
+      const association = (r as unknown[]).some(
+        (c) => collapse(c).includes('اختبار الجمعية'));
+      examDays.push({ level, dayNo, badge, association });
       continue;
     }
 
@@ -138,6 +150,18 @@ export function parseCurriculumSheet(rows: unknown[][], sheet: string, track: Tr
         message: `المستوى ${level}: ${total} يومًا بدل ٢٤ — راجع الملف قبل الاعتماد.`,
       });
     }
+  }
+
+  /* The association marker rides on a MURAJAA_KUBRA row for that day — the
+     same row the file carries it on — so it travels through the importer, the
+     state save and the database without a new table or a new column. */
+  for (const e of examDays) {
+    if (!e.association) continue;
+    days.push({
+      track, level: e.level, dayNo: e.dayNo, kind: 'MURAJAA_KUBRA',
+      fromSurah: '', fromAyah: '', toSurah: '', toAyah: '',
+      note: ASSOCIATION_NOTE,
+    });
   }
 
   return {

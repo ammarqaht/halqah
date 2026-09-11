@@ -238,6 +238,12 @@ function PlanSheetInner({ params }: { params: Promise<{ planId: string }> }) {
                         rather than in a scoring box too narrow to hold it. */}
                     <td className={`${tcell} font-medium text-brand-800`} colSpan={14}>
                       {BADGE_AR[d.examBadge]}
+                      {/* «واختبار الجمعية معه» on the levels the file marks —
+                          the boy and his teacher both need to know the day
+                          carries two exams, not one. */}
+                      {d.association && (
+                        <span className="text-assoc-700"> · اختبار الجمعية</span>
+                      )}
                     </td>
                     <td className={`${tcell} text-ink-500`}>التاريخ</td>
                   </tr>
@@ -253,7 +259,12 @@ function PlanSheetInner({ params }: { params: Promise<{ planId: string }> }) {
                 : (noted[0]?.note ?? '');
               return (
                 <tr key={d.dayNo} className="keep h-[28px]">
-                  <td className={`${tcell} font-medium`}><Num>{d.dayNo}</Num></td>
+                  <td className={`${tcell} font-medium`}>
+                    <Num>{d.dayNo}</Num>
+                    {d.association && (
+                      <span className="block text-[7.5px] leading-none text-assoc-700">جمعية</span>
+                    )}
+                  </td>
                   <RangeCells r={mk} cell={tcell} ayahCell={acell} />
                   <td className={tcell} />
                   <RangeCells r={ms} cell={tcell} ayahCell={acell} />
