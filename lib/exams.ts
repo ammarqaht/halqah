@@ -93,9 +93,11 @@ export function ajzaExact(track: Track | null, level: number | null): number | n
  * association readiness on completing a whole one and must never round.
  *
  * But an EXAM is not a readiness check: a boy at 56 is examined on the juz he
- * is working through, so he sits three, the same as the boy at 55. Rounding UP
- * is what «مثل مستوى ٥٥ ثلاث أجزاء» means, and rounding down would examine him
- * on ground he covered a month ago.
+ * is working through. Put the client's own way — a half level takes the count
+ * of THE LEVEL BELOW IT, the one it is on its way to: 56 sits what 55 sits,
+ * and 60 sits what 59 sits. Levels count down, so «below» is the next number
+ * down and the further-along one; rounding the other way would examine him on
+ * ground he covered a month ago.
  *
  * It is a SUGGESTION on the exam form, not a rule: the supervisor types over
  * it whenever the sitting was different.

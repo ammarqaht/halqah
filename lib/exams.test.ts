@@ -249,14 +249,17 @@ describe('what the supervisor is offered after a pass — §9', () => {
 });
 
 describe('عدد الأجزاء the exam form suggests', () => {
-  it('is the whole juz a boy is working through, not the half he has finished', () => {
-    /* Level 55 is exactly three juz, and 56 is two and a half. He sits the
-       juz he is on, so both are examined on three. */
-    expect(ajzaForExam('SILVER', 55)).toBe(3);
+  it('gives a half level the count of the level below it', () => {
+    /* The client's own rule: «٥٦ لـ٥٥ و٦٠ لـ٥٩ نفس الأجزاء». Levels count
+       down, so the level below is the next number down — the one he is on his
+       way to. Checked across the whole silver track, not a sample. */
+    for (let even = 60; even >= 42; even -= 2) {
+      expect(ajzaForExam('SILVER', even)).toBe(ajzaForExam('SILVER', even - 1));
+      /* and the odd one is exact, so the pair lands on a real whole number */
+      expect(ajzaForExam('SILVER', even - 1)).toBe(ajzaForLevel('SILVER', even - 1));
+    }
+    /* the two the client named */
     expect(ajzaForExam('SILVER', 56)).toBe(3);
-    expect(ajzaForExam('SILVER', 57)).toBe(2);
-    expect(ajzaForExam('SILVER', 58)).toBe(2);
-    expect(ajzaForExam('SILVER', 59)).toBe(1);
     expect(ajzaForExam('SILVER', 60)).toBe(1);
   });
 
