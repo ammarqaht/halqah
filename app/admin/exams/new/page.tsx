@@ -30,7 +30,7 @@ import { store, useDB } from '@/lib/store';
 import { earnsPoints, examPoints, EXAM_TYPE_AR, type ExamType } from '@/lib/points';
 import { DEFAULT_POINTS, POINTS_KEY, readPoints } from '@/lib/settings';
 import {
-  ajzaForLevel, isMidJuz, scoreFromCounters, isPassingFor, scoreMax, passMarkFor,
+  ajzaExact, ajzaForExam, ajzaForLevel, isMidJuz, scoreFromCounters, isPassingFor, scoreMax, passMarkFor,
   suggestionAfter,
 } from '@/lib/exams';
 import { type Exam, type Track } from '@/lib/types';
@@ -179,7 +179,9 @@ function RecordExam() {
 
   const levelNum = level === '' ? null : Number(level);
   const suggestedAjza = useMemo(
-    () => ajzaForLevel(student?.track ?? null, levelNum), [student, levelNum]);
+    /* Every level suggests a figure now, the half ones included: level 56 is
+       two and a half juz and he sits three, exactly as the boy on 55 does. */
+    () => ajzaForExam(student?.track ?? null, levelNum), [student, levelNum]);
 
   // ajza ← the level, via §4.2
   useEffect(() => {
@@ -597,7 +599,7 @@ function RecordExam() {
                 </Field>
                 <Field label="عدد الأجزاء · مطلوب"
                   hint={isMidJuz(student.track, levelNum)
-                    ? 'هذا المستوى في منتصف جزء، فاكتب العدد بنفسك'
+                    ? 'هذا المستوى في منتصف جزء — والمقترح الجزء الذي يعمل عليه، وقابل للتعديل'
                     : 'يُقترح من المستوى، وقابل للتعديل'}>
                   <input className={cx(INPUT, !ajzaValid && ajza !== '' && 'border-risk-500')}
                     inputMode="numeric" value={ajza}
@@ -617,8 +619,10 @@ function RecordExam() {
 
               {levelled && isMidJuz(student.track, levelNum) && (
                 <p className="mt-3 rounded-lg bg-info-100 px-3.5 py-2.5 text-panel text-info-700">
-                  المستوى <Num className="font-medium">{levelNum}</Num> في المسار الفضي يقع في منتصف جزء،
-                  فلا يقابله عدد أجزاء صحيح — اكتب العدد الذي اختُبر عليه.
+                  المستوى <Num className="font-medium">{levelNum}</Num> في المسار الفضي يقع في منتصف جزء —
+                  يقابله <Num className="font-medium">{ajzaExact(student.track, levelNum)}</Num> جزءًا،
+                  والمقترح <Num className="font-medium">{ajzaForExam(student.track, levelNum)}</Num> وهو
+                  الجزء الذي يعمل عليه. عدّله إن اختُبر على غيره.
                 </p>
               )}
 

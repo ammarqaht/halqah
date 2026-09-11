@@ -85,6 +85,26 @@ export function ajzaExact(track: Track | null, level: number | null): number | n
   return null;
 }
 
+/**
+ * How many WHOLE juz an exam at this level covers.
+ *
+ * A silver EVEN level sits half-way through a juz — level 56 is two and a half
+ * — and `ajzaForLevel` returns null there on purpose, because §4.8 gates
+ * association readiness on completing a whole one and must never round.
+ *
+ * But an EXAM is not a readiness check: a boy at 56 is examined on the juz he
+ * is working through, so he sits three, the same as the boy at 55. Rounding UP
+ * is what «مثل مستوى ٥٥ ثلاث أجزاء» means, and rounding down would examine him
+ * on ground he covered a month ago.
+ *
+ * It is a SUGGESTION on the exam form, not a rule: the supervisor types over
+ * it whenever the sitting was different.
+ */
+export function ajzaForExam(track: Track | null, level: number | null): number | null {
+  const exact = ajzaExact(track, level);
+  return exact === null ? null : Math.ceil(exact);
+}
+
 export function ajzaForLevel(track: Track | null, level: number | null): number | null {
   if (!track || level === null || level < 1) return null;
   if (track === 'GOLDEN') return level <= 30 ? 31 - level : null;

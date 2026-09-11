@@ -7,8 +7,7 @@ import {
   SCORE_DEDUCTIONS, PASSING_SCORE, nextLevel, ajzaForLevel, isMidJuz,
   scoreFromCounters, isPassing, isPassingFor, scoreMax, passMarkFor,
   totalCounts, readyForAssociation, suggestionAfter,
-  LEVEL_LATE_AFTER_DAYS, daysSince, isLate, examOverdue,
-} from './exams';
+  LEVEL_LATE_AFTER_DAYS, daysSince, isLate, examOverdue, ajzaForExam } from './exams';
 
 describe('level progression — §4.1', () => {
   it('counts down by one, on both tracks', () => {
@@ -246,5 +245,74 @@ describe('what the supervisor is offered after a pass — §9', () => {
     expect(suggestionAfter({ type: 'BADGE_DIAMOND', passed: false }, 26)).toBeNull();
     expect(suggestionAfter({ type: 'BADGE_GOLDEN', passed: true }, 26)).toBeNull();
     expect(suggestionAfter({ type: 'ASSOCIATION', passed: true }, 26)).toBeNull();
+  });
+});
+
+describe('عدد الأجزاء the exam form suggests', () => {
+  it('is the whole juz a boy is working through, not the half he has finished', () => {
+    /* Level 55 is exactly three juz, and 56 is two and a half. He sits the
+       juz he is on, so both are examined on three. */
+    expect(ajzaForExam('SILVER', 55)).toBe(3);
+    expect(ajzaForExam('SILVER', 56)).toBe(3);
+    expect(ajzaForExam('SILVER', 57)).toBe(2);
+    expect(ajzaForExam('SILVER', 58)).toBe(2);
+    expect(ajzaForExam('SILVER', 59)).toBe(1);
+    expect(ajzaForExam('SILVER', 60)).toBe(1);
+  });
+
+  it('leaves the golden track exactly as it was — every level is whole there', () => {
+    expect(ajzaForExam('GOLDEN', 30)).toBe(1);
+    expect(ajzaForExam('GOLDEN', 29)).toBe(2);
+    expect(ajzaForExam('GOLDEN', 1)).toBe(30);
+  });
+
+  it('never turns a null into a number', () => {
+    expect(ajzaForExam('TALQEEN', 10)).toBeNull();
+    expect(ajzaForExam(null, 10)).toBeNull();
+    expect(ajzaForExam('SILVER', null)).toBeNull();
+  });
+
+  it('does NOT change what readiness is measured on', () => {
+    /* §4.8 gates the association on a WHOLE juz completed. Level 56 has not
+       completed three, so `ajzaForLevel` still says so — the two answer two
+       different questions and must not be merged. */
+    expect(ajzaForLevel('SILVER', 56)).toBeNull();
+    expect(ajzaForLevel('SILVER', 55)).toBe(3);
+  });
+});
+
+describe('readiness needs the diamond, and the juz it was passed on', () => {
+  it('is never ready without a passed diamond', () => {
+    const r = readyForAssociation({
+      track: 'SILVER', level: 55,
+      exams: [{ type: 'BADGE_GOLDEN', passed: true, ajza: 3 }],
+    });
+    expect(r.ready).toBe(false);
+    expect(r.reason).toBe('لم يجتز الوسام الماسي على هذا الجزء');
+  });
+
+  it('is not ready on a diamond that was failed', () => {
+    expect(readyForAssociation({
+      track: 'SILVER', level: 55,
+      exams: [{ type: 'BADGE_DIAMOND', passed: false, ajza: 3 }],
+    }).ready).toBe(false);
+  });
+
+  it('is ready once a diamond is passed on a juz the association has not taken', () => {
+    const r = readyForAssociation({
+      track: 'SILVER', level: 55,
+      exams: [{ type: 'BADGE_DIAMOND', passed: true, ajza: 3 }],
+    });
+    expect(r).toMatchObject({ ready: true, ajza: 3 });
+  });
+
+  it('a passed diamond with NO juz recorded cannot make him ready', () => {
+    /* This is not a rule — it is a consequence, and it was silently true of 79
+       of the 84 passed diamonds in the client's data. The exam form now
+       suggests a figure for every level so it stops happening. */
+    expect(readyForAssociation({
+      track: 'SILVER', level: 56,
+      exams: [{ type: 'BADGE_DIAMOND', passed: true, ajza: null }],
+    }).ready).toBe(false);
   });
 });
