@@ -95,7 +95,8 @@ booleans only, so it is safe to call on the deployed site too.
 | `/admin/exams` · `/admin/exams/new` | **built** — the exam log, and recording that feeds the points ledger | SPEC.md §6.8 (إد-٥-ب) |
 | `/print/codes/[batchId]` · `/print/honour` · `/print/pick-list` | **built** — A4 card sheets with QR, the honour roll, and the delivery list | DESIGN.md §8 |
 | `/admin/*` (plans · follow-up) | placeholder screens, correct chrome and titles | BUILD_PLAN phases 4, 8 |
-| `/student` | placeholder | BUILD_PLAN phase 7 |
+| `/student` · `/student/login` · `/student/redeem` · `/student/store` · `/student/my-level` | **built** — PIN sign-in, and every figure from `/api/student/*` scoped by the cookie | BUILD_PLAN phase 7 |
+| `/student/rank` | **built** — لوحة الشرف on the phone: podium, «أنت», server-windowed | DESIGN.md §6 |
 
 The shell (rail + contextual panel + top bar) and the route veil are live on every
 `/admin` route.

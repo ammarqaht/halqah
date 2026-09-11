@@ -343,8 +343,17 @@ The mockups' rail is wrong for this product. This is the correct one, derived fr
 - **حسابات المعلمين** — phase 2. The rail has room; the entry appears when it ships.
 
 ### Student portal — no rail
-Four routes, a bottom tab bar on mobile, a slim top bar on desktop:
-`الرئيسية` · `شحن كود` · `المتجر` · `مستواي وخطتي`. Reading density, display headings, big touch targets.
+Five routes, a bottom tab bar on mobile, a slim top bar on desktop:
+`الرئيسية` · `شحن كود` · `المتجر` · `مستواي وخطتي` · `الترتيب`. Reading density, display headings,
+big touch targets. The fourth is labelled `مستواي` in the bar alone — five labels have to fit
+across a 360px phone.
+
+`الترتيب` is the one screen on this surface that names anyone but the boy reading it, and it is
+bounded deliberately: it shows what لوحة الشرف (§8, approved PDF §8) already posts on the halaqa
+wall — a place, a `shortName` and a figure — and nothing else. No identifiers, no levels, no
+halaqa membership. The board is windowed **on the server** (`lib/rank.ts` → `boardWindow`), so a
+boy ranked ninetieth is sent the head of the board and his own neighbourhood rather than all
+hundred and seventeen rows. Ties share a place and consume the ones beneath them: 1, 2, 2, 4.
 
 ---
 

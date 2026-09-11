@@ -11,8 +11,12 @@ export const TABS = [
   { href: '/student',          label: 'الرئيسية' },
   { href: '/student/redeem',   label: 'شحن كود' },
   { href: '/student/store',    label: 'المتجر' },
-  { href: '/student/my-level', label: 'مستواي وخطتي' },
+  { href: '/student/my-level', label: 'مستواي' },
+  { href: '/student/rank',     label: 'الترتيب' },
 ] as const;
+
+/** How many boys stand on the podium before the list takes over. */
+export const PODIUM = 3;
 
 /**
  * Which weekdays the halaqa runs — 0 is Sunday, so Sunday to Thursday.
@@ -61,4 +65,13 @@ export const COPY = {
   orderDone: 'اعرض هذا الرقم عند الاستلام.',
 
   levelDown: 'المستوى ينزل — كلما نقص الرقم اقتربت من الختم.',
+
+  rankMine: 'حلقتي',
+  rankAll: 'كل الحلقات',
+  rankYou: 'أنت',
+  rankBasis: 'يُحسب برصيد النقاط',
+  rankTalqeen: 'طلاب التلقين خارج نظام النقاط، فلا ترتيب لهم فيه.',
+  noRankHalaqa: 'لم تُسجَّل نقاط في حلقتك بعد. أول كود يُشحن يفتح اللوحة.',
+  noRankAll: 'لم تُسجَّل نقاط في أي حلقة بعد.',
+  rankFailed: 'تعذّر تحميل الترتيب.',
 } as const;

@@ -1,12 +1,13 @@
 'use client';
-/* Four destinations and nothing else — DESIGN.md §6 fixes them.
+/* Five destinations and nothing else — DESIGN.md §6.
    A frosted bar on a phone, a slim top bar on a desktop. No rail on this
-   surface: a boy holding a phone in a mosque has one thumb and four places
-   to be. */
+   surface: a boy holding a phone in a mosque has one thumb and a handful of
+   places to be. «مستواي وخطتي» is labelled «مستواي» in the bar since الترتيب
+   joined it — five labels have to fit across a 360px phone. */
 import Link from 'next/link';
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { Home, Ticket, Store, BookOpen, LogOut } from 'lucide-react';
+import { Home, Ticket, Store, BookOpen, Trophy, LogOut } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { LogoMark } from '@/components/Logo';
 import { TABS } from '@/content/student';
@@ -17,6 +18,7 @@ import { cx } from '@/lib/cx';
 const ICONS: Record<string, LucideIcon> = {
   '/student': Home, '/student/redeem': Ticket,
   '/student/store': Store, '/student/my-level': BookOpen,
+  '/student/rank': Trophy,
 };
 
 export function StudentNav() {
