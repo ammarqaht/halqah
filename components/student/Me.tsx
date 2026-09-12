@@ -14,6 +14,12 @@ export type Me = {
   levelTotal: number; progressPct: number;
   eligibleForPoints: boolean; balance: number;
   mustChangePin: boolean; attendedDays: number | null;
+  nextExam: {
+    scheduledOn: string;
+    badge: 'BADGE_GOLDEN' | 'BADGE_DIAMOND';
+    level: number | null;
+    daysAway: number;
+  } | null;
 };
 
 const Ctx = createContext<{ me: Me | null; reload: () => void }>({ me: null, reload: () => {} });

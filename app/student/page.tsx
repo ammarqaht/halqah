@@ -12,6 +12,7 @@ import { Empty } from '@/components/ui';
 import { Num, juzPhrase, pointWord } from '@/components/Num';
 import { useMe } from '@/components/student/Me';
 import { StudentCard } from '@/components/student/Card';
+import { NextExam } from '@/components/student/NextExam';
 import { Tile, ProgressRail } from '@/components/student/Tiles';
 import { COPY, LEDGER_ON_HOME } from '@/content/student';
 import { formatDate } from '@/lib/dates';
@@ -48,6 +49,10 @@ export default function StudentHome() {
   return (
     <div className="space-y-6">
       <StudentCard me={me} />
+
+      {/* Above everything but the card: an exam he has not prepared for is the
+          most useful thing this screen can tell him. */}
+      <NextExam me={me} />
 
       {levelled && (
         <>

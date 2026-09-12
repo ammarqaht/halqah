@@ -44,6 +44,19 @@ export async function GET() {
      so progress is how far the number has fallen, not how high it has risen. */
   const done = level != null && total ? Math.max(0, Math.min(total, total - level + 1)) : 0;
 
+  /* His next booked exam, and how many days away it is.
+     Only BOOKED — a sitting already done or cancelled is not something to warn
+     a boy about — and only from today forward, so a date that has passed does
+     not sit on his screen as a countdown into the negative. */
+  const today = new Date().toISOString().slice(0, 10);
+  const next = await db.examBooking.findFirst({
+    where: { studentId: student.id, status: 'BOOKED', scheduledOn: { gte: today } },
+    orderBy: { scheduledOn: 'asc' },
+  });
+  const daysAway = next ? Math.max(0, Math.round(
+    (Date.parse(`${next.scheduledOn}T00:00:00`) - Date.parse(`${today}T00:00:00`)) / 86_400_000,
+  )) : null;
+
   return NextResponse.json({
     id: student.id,
     fullName: student.fullName,
@@ -66,5 +79,11 @@ export async function GET() {
     balance: eligible ? txns.reduce((n, t) => n + t.delta, 0) : 0,
     mustChangePin: student.credential?.mustChangePin ?? false,
     attendedDays: student.attendedDays,
+    nextExam: next ? {
+      scheduledOn: next.scheduledOn,
+      badge: next.badge,
+      level: next.level,
+      daysAway,
+    } : null,
   });
 }
