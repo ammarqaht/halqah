@@ -12,7 +12,23 @@ export async function PATCH(req: Request) {
   const s = await readSession();
   if (!s) return NextResponse.json({ error: 'غير مصرّح' }, { status: 401 });
 
-  const { studentId, username, pin, active } = await req.json().catch(() => ({}));
+  const body = await req.json().catch(() => ({}));
+  const { studentId, username, pin, active } = body;
+
+  /* «صفّر دخولهم» — clear the last-sign-in stamps so the column reads clean
+     before the cards go out. It touches nothing a student uses: not his
+     number, not his password, not his points. It only forgets WHEN he last
+     came, which is a record for the supervisor and nobody else. */
+  if (body.clearLogins) {
+    const r = await db.studentCredential.updateMany({
+      data: { lastLoginAt: null, failedAttempts: 0, lockedUntil: null },
+    });
+    await db.auditLog.create({
+      data: { actorId: s.sub, action: 'STUDENT_LOGINS_CLEARED',
+              entity: 'student_credential', entityId: `${r.count} حساب` },
+    }).catch(() => { /* the change matters more than its trail */ });
+    return NextResponse.json({ ok: true, cleared: r.count });
+  }
   if (!studentId) return NextResponse.json({ error: 'حدّد الطالب.' }, { status: 400 });
 
   const student = await db.student.findUnique({ where: { id: String(studentId) } });

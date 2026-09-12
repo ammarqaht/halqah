@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   KeyRound, Loader2, Search, Check, X, FileSpreadsheet, AlertTriangle, Download, IdCard,
+  RotateCcw,
 } from 'lucide-react';
 import { Sheet, SheetHead } from '@/components/Sheet';
 import { Btn, Chip, Empty, Modal, INPUT } from '@/components/ui';
@@ -33,6 +34,7 @@ export function AccountsSettingsCard() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [confirmExport, setConfirmExport] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
   const [exporting, setExporting] = useState(false);
 
   const load = useCallback(() => {
@@ -63,6 +65,17 @@ export function AccountsSettingsCard() {
     setBusy(false);
     if (!res?.ok) { setErr(d?.error ?? 'تعذّر الحفظ.'); return; }
     setEditing(null); load();
+  };
+
+  const clearLogins = async () => {
+    setBusy(true); setErr('');
+    const res = await fetch('/api/admin/credentials/one', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clearLogins: true }),
+    }).catch(() => null);
+    setBusy(false); setConfirmClear(false);
+    if (!res?.ok) { setErr('تعذّر التصفير.'); return; }
+    load();
   };
 
   const exportAll = async () => {
@@ -104,6 +117,7 @@ export function AccountsSettingsCard() {
           <a href="/print/student-cards" target="_blank" rel="noreferrer">
             <Btn icon={IdCard}>بطاقات الطلاب (طباعة)</Btn>
           </a>
+          <Btn icon={RotateCcw} onClick={() => setConfirmClear(true)}>تصفير سجلّ الدخول</Btn>
           <span className="text-panel text-ink-500">
             <Num className="font-medium text-ink-900">{withAccount}</Num> حسابًا
           </span>
@@ -206,6 +220,24 @@ export function AccountsSettingsCard() {
       </Modal>
 
       {/* The file can only be produced by SETTING the PINs — so say so first. */}
+      <Modal open={confirmClear} onClose={() => !busy && setConfirmClear(false)}
+        title="تصفير سجلّ الدخول"
+        footer={<>
+          <Btn onClick={() => setConfirmClear(false)} disabled={busy}>تراجع</Btn>
+          <Btn variant="primary" onClick={clearLogins} disabled={busy}>
+            {busy ? <><Loader2 size={16} className="animate-spin" /> جارٍ…</> : 'صفّر'}
+          </Btn>
+        </>}>
+        <div className="space-y-3">
+          <p className="text-base2 text-ink-700">
+            يعود عمود «آخر دخول» إلى «لم يدخل بعد» للجميع، وتُفكّ أي حسابات مقفلة.
+          </p>
+          <p className="rounded-lg bg-info-100 px-3.5 py-3 text-panel text-info-700">
+            لا يتغيّر رقم دخول أحد ولا كلمة مروره ولا نقاطه — يُنسى وقت آخر زيارة فقط.
+          </p>
+        </div>
+      </Modal>
+
       <Modal open={confirmExport} onClose={() => !exporting && setConfirmExport(false)}
         title="ملف حسابات الطلاب"
         footer={<>

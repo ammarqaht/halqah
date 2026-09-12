@@ -25,6 +25,16 @@ export function StudentNav() {
   const { me } = useMe();
   const active = (href: string) => (href === '/student' ? path === href : path.startsWith(href));
 
+  /* Talqeen sits outside the points system entirely (§13.1), so the screens
+     that live on it are not offered. Every one of them already refuses him —
+     the store answers `eligible:false`, the board 403s — and a tab whose only
+     reply is «أنت خارج هذا» is a door drawn on a wall. */
+  const points = me?.eligibleForPoints !== false;
+  const allowed = (t: { href: string }) =>
+    points || (t.href !== '/student/store' && t.href !== '/student/rank'
+      && t.href !== REDEEM_TAB.href);
+  const tabs = TABS.filter(allowed);
+
   /* الرئيسية hides this bar on the phone so the sticky hero can own the top of
      the screen — the hero carries the mark, the name and خروج itself, and two
      sticky layers saying the same three things is one too many. */
@@ -39,7 +49,7 @@ export function StudentNav() {
             <LogoMark height={30} white={false} />
           </Link>
           <nav className="flex flex-1 items-center gap-1">
-            {DESKTOP_TABS.map((t) => {
+            {DESKTOP_TABS.filter(allowed).map((t) => {
               const I = ICONS[t.href];
               return (
                 <Link key={t.href} href={t.href}
@@ -78,12 +88,18 @@ export function StudentNav() {
           fixed 76px so the pairs either side keep an equal share and nothing
           shuffles when a label changes width. */}
       <nav aria-label="التنقّل"
-        className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-[1fr_1fr_76px_1fr_1fr] items-start gap-1 border-t border-ink-150 bg-paper/90 px-3 pt-2 backdrop-blur-lg md:hidden"
+        className={cx('fixed inset-x-0 bottom-0 z-40 grid items-start gap-1 border-t border-ink-150 bg-paper/90 px-3 pt-2 backdrop-blur-lg md:hidden',
+          points ? 'grid-cols-[1fr_1fr_76px_1fr_1fr]' : 'grid-cols-2')}
         style={{ paddingBottom: 'calc(14px + env(safe-area-inset-bottom))' }}>
-        {TABS.slice(0, 2).map((t) => <Tab key={t.href} tab={t} on={active(t.href)} />)}
+        {(points ? tabs.slice(0, 2) : tabs).map(
+          (t) => <Tab key={t.href} tab={t} on={active(t.href)} />)}
 
         {/* «شحن كود» — raised, ringed in the page colour so it reads as sitting
-            above the bar rather than punched through it. */}
+            above the bar rather than punched through it.
+            A talqeen boy does not get it: §13.1 keeps him outside the points
+            system, and a tab that answers «أنت خارج هذا» when tapped is a
+            promise made only to be withdrawn. */}
+        {points ? (
         <div className="-mt-6 flex flex-col items-center gap-[3px]">
           <Link href={REDEEM_TAB.href} aria-label={REDEEM_TAB.label}
             aria-current={active(REDEEM_TAB.href) ? 'page' : undefined}
@@ -95,8 +111,9 @@ export function StudentNav() {
             {REDEEM_TAB.label}
           </span>
         </div>
+        ) : <span aria-hidden />}
 
-        {TABS.slice(2).map((t) => <Tab key={t.href} tab={t} on={active(t.href)} />)}
+        {points && tabs.slice(2).map((t) => <Tab key={t.href} tab={t} on={active(t.href)} />)}
       </nav>
     </>
   );

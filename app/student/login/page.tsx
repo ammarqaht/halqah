@@ -127,6 +127,14 @@ function LoginScreen() {
             </Btn>
 
             <p className="text-center text-panel leading-relaxed text-ink-500">{COPY.forgot}</p>
+
+            {/* The supervisor arrives at this door now too, since it is the
+                default. One line, not a button — he needs it once a day and a
+                boy never needs it at all. */}
+            <p className="text-center text-xs2 text-ink-400">
+              مشرف؟{' '}
+              <a href="/login" className="text-brand-800 hover:underline">ادخل من بوابة الإشراف</a>
+            </p>
           </form>
         </div>
       </main>

@@ -6,7 +6,7 @@
    dead button. */
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Loader2, Camera, Check, X, Ticket } from 'lucide-react';
+import { Loader2, Camera, Check, X, Ticket, ImageUp } from 'lucide-react';
 import { Sheet, SheetHead } from '@/components/Sheet';
 import { Btn, INPUT } from '@/components/ui';
 import { Num, pointWord } from '@/components/Num';
@@ -32,6 +32,8 @@ function RedeemScreen() {
 
   const [scanning, setScanning] = useState(false);
   const [scanErr, setScanErr] = useState('');
+  const [reading, setReading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const stream = useRef<MediaStream | null>(null);
   const raf = useRef(0);
@@ -97,6 +99,51 @@ function RedeemScreen() {
     raf.current = requestAnimationFrame(tick);
   };
 
+  /* The live camera fails for reasons a boy in a mosque cannot fix: an
+     insecure context, a refused permission, a browser without getUserMedia, an
+     iOS in-app webview that hands back a black frame. A PHOTO works in all of
+     them — the same decoder, a still image instead of a stream — and «صوّر
+     البطاقة» is an instruction he already understands. */
+  const fromPhoto = async (file: File) => {
+    setScanErr(''); setReading(true);
+    try {
+      const bitmap = await createImageBitmap(file);
+      const canvas = document.createElement('canvas');
+      /* A phone photo is far larger than a QR needs. Scaling the long edge to
+         1400px keeps every module distinct and cuts the decode from seconds to
+         a blink on a cheap handset. */
+      const scale = Math.min(1, 1400 / Math.max(bitmap.width, bitmap.height));
+      canvas.width = Math.round(bitmap.width * scale);
+      canvas.height = Math.round(bitmap.height * scale);
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      if (!ctx) throw new Error();
+      ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      bitmap.close?.();
+
+      type Detector = { detect: (v: CanvasImageSource) => Promise<{ rawValue: string }[]> };
+      const Native = (window as unknown as { BarcodeDetector?: new (o: object) => Detector })
+        .BarcodeDetector;
+
+      let text: string | null = null;
+      if (Native) {
+        const hits = await new Native({ formats: ['qr_code'] }).detect(canvas).catch(() => []);
+        text = hits[0]?.rawValue ?? null;
+      }
+      if (!text) {
+        const jsQR = (await import('jsqr')).default;
+        const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        text = jsQR(img.data, img.width, img.height)?.data ?? null;
+      }
+
+      const found = text ? codeFromScan(text) : '';
+      if (found) setCode(found);
+      else setScanErr(COPY.scanNoCodeInPhoto);
+    } catch {
+      setScanErr(COPY.scanPhotoFailed);
+    }
+    setReading(false);
+  };
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (busy) return;
@@ -153,6 +200,26 @@ function RedeemScreen() {
             <video ref={videoRef} playsInline muted className="block max-h-[46vh] w-full object-cover" />
           </div>
         )}
+        {/* Always offered, not only after the camera fails — on some phones it
+            is the path that works, and finding that out should not require
+            watching something else fail first. */}
+        <div className="mt-3">
+          <input ref={fileRef} type="file" accept="image/*" capture="environment"
+            className="hidden" aria-label={COPY.scanPhoto}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void fromPhoto(f);
+              e.target.value = '';
+            }} />
+          <Btn type="button" size="lg" icon={reading ? undefined : ImageUp} className="w-full"
+            disabled={reading} onClick={() => fileRef.current?.click()}>
+            {reading
+              ? <><Loader2 size={16} className="animate-spin" /> جارٍ القراءة…</>
+              : COPY.scanPhoto}
+          </Btn>
+          <p className="mt-1.5 text-center text-micro text-ink-500">{COPY.scanPhotoHint}</p>
+        </div>
+
         {scanErr && (
           <p className="mt-3 rounded-lg border border-warn-200 bg-warn-100 px-3.5 py-2.5 text-panel text-warn-700">
             {scanErr}
