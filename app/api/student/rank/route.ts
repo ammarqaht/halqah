@@ -18,7 +18,7 @@ import type { Track } from '@/lib/types';
 
    • Only what لوحة الشرف already posts. The printed honour roll (approved PDF
      §8) is pinned to the halaqa wall carrying the top ten boys' names and their
-     points, in `shortName` form. This shows the same two facts in the same
+     points, in full. This shows the same two facts in the same
      form, so nothing here is readable on a phone that is not already readable
      on the wall.
    • Names, never identifiers. No id, no national id, no level, no halaqa, no
@@ -80,7 +80,10 @@ export async function GET(req: Request) {
   const out = (r: { id: string; fullName: string; points: number; rank: number }, i: number) => ({
     key: String(i),
     rank: r.rank,
-    name: r.id === me.id ? r.fullName : shortName(r.fullName),
+    /* Full, for everyone. The board was shortening other boys' names, and in
+       a roster carrying «محمد» four times over that identifies nobody — the
+       printed honour roll on the wall has always carried them whole. */
+    name: r.fullName,
     points: r.points,
     me: r.id === me.id,
   });

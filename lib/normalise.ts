@@ -74,13 +74,21 @@ export function isNonHalaqaName(name: unknown): boolean {
   return false;
 }
 
-/** «الحسيني عبد الوهاب الحسيني السعدني» → «الحسيني السعدني».
-    Arabic names run four or five parts; a narrow list only has room for the
-    first and the family name. The full string stays available on hover. */
+/**
+ * The name, whole.
+ *
+ * This used to drop the middle of an Arabic name — «الحسيني عبد الوهاب الحسيني
+ * السعدني» became «الحسيني السعدني» — to fit narrow columns. The client asked
+ * for full names everywhere, for students and for halaqat alike, and he is
+ * right: a shortened name is a guess about which two parts identify a person,
+ * and in a roster carrying «محمد» four times over it identifies nobody.
+ *
+ * Kept as a function rather than deleted at sixty call sites: it is the one
+ * place a display rule about names belongs, and columns that are genuinely too
+ * narrow now truncate with an ellipsis — which at least admits it is cutting.
+ */
 export function shortName(full: unknown): string {
-  const parts = collapse(full).split(' ').filter(Boolean);
-  if (parts.length <= 2) return parts.join(' ');
-  return `${parts[0]} ${parts[parts.length - 1]}`;
+  return collapse(full);
 }
 
 /**

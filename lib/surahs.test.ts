@@ -30,3 +30,15 @@ test('a halaqa is named without its session time', async () => {
   expect(halaqaLabel('حلقة (أ) الكبرى')).toBe('حلقة (أ) الكبرى');
   expect(halaqaLabel(null)).toBe('');
 });
+
+test('a name is shown whole, never trimmed to two parts', async () => {
+  const { shortName } = await import('./normalise');
+  /* It used to return «الحسيني السعدني». A roster carrying «محمد» four times
+     over is not served by guessing which two parts identify a person. */
+  expect(shortName('الحسيني عبد الوهاب الحسيني السعدني'))
+    .toBe('الحسيني عبد الوهاب الحسيني السعدني');
+  expect(shortName('معاذ محمد عبدالله المجحد')).toBe('معاذ محمد عبدالله المجحد');
+  /* Whitespace is still collapsed — that is tidying, not trimming. */
+  expect(shortName('  أحمد   محمد  ')).toBe('أحمد محمد');
+  expect(shortName(null)).toBe('');
+});

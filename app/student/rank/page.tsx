@@ -175,9 +175,15 @@ function Step({ row }: { row: Row }) {
             : 'border-paper bg-ink-100 text-ink-700')}>
         {row.name.trim()[0]}
       </span>
-      <p className={cx('max-w-full truncate text-center text-xs2',
-        row.me ? 'font-bold text-brand-800' : 'text-ink-900')}>
-        {row.name.split(' ')[0]}
+      {/* The whole name. A podium of «محمد · محمد · نواف» names nobody in a
+          roster that carries محمد four times over; two lines of small type
+          name everyone. */}
+      <p className={cx('max-w-full text-center text-[10px] leading-tight',
+        row.me ? 'font-bold text-brand-800' : 'text-ink-900')}
+        style={{ display: '-webkit-box', WebkitLineClamp: 2,
+                 WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+        title={row.name}>
+        {row.name}
       </p>
       <div className={cx('flex w-full flex-col items-center rounded-t-xl pt-2.5',
         first ? 'h-24' : row.rank === 2 ? 'h-20' : 'h-[68px]',
