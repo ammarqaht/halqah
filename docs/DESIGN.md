@@ -414,6 +414,66 @@ Print is a first-class output here, not an afterthought — the supervisor print
 - ✅ Sign-in structure and its opening animation, with timings
 - ✅ The corrected navigation map, reconciled against the approved scope
 - ✅ Component inventory and mandatory states
+- ✅ The student portal's redesigned surface (§11)
 
 **Open:** exact icon set (Lucide is the working assumption — it is what the mockups use and it ships
 tree-shaken), and the lattice tile geometry, which will be lifted from Mockup A's `<pattern>`.
+
+
+---
+
+## 11. The student portal — the phone surface
+
+The desk surfaces and this one share a palette and nothing else. The supervisor is at 1440px with
+a mouse, reading tables; the boy is six to eighteen, standing in a mosque, holding a phone.
+
+**Provenance.** Redesigned from a Claude Design prototype (`Student Portal.dc.html`, 11 Sep 2026)
+drawn against the tokens in §1–§3. It introduced **no colour of its own** — every value in it
+resolves to a token already in `tailwind.config.js`. What changed is arrangement, not palette.
+
+### 11.1 الرئيسية — one ring instead of five boxes
+Four jewel tiles (المستوى · الأجزاء · ما أنجزته · اجتزتها) and a progress rail were five separate
+boxes stating five facts about one thing. They are now `Journey`: a single 96px ring with the level
+in the middle of it, the juz phrase beside it, and the percentage and bar underneath.
+
+The card lost its «بطاقة الطالب» label — a card need not announce that it is one — and lost the two
+large buttons under it, since شحن كود and المتجر are both already destinations in the tab bar. What
+took their place is the rank chip: the boy's standing in his own halaqa, which is the other thing
+he opens this screen to see.
+
+آخر اختباراتي became a horizontal rail of cards rather than a list of rows, each score drawn as the
+proportion it is. Pass and fail still carry a WORD as well as a colour.
+
+### 11.2 مستواي وخطتي — the sheet as a grid
+Twenty-four days in a three-column grid, the whole level visible at once, any day opened with one
+tap — replacing a list that had to be scrolled to find anything. Exam days carry the warn tone; the
+selected day expands above the grid into three cards, one per kind, in the tones the prototype used
+(brand / info / ok — all tokens). A ladder of every level in the track sits on the level card and
+scrolls the current one into view on arrival.
+
+### 11.3 المتجر — the named gap
+A gift out of reach keeps its place on the shelf and gains a bar: «بقي ٥٠ نقطة» is now something he
+can watch filling. What he can afford sorts to the front, dearest first, so the top of the grid is
+the best thing within reach today. A filter chip pair narrows to «أقدر أشتريها» with a live count.
+
+### 11.4 What was deliberately NOT adopted
+The prototype is a mockup and two of its moves do not survive contact with this app:
+
+- **The sticky hero with parallax.** It assumed the hero owned the top of the screen. The real
+  portal has a sticky top bar on every route carrying the mark, the name and خروج, and a second
+  sticky layer beneath it fights the first. The hero keeps the gradient, the glow, the grain and
+  the large balance; it does not pin or shift.
+- **«اليوم في خطتي».** The prototype preselects day 6. `/api/student/plan` deliberately points at no
+  day — nothing records which one a boy reached, and a guess sends a child to the wrong passage on
+  the system's authority. The grid opens on day 1 and says «اضغط أي يوم». When the teacher's screen
+  records attendance this can preselect and be right.
+- **Bottom sheets as a new component.** Not needed: `Modal` already rises from the bottom on a
+  phone and centres on a desktop.
+- **The redeem screen.** Already built with a real camera path (native `BarcodeDetector` with a
+  lazy fallback) and a `?code=` deep link from the printed QR. The prototype's version adds nothing
+  and its scan was faked on a timer.
+
+### 11.5 Motion
+Count-ups on the balance, rings filling from zero, cards rising. `transform`/`opacity` only — and
+every one checks `prefers-reduced-motion` in **JS** as well, because a count-up is a state change
+and the CSS rule in §5.2 cannot reach it.

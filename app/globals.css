@@ -123,3 +123,8 @@
 /* Every tap target on a phone. */
 .student-body a,.student-body button{-webkit-tap-highlight-color:transparent}
 .student-body .press:active{transform:scale(.985)}
+
+/* The horizontal rails on the portal — the exam cards and the level ladder —
+   scroll by thumb, and a phone shows no scrollbar for them. */
+.student-body .no-bar{scrollbar-width:none}
+.student-body .no-bar::-webkit-scrollbar{display:none}
