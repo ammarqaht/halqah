@@ -27,7 +27,10 @@ function LoginScreen() {
   const next = sp.get('next') || '/student';
   const expired = sp.get('reason') === 'expired';
 
-  const [loginId, setLoginId] = useState('');
+  /* Arrived from his own card's QR: `?u=1001`. He points his camera at the
+     slip his teacher handed him and only has to type his id. */
+  const [loginId, setLoginId] = useState(() =>
+    (sp.get('u') ?? '').replace(/\D/g, '').slice(0, 4));
   const [nationalId, setNationalId] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');

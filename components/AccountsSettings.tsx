@@ -8,7 +8,7 @@
    wrong and has been corrected, and a login number the supervisor wants moved. */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  KeyRound, Loader2, Search, Check, X, FileSpreadsheet, AlertTriangle, Download,
+  KeyRound, Loader2, Search, Check, X, FileSpreadsheet, AlertTriangle, Download, IdCard,
 } from 'lucide-react';
 import { Sheet, SheetHead } from '@/components/Sheet';
 import { Btn, Chip, Empty, Modal, INPUT } from '@/components/ui';
@@ -99,6 +99,11 @@ export function AccountsSettingsCard() {
           <Btn icon={FileSpreadsheet} onClick={() => setConfirmExport(true)}>
             ملف الحسابات (Excel)
           </Btn>
+          {/* One slip per boy: his name, his number, his password and a QR that
+              opens the portal with the number already in it. */}
+          <a href="/print/student-cards" target="_blank" rel="noreferrer">
+            <Btn icon={IdCard}>بطاقات الطلاب (طباعة)</Btn>
+          </a>
           <span className="text-panel text-ink-500">
             <Num className="font-medium text-ink-900">{withAccount}</Num> حسابًا
           </span>
@@ -146,7 +151,15 @@ export function AccountsSettingsCard() {
                     {r.lastLoginAt ? <Num>{formatDate(r.lastLoginAt.slice(0, 10))}</Num> : 'لم يدخل بعد'}
                   </td>
                   <td className="px-3 py-2.5 text-end">
-                    <Btn size="sm" onClick={() => open(r)}>تعديل</Btn>
+                    <span className="inline-flex items-center gap-1.5">
+                      <a href={`/print/student-cards?student=${r.studentId}`}
+                        target="_blank" rel="noreferrer" title={`بطاقة ${r.fullName}`}
+                        aria-label={`طباعة بطاقة ${r.fullName}`}
+                        className="rounded p-1.5 text-ink-400 transition-colors hover:bg-brand-100 hover:text-brand-800">
+                        <IdCard size={15} />
+                      </a>
+                      <Btn size="sm" onClick={() => open(r)}>تعديل</Btn>
+                    </span>
                   </td>
                 </tr>
               ))}
