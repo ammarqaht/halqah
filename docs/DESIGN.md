@@ -431,7 +431,25 @@ a mouse, reading tables; the boy is six to eighteen, standing in a mosque, holdi
 drawn against the tokens in §1–§3. It introduced **no colour of its own** — every value in it
 resolves to a token already in `tailwind.config.js`. What changed is arrangement, not palette.
 
-### 11.1 الرئيسية — one ring instead of five boxes
+### 11.1 الرئيسية — the hero that stays
+On a phone the card IS the top of the screen. It is `sticky top-0`, and the sheet of detail below
+it — full-bleed, 28px top radius, its own opaque ground — climbs over it as he scrolls while the
+card retreats `0.32×` the distance travelled and fades out over 300px. Apple Wallet's move, and
+the reason the card can be this big without costing a screenful.
+
+That only works if the card owns the top, so **الرئيسية hides the phone's top bar** and the hero
+carries the mark, the name and خروج itself — two sticky layers saying the same three things is one
+too many. `SignOutButton` exists so the bar and the hero ask the same question. Above `md` the
+portal keeps its own sticky bar, the card goes back to being a card, and the parallax does not run.
+
+### 11.2 The tab bar — four tabs and a disc
+`شحن كود` is the most frequent thing a boy does here and it was one fifth of a bar, the same size
+as `الترتيب`. It is now the raised 58px disc in the middle — `1fr 1fr 76px 1fr 1fr`, ringed in
+`page` so it reads as sitting above the bar — in reach of the thumb from every screen. The tab it
+vacated went to `الترتيب`. On a desktop there is no thumb and no bar, so it is a link like the
+others and sits second, as it always did (`DESKTOP_TABS`).
+
+### 11.3 الرئيسية — one ring instead of five boxes
 Four jewel tiles (المستوى · الأجزاء · ما أنجزته · اجتزتها) and a progress rail were five separate
 boxes stating five facts about one thing. They are now `Journey`: a single 96px ring with the level
 in the middle of it, the juz phrase beside it, and the percentage and bar underneath.
@@ -444,25 +462,21 @@ he opens this screen to see.
 آخر اختباراتي became a horizontal rail of cards rather than a list of rows, each score drawn as the
 proportion it is. Pass and fail still carry a WORD as well as a colour.
 
-### 11.2 مستواي وخطتي — the sheet as a grid
+### 11.4 مستواي وخطتي — the sheet as a grid
 Twenty-four days in a three-column grid, the whole level visible at once, any day opened with one
 tap — replacing a list that had to be scrolled to find anything. Exam days carry the warn tone; the
 selected day expands above the grid into three cards, one per kind, in the tones the prototype used
 (brand / info / ok — all tokens). A ladder of every level in the track sits on the level card and
 scrolls the current one into view on arrival.
 
-### 11.3 المتجر — the named gap
+### 11.5 المتجر — the named gap
 A gift out of reach keeps its place on the shelf and gains a bar: «بقي ٥٠ نقطة» is now something he
 can watch filling. What he can afford sorts to the front, dearest first, so the top of the grid is
 the best thing within reach today. A filter chip pair narrows to «أقدر أشتريها» with a live count.
 
-### 11.4 What was deliberately NOT adopted
+### 11.6 What was deliberately NOT adopted
 The prototype is a mockup and two of its moves do not survive contact with this app:
 
-- **The sticky hero with parallax.** It assumed the hero owned the top of the screen. The real
-  portal has a sticky top bar on every route carrying the mark, the name and خروج, and a second
-  sticky layer beneath it fights the first. The hero keeps the gradient, the glow, the grain and
-  the large balance; it does not pin or shift.
 - **«اليوم في خطتي».** The prototype preselects day 6. `/api/student/plan` deliberately points at no
   day — nothing records which one a boy reached, and a guess sends a child to the wrong passage on
   the system's authority. The grid opens on day 1 and says «اضغط أي يوم». When the teacher's screen
@@ -473,7 +487,7 @@ The prototype is a mockup and two of its moves do not survive contact with this 
   lazy fallback) and a `?code=` deep link from the printed QR. The prototype's version adds nothing
   and its scan was faked on a timer.
 
-### 11.5 Motion
+### 11.7 Motion
 Count-ups on the balance, rings filling from zero, cards rising. `transform`/`opacity` only — and
 every one checks `prefers-reduced-motion` in **JS** as well, because a count-up is a state change
 and the CSS rule in §5.2 cannot reach it.

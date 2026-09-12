@@ -62,12 +62,20 @@ export default function StudentHome() {
   const passed = (exams ?? []).filter((e) => e.passed === true).length;
 
   return (
-    <div className="space-y-3.5">
+    <div>
       <StudentCard me={me} standing={inHalaqa} />
 
-      {/* Above everything but the card: an exam he has not prepared for is the
-          most useful thing this screen can tell him. */}
-      <NextExam me={me} />
+      {/* The sheet of detail, which on a phone climbs over the card as he
+          scrolls: full-bleed, its own opaque ground, and a higher layer than
+          the hero it covers. Above `md` the card is just a card again and this
+          goes back to being the rest of the page. */}
+      <div className="relative z-10 -mx-5 -mt-7 space-y-3.5 rounded-t-[28px] bg-page px-5 pt-4 shadow-[0_-14px_36px_-18px_rgba(10,64,60,.6)] md:mx-0 md:mt-3.5 md:rounded-none md:bg-transparent md:px-0 md:pt-0 md:shadow-none">
+        <div aria-hidden="true"
+          className="mx-auto -mt-1 mb-1 h-[5px] w-10 rounded-full bg-ink-200 md:hidden" />
+
+        {/* Above everything but the card: an exam he has not prepared for is the
+            most useful thing this screen can tell him. */}
+        <NextExam me={me} />
 
       {levelled && (
         <Journey level={me.currentLevel} ajza={me.ajza}
@@ -103,6 +111,7 @@ export default function StudentHome() {
           <Ledger moves={moves} formatDate={formatDate} />
         )
       )}
+      </div>
     </div>
   );
 }

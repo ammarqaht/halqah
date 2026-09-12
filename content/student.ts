@@ -9,11 +9,24 @@ export const NEIGHBOURHOOD = 'حي أُحد، الدمام';
 
 export const TABS = [
   { href: '/student',          label: 'الرئيسية' },
-  { href: '/student/redeem',   label: 'شحن كود' },
-  { href: '/student/store',    label: 'المتجر' },
   { href: '/student/my-level', label: 'مستواي' },
+  { href: '/student/store',    label: 'المتجر' },
   { href: '/student/rank',     label: 'الترتيب' },
 ] as const;
+
+/**
+ * «شحن كود» is not a tab on a phone.
+ *
+ * It is the single most frequent thing a boy does here, and as one fifth of a
+ * bar it was the same size as «الترتيب». It is now the raised disc in the
+ * middle of that bar — in reach of the thumb from every screen — and the tab it
+ * vacated went to «الترتيب». On a desktop, where there is no thumb and no bar,
+ * it is a link like the others and sits second, as it always did.
+ */
+export const REDEEM_TAB = { href: '/student/redeem', label: 'شحن كود' } as const;
+
+/** The desktop bar shows all five in the approved order. */
+export const DESKTOP_TABS = [TABS[0], REDEEM_TAB, ...TABS.slice(1)] as const;
 
 /** How many boys stand on the podium before the list takes over. */
 export const PODIUM = 3;

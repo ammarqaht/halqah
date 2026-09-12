@@ -79,3 +79,42 @@ export function Ring({ size, stroke, pct, tone, track = 'stroke-ink-100', childr
     </div>
   );
 }
+
+/**
+ * True on a phone-width viewport. The sticky hero and its parallax are a phone
+ * behaviour: above `md` the portal already has a sticky top bar of its own, and
+ * a second sticky layer under it would fight the first.
+ *
+ * False until mounted, so the server and the first client paint agree.
+ */
+export function usePhone(query = '(max-width: 767px)') {
+  const [is, setIs] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    setIs(mq.matches);
+    const on = () => setIs(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, [query]);
+  return is;
+}
+
+/**
+ * How far the page has scrolled, rAF-throttled — and pinned at 0 for anyone who
+ * asked for reduced motion, so every parallax built on it simply does not move.
+ */
+export function useScrollY(active = true) {
+  const [y, setY] = useState(0);
+  useEffect(() => {
+    if (!active || still()) { setY(0); return; }
+    let raf = 0;
+    const on = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => { raf = 0; setY(window.scrollY); });
+    };
+    on();
+    window.addEventListener('scroll', on, { passive: true });
+    return () => { window.removeEventListener('scroll', on); cancelAnimationFrame(raf); };
+  }, [active]);
+  return y;
+}
