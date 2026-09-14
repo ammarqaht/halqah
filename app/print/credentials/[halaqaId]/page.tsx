@@ -48,10 +48,11 @@ export default function CredentialSheet({ params }: { params: Promise<{ halaqaId
         <PrintHead title="حسابات الطلاب"
           sub={<span>{halaqaLabel(halaqa.name || halaqa.teacher)} — {MOSQUE}، {NEIGHBOURHOOD}</span>} />
 
-        <p className="keep mb-4 rounded-lg border border-ink-300 px-4 py-3 text-[11px] leading-relaxed text-ink-700">
-          يدخل الطالب من <span className="font-medium">بوابة الطالب</span> باسم دخوله ورمزه.
-          الرمز خمسة أرقام، ويُطلب منه تغييره في أول دخول. مَن نسي رمزه يراجعك، وتعيد
-          تعيينه من شاشة «حسابات الطلاب».
+        {/* One line, not four. The sheet has to hold twenty-five rows and its
+            instructions were eating eighty pixels of the page they sit on. */}
+        <p className="keep mb-3 text-[10px] leading-relaxed text-ink-600">
+          يدخل الطالب من <span className="font-medium">بوابة الطالب</span> برقم دخوله وكلمة
+          المرور (رقم هويته). مَن نسي رقمه يراجعك.
         </p>
 
         <table className="w-full border-collapse text-[11px]">
@@ -63,7 +64,7 @@ export default function CredentialSheet({ params }: { params: Promise<{ halaqaId
           </thead>
           <tbody>
             {rows.map((s, i) => (
-              <tr key={s.id} className="keep h-[30px]">
+              <tr key={s.id} className="keep h-[26px]">
                 <td className="border border-ink-300 px-2 py-1.5 text-center">
                   <Num>{toArabicDigits(i + 1)}</Num>
                 </td>

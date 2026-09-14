@@ -6,7 +6,7 @@
    exams and Ratel only — §4.11 keeps them outside plans and points. */
 import { use, useMemo } from 'react';
 import { Printer } from 'lucide-react';
-import { PrintHead, PrintFoot, PrintSec, PCELL } from '@/components/PrintHead';
+import { PrintHead, PrintFoot, PrintSec, PCELL, PCELL_TIGHT } from '@/components/PrintHead';
 import { Num, toArabicDigits, plural } from '@/components/Num';
 import { Btn } from '@/components/ui';
 import { useDB } from '@/lib/store';
@@ -17,7 +17,9 @@ import { TRACK_AR, STATUS_AR, TXN_KIND_AR } from '@/lib/types';
 import { halaqaLabel, shortName  } from '@/lib/normalise';
 import { formatDate } from '@/lib/dates';
 
-const MAX_EXAM_ROWS = 14;
+// Seventeen is the most any one boy has sat; at the tighter row height they all
+// fit, so nobody's report is truncated at all.
+const MAX_EXAM_ROWS = 17;
 const MAX_TXN_ROWS = 5;
 
 export default function StudentReport({ params }: { params: Promise<{ studentId: string }> }) {
@@ -124,30 +126,30 @@ export default function StudentReport({ params }: { params: Promise<{ studentId:
               <thead>
                 <tr className="bg-page/60 text-[10px] text-ink-700">
                   {['التاريخ', 'النوع', 'المستوى', 'الأجزاء', 'الدرجة', 'النتيجة', 'ملاحظة'].map((h) => (
-                    <th key={h} className={PCELL}>{h}</th>))}
+                    <th key={h} className={PCELL_TIGHT}>{h}</th>))}
                 </tr>
               </thead>
               <tbody>
                 {exams.slice(0, MAX_EXAM_ROWS).map((e) => (
                   <tr key={e.id} className="keep">
-                    <td className={PCELL}><Num>{toArabicDigits(formatDate(e.takenOn))}</Num></td>
-                    <td className={PCELL}>
+                    <td className={PCELL_TIGHT}><Num>{toArabicDigits(formatDate(e.takenOn))}</Num></td>
+                    <td className={PCELL_TIGHT}>
                       {EXAM_TYPE_AR[e.type as ExamType] ?? e.type}
                       {e.tajweedTopics.length ? ` — ${e.tajweedTopics.join('، ')}` : ''}
                     </td>
-                    <td className={PCELL}>{e.level != null ? <Num>{toArabicDigits(e.level)}</Num> : '—'}</td>
-                    <td className={PCELL}>{e.ajza != null ? <Num>{toArabicDigits(e.ajza)}</Num> : '—'}</td>
-                    <td className={PCELL}>
+                    <td className={PCELL_TIGHT}>{e.level != null ? <Num>{toArabicDigits(e.level)}</Num> : '—'}</td>
+                    <td className={PCELL_TIGHT}>{e.ajza != null ? <Num>{toArabicDigits(e.ajza)}</Num> : '—'}</td>
+                    <td className={PCELL_TIGHT}>
                       {e.score != null
                         ? <Num>{`${toArabicDigits(e.score)}/${toArabicDigits(scoreMax(e.type))}`}</Num>
                         : '—'}
                     </td>
-                    <td className={PCELL}>
+                    <td className={PCELL_TIGHT}>
                       {e.passed === null ? '—'
                         : e.passed ? <span className="text-ok-700">اجتاز</span>
                         : <span className="text-risk-700">لم يجتز</span>}
                     </td>
-                    <td className={`${PCELL} text-start text-[10px]`}>{e.note}</td>
+                    <td className={`${PCELL_TIGHT} text-start text-[10px]`}>{e.note}</td>
                   </tr>
                 ))}
               </tbody>

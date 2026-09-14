@@ -79,6 +79,9 @@
      its header on every sheet. */
   .keep{break-inside:avoid;page-break-inside:avoid}
   thead{display:table-header-group}
+  /* A section heading must never be the last thing on a page with its own
+     content overleaf. */
+  h2,h3{break-after:avoid;page-break-after:avoid}
   tr{break-inside:avoid;page-break-inside:avoid}
   /* Browsers drop background fills by default; the card colours ARE the sorting
      mechanism the client asked for, so they have to survive the printer. */

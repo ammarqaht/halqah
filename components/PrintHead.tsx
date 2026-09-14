@@ -50,3 +50,8 @@ export function PrintSec({ children, assoc }: { children: React.ReactNode; assoc
 
 /** One bordered cell, the same look as the plan sheet's tables. */
 export const PCELL = 'border border-ink-300 px-1.5 py-1 text-center align-middle';
+
+/** For the one table on a sheet whose length the data decides. A student with
+    twenty exams must still print on one page; four pixels a row is the
+    difference, and at this size nothing is harder to read. */
+export const PCELL_TIGHT = 'border border-ink-300 px-1.5 py-0.5 text-center align-middle';
