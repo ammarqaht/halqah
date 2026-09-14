@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { scope } from '../_scope';
+import { pointsScope } from '../_scope';
 import { giftAvailability, shortBy, earnsPoints } from '@/lib/points';
 import type { GiftStatus, Track } from '@/lib/types';
 
@@ -9,7 +9,7 @@ import type { GiftStatus, Track } from '@/lib/types';
    motivation — «لا يُخفى، ليكون حافزًا» — and a client-side check is a check
    anyone can edit. */
 export async function GET() {
-  const g = await scope();
+  const g = await pointsScope();
   if (!g.ok) return g.res;
 
   const student = await db.student.findUnique({ where: { id: g.s.sub } });

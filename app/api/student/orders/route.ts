@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { scope, fail } from '../_scope';
+import { pointsScope, fail } from '../_scope';
 import { purchaseBlock, PURCHASE_BLOCK_AR } from '@/lib/points';
 import { ORDER_STATUS_AR, type GiftStatus, type OrderStatus, type Track } from '@/lib/types';
 
 /** طلباتي — mine only, newest first. */
 export async function GET() {
-  const g = await scope();
+  const g = await pointsScope();
   if (!g.ok) return g.res;
 
   const orders = await db.order.findMany({
@@ -30,7 +30,7 @@ export async function GET() {
    order, not two. And the balance is recomputed INSIDE the transaction, never
    trusted from the request, so a stale page cannot spend points twice. */
 export async function POST(req: Request) {
-  const g = await scope();
+  const g = await pointsScope();
   if (!g.ok) return g.res;
 
   const { giftId } = await req.json().catch(() => ({}));

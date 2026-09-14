@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { scope } from '../_scope';
+import { pointsScope } from '../_scope';
 import { earnsPoints } from '@/lib/points';
 import { boardWindow, rankBoard, standingOf } from '@/lib/rank';
 import { halaqaLabel, shortName } from '@/lib/normalise';
@@ -33,7 +33,7 @@ import type { Track } from '@/lib/types';
    ───────────────────────────────────────────────────────────────────────── */
 
 export async function GET(req: Request) {
-  const g = await scope();
+  const g = await pointsScope();
   if (!g.ok) return g.res;
 
   const me = await db.student.findUnique({

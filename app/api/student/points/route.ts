@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { scope } from '../_scope';
+import { pointsScope } from '../_scope';
 import { TXN_KIND_AR, type TxnKind } from '@/lib/types';
 import { LEDGER_PAGE } from '@/content/student';
 
 /** My ledger, newest first. Scoped by the cookie — never by a query parameter. */
 export async function GET(req: Request) {
-  const g = await scope();
+  const g = await pointsScope();
   if (!g.ok) return g.res;
 
   const limit = Math.min(200, Number(new URL(req.url).searchParams.get('limit')) || LEDGER_PAGE);

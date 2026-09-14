@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { scope, fail } from '../_scope';
+import { pointsScope, fail } from '../_scope';
 import { normaliseCode, CODE_STATE_AR, earnsPoints } from '@/lib/points';
 import type { Track } from '@/lib/types';
 
@@ -32,7 +32,7 @@ function noteFailure(studentId: string) {
 }
 
 export async function POST(req: Request) {
-  const g = await scope();
+  const g = await pointsScope();
   if (!g.ok) return g.res;
 
   const student = await db.student.findUnique({ where: { id: g.s.sub } });

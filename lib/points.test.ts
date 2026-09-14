@@ -315,3 +315,20 @@ describe('reading a code off a scan', () => {
     expect(codeFromScan('')).toBe('');
   });
 });
+
+/* §13.1 — talqeen sits outside the points system. This is the RULE, not the
+   navigation: hiding a tab is presentation, and the routes used to answer a
+   request aimed straight at them. */
+describe('earnsPoints', () => {
+  it('التلقين خارج نظام النقاط', () => {
+    expect(earnsPoints({ track: 'TALQEEN' })).toBe(false);
+  });
+  it('ومَن لا مسار له كذلك — لا نمنح نقاطًا بالشك', () => {
+    expect(earnsPoints({ track: null })).toBe(false);
+  });
+  it('وسائر المسارات تدخل', () => {
+    for (const t of ['GOLDEN', 'SILVER', 'DIAMOND'] as const) {
+      expect(earnsPoints({ track: t })).toBe(true);
+    }
+  });
+});
