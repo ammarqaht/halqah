@@ -125,6 +125,14 @@ const slice = (d: DB) => ({
 
 function setSync(s: SyncState) { syncState = s; subs.forEach((f) => f()); }
 
+/* WHO is doing this.
+   Every row that records a person — a plan issued, points granted, a code
+   batch created — used to fall back to the literal word «المشرف», which said
+   everything while there was one account and nothing once there were four.
+   Set once when the session is known; every default below reads it. */
+let actor = 'المشرف';
+export function setActor(name: string | null) { if (name) actor = name; }
+
 /** Accounts the last save created, waiting to be shown once. */
 let newAccounts: IssuedAccount[] = [];
 let accountsWithoutId: string[] = [];
@@ -446,7 +454,7 @@ export const store = {
       delta: opts.delta,
       kind: opts.kind ?? 'MANUAL',
       reason,
-      createdBy: opts.by ?? 'المشرف',
+      createdBy: opts.by ?? actor,
       createdAt: at,
     }));
     commit({ ...cur, txns: [...cur.txns, ...rows] });
@@ -466,7 +474,7 @@ export const store = {
       reason: note.trim() || `تصحيح حركة «${t.reason}»`,
       refType: null,
       refId: t.id,
-      createdBy: 'المشرف',
+      createdBy: actor,
       createdAt: new Date().toISOString(),
     };
     commit({ ...cur, txns: [...cur.txns, row] });
@@ -492,7 +500,7 @@ export const store = {
       quantity,
       expiresAt: opts.expiresAt || null,
       revokedAt: null,
-      createdBy: opts.by ?? 'المشرف',
+      createdBy: opts.by ?? actor,
       createdAt: new Date().toISOString(),
     };
     const fresh = generateCodes(quantity, cur.codes.map((c) => c.code));
@@ -654,7 +662,7 @@ export const store = {
       reason: reason.trim() ? `إلغاء طلب — ${reason.trim()}` : `إلغاء طلب «${o.giftNameSnapshot}»`,
       refType: 'order',
       refId: o.id,
-      createdBy: 'المشرف',
+      createdBy: actor,
       createdAt: new Date().toISOString(),
     };
     commit({
@@ -717,7 +725,7 @@ export const store = {
           : `تعديل نقاط اختبار — ${EXAM_LABEL(exam.type)}`,
         refType: 'exam',
         refId: exam.id,
-        createdBy: 'المشرف',
+        createdBy: actor,
         createdAt: new Date().toISOString(),
       });
     }
@@ -757,7 +765,7 @@ export const store = {
         reason: `حذف اختبار — ${EXAM_LABEL(exam.type)}`,
         refType: 'exam',
         refId: examId,
-        createdBy: 'المشرف',
+        createdBy: actor,
         createdAt: new Date().toISOString(),
       });
     }
@@ -951,7 +959,7 @@ export const store = {
       track: args.track,
       level: args.level,
       issuedAt: now,
-      issuedBy: args.by ?? 'المشرف',
+      issuedBy: args.by ?? actor,
       /* The level's own curriculum says how long its sheet is — it is the only
          place days are added or removed now, so a level extended to 26 hands
          out 26 rather than silently printing the first 24. */
@@ -1091,7 +1099,7 @@ export const store = {
           reason: `اجتياز — ${EXAM_LABEL(exam.type)}`,
           refType: 'exam' as const,
           refId: examId,
-          createdBy: args.by ?? 'المشرف',
+          createdBy: args.by ?? actor,
           createdAt: new Date().toISOString(),
         }]
       : cur.txns;

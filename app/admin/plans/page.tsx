@@ -31,12 +31,14 @@ import { PLAN_KIND_AR, TRACK_AR, type Track } from '@/lib/types';
 import { shortName } from '@/lib/normalise';
 import { formatDate } from '@/lib/dates';
 import { cx } from '@/lib/cx';
+import { useMyName } from '@/lib/useMe';
 
 const BADGE_AR = { BADGE_GOLDEN: 'الوسام الذهبي', BADGE_DIAMOND: 'الوسام الماسي' } as const;
 
 function PlansScreen() {
   const { panelOpen, setPanelOpen } = usePanel();
   const db = useDB();
+  const myName = useMyName();
   const sp = useSearchParams();
   const router = useRouter();
 
@@ -148,6 +150,10 @@ function PlansScreen() {
                  here and the print route opens on the row that now exists. */
               <Btn variant="primary" icon={Printer} onClick={() => {
                 const issued = store.issuePlan({
+                  /* Whose signature goes on the sheet. Left out, every plan
+                     ever issued read «المشرف» — which said nothing once there
+                     was more than one of them. */
+                  by: myName,
                   studentId: student.id,
                   track: student.track as Exclude<typeof student.track, null>,
                   level: plan.level,

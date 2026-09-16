@@ -16,6 +16,7 @@ import { useDB } from '@/lib/store';
 import { isoDate } from '@/lib/dates';
 import { derive } from '@/lib/derive';
 import { cx } from '@/lib/cx';
+import { useMyName, greeting, shortGreetingName } from '@/lib/useMe';
 
 const TRACK_TONE: Record<string, string> = {
   'ذهبي': 'bg-warn-500', 'فضي': 'bg-sage-500', 'تلقين': 'bg-info-500',
@@ -25,6 +26,7 @@ export default function OverviewPage() {
   const { panelOpen, setPanelOpen } = usePanel();
   const db = useDB();
   const d = derive(db);
+  const myName = useMyName();
 
   /* Booked for today and not yet sat. */
   const todaysBookings = useMemo(() => {
@@ -57,7 +59,9 @@ export default function OverviewPage() {
       <div className="mx-auto max-w-column px-6 py-8 pb-16">
         <header className="rise mb-9">
           <p className="text-micro uppercase tracking-[.14em] text-ink-500">الفصل الأول ١٤٤٨ هـ</p>
-          <h2 className="mt-2 font-display text-d1 text-ink-900">مساء الخير، أبا عبدالله</h2>
+          <h2 className="mt-2 font-display text-d1 text-ink-900">
+            {greeting()}{myName ? `، ${shortGreetingName(myName)}` : ''}
+          </h2>
         </header>
 
         <div className="mb-4 grid grid-cols-2 gap-4 lg:grid-cols-4">

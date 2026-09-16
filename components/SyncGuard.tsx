@@ -5,7 +5,8 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { CloudOff, KeyRound, Loader2, LogIn, X } from 'lucide-react';
 import { Btn } from '@/components/ui';
-import { store, hydrateFromServer, flushToServer, syncStatus } from '@/lib/store';
+import { store, hydrateFromServer, flushToServer, syncStatus, setActor } from '@/lib/store';
+import { useMyName } from '@/lib/useMe';
 
 export function SyncGuard() {
   const state = useSyncExternalStore(store.subscribe, syncStatus, () => 'idle' as const);
@@ -22,6 +23,11 @@ export function SyncGuard() {
     if (t.issued.length) setFresh((c) => [...c, ...t.issued]);
     if (t.noNationalId.length) setNoId((c) => [...c, ...t.noNationalId]);
   }, [state]);
+
+  /* Mounted on every admin screen, so this is where the store learns whose
+     name goes on what he writes. */
+  const myName = useMyName();
+  useEffect(() => { setActor(myName); }, [myName]);
 
   useEffect(() => {
     void hydrateFromServer();

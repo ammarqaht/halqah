@@ -17,6 +17,7 @@ export async function GET() {
 
   return NextResponse.json({
     me: s.sub,
+    name: s.name,
     supervisors: all.map((u) => ({
       ...u,
       lastLoginAt: u.lastLoginAt ? u.lastLoginAt.toISOString() : null,
