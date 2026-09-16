@@ -255,8 +255,15 @@ model Order {
   number           Int       @unique
   studentId        String    @map("student_id")
   student          Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  giftId           String    @map("gift_id")
-  gift             Gift      @relation(fields: [giftId], references: [id])
+  /** Nullable, and severed rather than cascaded when the gift goes.
+      An order is a record of something that happened and must outlive the
+      shelf it was bought from — but the relation used to be required, so a
+      supervisor deleting a purchased gift produced a foreign-key violation
+      that aborted the WHOLE save: not the gift, not the deletion, nothing at
+      all was written, and the screen said «تعذّر الحفظ». The snapshots below
+      are what the order actually needs. */
+  giftId           String?   @map("gift_id")
+  gift             Gift?     @relation(fields: [giftId], references: [id], onDelete: SetNull)
   /** Snapshots: the gift's price and name may change, what he paid may not. */
   pointsSpent      Int       @map("points_spent")
   giftNameSnapshot String    @map("gift_name_snapshot")

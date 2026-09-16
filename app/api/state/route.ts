@@ -67,6 +67,18 @@ export async function GET() {
   });
 }
 
+/** Is this row already what we are about to write?
+    Compares only the fields being written, and compares them loosely enough
+    that null and '' and undefined do not count as a change — they arrive that
+    way from a browser and would make every save rewrite every row. */
+const SAME = (cur: Record<string, unknown>, next: Record<string, unknown>) =>
+  Object.keys(next).every((k) => {
+    const a = cur[k] ?? null, b = next[k] ?? null;
+    if (a === null && (b === null || b === '')) return true;
+    if (b === null && a === '') return true;
+    return String(a) === String(b);
+  });
+
 /** Every list the browser owns, replaced wholesale in one transaction. */
 export async function PUT(req: Request) {
   if (!await readSession()) return NextResponse.json({ error: 'غير مصرّح' }, { status: 401 });
@@ -116,7 +128,13 @@ export async function PUT(req: Request) {
 
   try {
     await db.$transaction(async (tx) => {
-      const roster = await tx.student.findMany({ select: { id: true, dedupeKey: true } });
+      /* The whole row, not just the key: the roster is written now, and writing
+         it back unconditionally meant a hundred and seventeen sequential
+         UPDATEs inside the transaction — against a database across a network,
+         that alone spent the thirty-second budget and the save died of a
+         timeout. Only what actually differs is written, which on an ordinary
+         save is nothing at all. */
+      const roster = await tx.student.findMany();
       const known = new Set(roster.map((r) => r.id));
 
       /* Every parse mints its own student ids, so a browser that imported
@@ -136,6 +154,44 @@ export async function PUT(req: Request) {
         if (kept) keyFor.set(st.id, kept);
       }
 
+      /* Halaqat, before the students who point at them.
+         A halaqa DELETED in the browser is deleted here — but its students are
+         not: they are moved to «بلا حلقة», which is the state the screens
+         already know how to show and alert on. Cascading the delete would take
+         a boy's whole history with the row that merely named his teacher. */
+      const sentHalaqat = (s.halaqat ?? []) as Record<string, unknown>[];
+      if (sentHalaqat.length) {
+        const keep = new Set(sentHalaqat.map((h) => String(h.id)));
+        const gone = (await tx.halaqa.findMany({ select: { id: true } }))
+          .filter((h) => !keep.has(h.id)).map((h) => h.id);
+        if (gone.length) {
+          await tx.student.updateMany({
+            where: { halaqaId: { in: gone } }, data: { halaqaId: null } });
+          await tx.halaqa.deleteMany({ where: { id: { in: gone } } });
+        }
+        const haveHalaqa = new Map((await tx.halaqa.findMany()).map((h) => [h.id, h]));
+        for (const h of sentHalaqat) {
+          const row = {
+            name: String(h.name ?? ''),
+            teacher: String(h.teacher ?? ''),
+            mosque: String(h.mosque ?? 'جامع محمد العبدالكريم — حي أُحد'),
+            timeSlot: String(h.timeSlot ?? 'العصر'),
+            track: (h.track as string) || null,
+            notes: (h.notes as string) || null,
+            active: h.active === undefined ? true : Boolean(h.active),
+          } as Prisma.HalaqaUncheckedCreateInput;
+          if (!row.name) continue;
+          const cur = haveHalaqa.get(String(h.id));
+          if (!cur) {
+            await tx.halaqa.create({ data: { ...row, id: String(h.id) } });
+          } else if (SAME(cur, row)) {
+            /* unchanged — the ordinary case, and worth nothing to the database */
+          } else {
+            await tx.halaqa.update({ where: { id: String(h.id) }, data: row });
+          }
+        }
+      }
+
       /* The roster is WRITTEN here now.
          It used to be read-only — «a save must not be able to invent a roster»
          — and the reasoning was sound about DELETION but wrong about the rest:
@@ -143,6 +199,7 @@ export async function PUT(req: Request) {
          typed into, and neither did any correction to an existing one. The
          guard that matters is kept: nothing here removes a student, and the
          409 above still refuses a save that would empty the tables. */
+      const byId = new Map(roster.map((r) => [r.id, r as Record<string, unknown>]));
       const incoming = (s.students ?? []) as Record<string, unknown>[];
       const fresh: string[] = [];
       for (const st of incoming) {
@@ -162,7 +219,8 @@ export async function PUT(req: Request) {
         } as Prisma.StudentUncheckedCreateInput;
         if (!row.fullName) continue;
         if (known.has(id)) {
-          await tx.student.update({ where: { id }, data: row });
+          const cur = byId.get(id);
+          if (cur && !SAME(cur, row)) await tx.student.update({ where: { id }, data: row });
         } else {
           await tx.student.create({ data: { ...row, id } });
           known.add(id);
@@ -230,9 +288,16 @@ export async function PUT(req: Request) {
       if (plans.length) await tx.studentPlan.createMany({ data: plans.map((p) => ({
         ...p, createdAt: d(p.createdAt) ?? new Date() })) as Prisma.StudentPlanCreateManyInput[] });
 
+      /* An order whose gift has been deleted keeps its snapshots and loses only
+         the link. Carried through as it stood, it named a row that this save
+         had just removed, and the foreign key took the entire transaction down
+         with it — so deleting a gift anyone had bought saved NOTHING. */
+      const giftIds = new Set((s.gifts ?? []).map((g: Record<string, unknown>) => String(g.id)));
       const orders = mine<{ studentId: string } & Record<string, unknown>>(s.orders ?? []);
       if (orders.length) await tx.order.createMany({ data: orders.map((o) => ({
-        ...o, createdAt: d(o.createdAt) ?? new Date(), deliveredAt: d(o.deliveredAt),
+        ...o,
+        giftId: o.giftId && giftIds.has(String(o.giftId)) ? o.giftId : null,
+        createdAt: d(o.createdAt) ?? new Date(), deliveredAt: d(o.deliveredAt),
       })) as Prisma.OrderCreateManyInput[] });
 
       const txns = mine<{ studentId: string } & Record<string, unknown>>(s.txns ?? []);

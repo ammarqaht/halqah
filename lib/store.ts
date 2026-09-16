@@ -121,6 +121,10 @@ let inFlight: Promise<void> | null = null;
 const slice = (d: DB) => ({
   ...Object.fromEntries(SYNCED.map((k) => [k, d[k]])),
   students: d.students,
+  /* Halaqat went up nowhere either — they were read from the server and never
+     written back, so adding a halaqa, renaming one, or deleting one changed
+     nothing beyond the browser it was done in. */
+  halaqat: d.halaqat,
 });
 
 function setSync(s: SyncState) { syncState = s; subs.forEach((f) => f()); }
