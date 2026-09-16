@@ -33,7 +33,6 @@ function StudentsScreen() {
   const [editStudent, setEditStudent] = useState<Student | 'new' | null>(null);
   const [editHalaqa, setEditHalaqa] = useState(false);
   const [moving, setMoving] = useState(false);
-
   const halaqaFilter = sp.get('halaqa');
 
   /* Filtering replaces the query string without unmounting this screen, so an

@@ -10,6 +10,7 @@ import type {
 } from './types';
 import { SEED_TAJWEED_TOPIC } from './types';
 import { dayCountFor, DEFAULT_EXAM_DAYS } from './curriculum';
+import type { IssuedAccount } from './credentials';
 import {
   earnsPoints, generateCodes, codeState, purchaseBlock, EXAM_TYPE_AR,
   type PurchaseBlock, type ExamType,
@@ -108,12 +109,25 @@ let inFlight: Promise<void> | null = null;
 /* The students ride along — not to be written (that is /api/import's job) but
    so the server can recognise a boy this browser names by an id it minted
    itself. Without them a stale cache's exams are unidentifiable and dropped. */
+/* The roster goes up WHOLE.
+   It used to be sent as `{id, dedupeKey}` — enough for the server to match a
+   boy it already knew, and nothing else. So a student added through «إضافة
+   طالب» never reached the database at all: he sat in one browser's storage,
+   invisible on every other device, and no account could be issued to a boy the
+   server had never heard of. The same silence swallowed every EDIT — a
+   corrected name, a changed track, a national id typed in later.
+   The server still refuses to DELETE a student from a save; it now accepts the
+   ones it is given. */
 const slice = (d: DB) => ({
   ...Object.fromEntries(SYNCED.map((k) => [k, d[k]])),
-  students: d.students.map((s) => ({ id: s.id, dedupeKey: s.dedupeKey })),
+  students: d.students,
 });
 
 function setSync(s: SyncState) { syncState = s; subs.forEach((f) => f()); }
+
+/** Accounts the last save created, waiting to be shown once. */
+let newAccounts: IssuedAccount[] = [];
+let accountsWithoutId: string[] = [];
 
 async function pushNow(): Promise<void> {
   setSync('saving');
@@ -136,7 +150,17 @@ async function pushNow(): Promise<void> {
     /* If the server could not place some rows, say so — a save that keeps two
        thirds of what it was given must not read as a clean save. */
     if (res.ok) {
-      try { lastOrphaned = (await res.json())?.orphaned ?? 0; } catch { lastOrphaned = 0; }
+      try {
+        const body = await res.json();
+        lastOrphaned = body?.orphaned ?? 0;
+        /* A new boy's account is created by the save itself. The supervisor
+           has to be TOLD his number — it is what goes on the card — so it is
+           held here until a screen has shown it. */
+        const fresh = (body?.newAccounts ?? []) as IssuedAccount[];
+        if (fresh.length) newAccounts = [...newAccounts, ...fresh];
+        const noId = (body?.accountsWithoutId ?? []) as string[];
+        if (noId.length) accountsWithoutId = [...accountsWithoutId, ...noId];
+      } catch { lastOrphaned = 0; }
     }
   } catch {
     /* No connection. The cache still holds it, and the next successful save
@@ -357,6 +381,13 @@ export const store = {
     commit({ ...cur,
       halaqat: cur.halaqat.filter((h) => h.id !== id),
       students: cur.students.map((s) => (s.halaqaId === id ? { ...s, halaqaId: null } : s)) });
+  },
+  /** What the last save created, and whom it could not. Reading CLEARS it, so
+      the notice appears once and does not follow the supervisor around. */
+  takeNewAccounts(): { issued: IssuedAccount[]; noNationalId: string[] } {
+    const out = { issued: newAccounts, noNationalId: accountsWithoutId };
+    newAccounts = []; accountsWithoutId = [];
+    return out;
   },
   upsertStudent(s: Student) {
     const cur = load();

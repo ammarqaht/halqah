@@ -75,8 +75,23 @@ function Sheet() {
     </div>;
   }
 
+  /* Pages break BY HALAQA, not merely every eighteenth card.
+     A sheet that ends with four boys from one halaqa and begins with fourteen
+     from another is cut once and then sorted by hand — which is the work the
+     cards were meant to save. Each halaqa starts its own sheet; a halaqa of
+     twenty-five simply runs onto a second. */
   const pages: Card[][] = [];
-  for (let i = 0; i < cards.length; i += PER_PAGE) pages.push(cards.slice(i, i + PER_PAGE));
+  const order: string[] = [];
+  const byHalaqa = new Map<string, Card[]>();
+  for (const c of cards) {
+    const k = c.halaqa ?? '—';
+    if (!byHalaqa.has(k)) { byHalaqa.set(k, []); order.push(k); }
+    byHalaqa.get(k)!.push(c);
+  }
+  for (const k of order) {
+    const group = byHalaqa.get(k)!;
+    for (let i = 0; i < group.length; i += PER_PAGE) pages.push(group.slice(i, i + PER_PAGE));
+  }
   const missing = cards.filter((c) => !c.username || !c.password).length;
 
   return (
@@ -85,7 +100,7 @@ function Sheet() {
         <p className="text-panel text-ink-600">
           <Num className="font-medium text-ink-900">{cards.length}</Num> بطاقة على{' '}
           <Num className="font-medium text-ink-900">{pages.length}</Num>{' '}
-          {pages.length === 1 ? 'ورقة' : 'أوراق'} — ورقة سرّية، تُقصّ وتُسلَّم لكل طالب بطاقته.
+          {pages.length === 1 ? 'ورقة' : 'أوراق'} — كل حلقة في ورقتها، تُقصّ وتُسلَّم لكل طالب بطاقته.
         </p>
         <Btn variant="primary" icon={Printer} onClick={() => window.print()}>طباعة</Btn>
       </div>

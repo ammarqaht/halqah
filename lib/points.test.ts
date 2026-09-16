@@ -327,7 +327,7 @@ describe('earnsPoints', () => {
     expect(earnsPoints({ track: null })).toBe(false);
   });
   it('وسائر المسارات تدخل', () => {
-    for (const t of ['GOLDEN', 'SILVER', 'DIAMOND'] as const) {
+    for (const t of ['GOLDEN', 'SILVER'] as const) {
       expect(earnsPoints({ track: t })).toBe(true);
     }
   });

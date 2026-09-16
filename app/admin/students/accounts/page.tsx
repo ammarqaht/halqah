@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-  KeyRound, Loader2, Printer, RotateCcw, AlertTriangle, CheckCircle2, Users2,
+  KeyRound, Loader2, Printer, RotateCcw, AlertTriangle, CheckCircle2, Users2, IdCard,
 } from 'lucide-react';
 import { TopBar } from '@/components/TopBar';
 import { Sheet, SheetHead } from '@/components/Sheet';
@@ -93,13 +93,17 @@ export default function Accounts() {
           )}
         </Sheet>
 
-        {/* one sheet per halaqa — that is how they are handed out */}
+        {/* Cards, one halaqa at a time — the same sheet as «بطاقات الطلاب», so a
+            boy's card looks the same whichever button printed it. It used to be
+            a column of slips; cards carry the QR, and a teacher hands out one
+            halaqa's worth at a sitting. */}
         <Sheet className="rise mb-4">
-          <SheetHead title="أوراق الحلقات" meta="ورقة لكل حلقة، تُقصّ قسائم ويُعطى كل طالب قسيمته" />
+          <SheetHead title="بطاقات الحلقات"
+            meta="بطاقات حلقة واحدة في ورقة، بحدود القصّ — ويُعطى كل طالب بطاقته" />
           <div className="flex flex-wrap gap-2">
             {db.halaqat.map((h) => (
-              <a key={h.id} href={`/print/credentials/${h.id}`} target="_blank" rel="noreferrer">
-                <Btn icon={Printer}>{halaqaLabel(shortName(h.teacher))}</Btn>
+              <a key={h.id} href={`/print/student-cards?halaqa=${h.id}`} target="_blank" rel="noreferrer">
+                <Btn icon={IdCard}>{halaqaLabel(shortName(h.teacher))}</Btn>
               </a>
             ))}
             {db.halaqat.length === 0 && <p className="text-panel text-ink-500">ارفع ملفاتك أولًا.</p>}

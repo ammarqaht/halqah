@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { issueMissingAccounts, type IssuedAccount } from '@/lib/credentials';
 import { readSession } from '@/lib/auth';
 import { toStudent, toHalaqa } from '@/lib/serialize';
 import type { Prisma } from '@prisma/client';
@@ -110,6 +111,9 @@ export async function PUT(req: Request) {
      rather than a merge — and it happens inside ONE transaction, so a device
      that loses its connection half-way through leaves the previous state
      intact rather than half of two. */
+  let newAccounts: IssuedAccount[] = [];
+  let accountsWithoutId: string[] = [];
+
   try {
     await db.$transaction(async (tx) => {
       const roster = await tx.student.findMany({ select: { id: true, dedupeKey: true } });
@@ -125,13 +129,55 @@ export async function PUT(req: Request) {
          key if the payload names one, before anything is discarded. What is
          still unrecognisable belongs to a roster that was never imported here,
          and that is reported rather than invented. */
-      /* Read only. This route never writes a student — that is /api/import's
-         job, and a save must not be able to invent a roster. */
       const byDedupe = new Map(roster.filter((r) => r.dedupeKey).map((r) => [r.dedupeKey!, r.id]));
       const keyFor = new Map<string, string>();
       for (const st of (s.students ?? []) as { id: string; dedupeKey?: string }[]) {
         const kept = st.dedupeKey ? byDedupe.get(st.dedupeKey) : undefined;
         if (kept) keyFor.set(st.id, kept);
+      }
+
+      /* The roster is WRITTEN here now.
+         It used to be read-only — «a save must not be able to invent a roster»
+         — and the reasoning was sound about DELETION but wrong about the rest:
+         a student added through «إضافة طالب» never left the browser he was
+         typed into, and neither did any correction to an existing one. The
+         guard that matters is kept: nothing here removes a student, and the
+         409 above still refuses a save that would empty the tables. */
+      const incoming = (s.students ?? []) as Record<string, unknown>[];
+      const fresh: string[] = [];
+      for (const st of incoming) {
+        const id = keyFor.get(String(st.id)) ?? String(st.id);
+        const row = {
+          fullName: String(st.fullName ?? ''),
+          nationalId: (st.nationalId as string) || null,
+          track: (st.track as string) || null,
+          halaqaId: (st.halaqaId as string) || null,
+          grade: String(st.grade ?? ''),
+          stage: String(st.stage ?? ''),
+          nationality: String(st.nationality ?? ''),
+          guardianPhone: String(st.guardianPhone ?? ''),
+          status: String(st.status ?? 'ACTIVE'),
+          currentLevel: st.currentLevel == null ? null : Number(st.currentLevel),
+          dedupeKey: (st.dedupeKey as string) || null,
+        } as Prisma.StudentUncheckedCreateInput;
+        if (!row.fullName) continue;
+        if (known.has(id)) {
+          await tx.student.update({ where: { id }, data: row });
+        } else {
+          await tx.student.create({ data: { ...row, id } });
+          known.add(id);
+          fresh.push(id);
+        }
+      }
+
+      /* And a new boy gets his account in the same breath — next free number
+         from 1001, his own national id for a password. Asking the supervisor
+         to remember a second screen is how a student ends up on the roster
+         with no way to sign in. */
+      if (fresh.length) {
+        const r = await issueMissingAccounts(tx, fresh);
+        newAccounts = r.issued;
+        accountsWithoutId = r.noNationalId;
       }
 
       const countOrphan = () => { dropped++; };
@@ -236,5 +282,10 @@ export async function PUT(req: Request) {
 
   /* Named, not swallowed. A save that quietly kept two thirds of what it was
      given is the failure this whole endpoint exists to avoid. */
-  return NextResponse.json({ ok: true, ms: Date.now() - started, orphaned: dropped });
+  return NextResponse.json({
+    ok: true, ms: Date.now() - started, orphaned: dropped,
+    /* So the screen can tell the supervisor the number to write on the card,
+       and name the boy who could not be given one. */
+    newAccounts, accountsWithoutId,
+  });
 }
