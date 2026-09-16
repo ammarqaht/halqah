@@ -14,6 +14,7 @@ import { PointsSettingsCard } from '@/components/PointsSettings';
 import { BandsSettingsCard } from '@/components/BandsSettings';
 import { AccountsSettingsCard } from '@/components/AccountsSettings';
 import { SETTINGS_SECTIONS, type SettingsSection } from '@/components/SettingsPanel';
+import { SupervisorSettingsCard } from '@/components/SupervisorSettings';
 
 type Stats = { students: number; halaqat: number; imports: number; audit: number; bytes: number };
 
@@ -88,6 +89,8 @@ function SettingsScreen() {
             {SETTINGS_SECTIONS.find((x) => x.id === section)!.label}
           </h2>
         </header>
+
+        {section === 'me' && <SupervisorSettingsCard />}
 
         {section === 'points' && <>
           <PointsSettingsCard />

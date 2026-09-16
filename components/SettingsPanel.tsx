@@ -10,9 +10,10 @@ import { PanelShell, PanelGroup, PanelItem } from '@/components/Panel';
 import { Num } from '@/components/Num';
 import { useDB } from '@/lib/store';
 
-export type SettingsSection = 'points' | 'accounts' | 'database';
+export type SettingsSection = 'me' | 'points' | 'accounts' | 'database';
 
 export const SETTINGS_SECTIONS: { id: SettingsSection; label: string; sub: string }[] = [
+  { id: 'me',       label: 'حسابي',         sub: 'كلمة المرور، والمشرفون' },
   { id: 'points',   label: 'النقاط',        sub: 'ما يُمنح، وبنوده' },
   { id: 'accounts', label: 'حسابات الطلاب', sub: 'اسم الدخول والرمز' },
   { id: 'database', label: 'قاعدة البيانات', sub: 'الحجم، والتصفير' },
