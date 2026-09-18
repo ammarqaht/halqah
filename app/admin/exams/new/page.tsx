@@ -23,6 +23,7 @@ import { TopBar } from '@/components/TopBar';
 import { Sheet, SheetHead } from '@/components/Sheet';
 import { Btn, Empty, Chip, Field, INPUT } from '@/components/ui';
 import { Combobox } from '@/components/Combobox';
+import { DateField } from '@/components/DateField';
 import { TrackPicker } from '@/components/TrackPicker';
 import { Num, pointWord } from '@/components/Num';
 import { usePanel } from '@/components/PanelState';
@@ -519,8 +520,8 @@ function RecordExam() {
                 emptyText="لا طالب بهذا الاسم" />
             </Field>
             <Field label="التاريخ" hint="تاريخ اليوم افتراضيًا">
-              <input type="date" className={INPUT} value={takenOn}
-                onChange={(e) => setTakenOn(e.target.value)} />
+              {/* The site's calendar, not the operating system's — §7.2. */}
+              <DateField value={takenOn} onChange={setTakenOn} label="تاريخ الاختبار" chrome="field" />
             </Field>
           </div>
 

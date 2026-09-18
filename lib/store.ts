@@ -1040,6 +1040,23 @@ export const store = {
     return booking;
   },
 
+  /**
+   * Correct a booking that has not been sat yet — «أبي إمكانية تعديل تفاصيل
+   * حجز اختبار» (client, 18 Sep 2026).
+   *
+   * Only while it is «محجوز»: once it is DONE the exam is the record and the
+   * appointment is history, and once it is CANCELLED editing it would quietly
+   * resurrect something that was called off. A moved date used to be a cancel
+   * and a re-book, which left the book carrying an «أُلغي» row describing
+   * nothing that ever happened.
+   */
+  editBooking(bookingId: string, patch: Partial<Pick<ExamBooking,
+    'studentId' | 'scheduledOn' | 'level' | 'badge' | 'note'>>) {
+    const cur = load();
+    commit({ ...cur, bookings: cur.bookings.map((b) =>
+      (b.id === bookingId && b.status === 'BOOKED' ? { ...b, ...patch } : b)) });
+  },
+
   cancelBooking(bookingId: string) {
     const cur = load();
     commit({ ...cur, bookings: cur.bookings.map((b) =>

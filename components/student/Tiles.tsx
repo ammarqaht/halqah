@@ -16,10 +16,32 @@ import { cx } from '@/lib/cx';
 
 const CARD = 'rounded-2xl border border-ink-150 bg-paper shadow-soft';
 
-/** مسيرتي في الحفظ — the level, what it is worth, and how far down the track. */
-export function Journey({ level, ajza, pct, total }: {
+/**
+ * مسيرتي في الحفظ.
+ *
+ * THE RING MEASURES THIS LEVEL — «حلقة المستوى خلّها حلقة تحسب كم أنجز من
+ * المستوى هذا» (client, 18 Sep 2026). It used to draw his share of the whole
+ * TRACK, which for a boy on level 60 of 60 is two per cent on the day he starts
+ * and three per cent a fortnight later: a ring that never visibly moves is a
+ * ring nobody looks at twice. What he is actually working through is the
+ * twenty-four مقرّرات of the level in front of him, and that arc fills.
+ *
+ * `at` is what he must recite TODAY, so what he has FINISHED is the one before
+ * it. The track's own share keeps its line underneath, because «أين أنا من
+ * المسار كله» is still worth one sentence — just not the headline.
+ *
+ * With no pointer set, the ring falls back to the track exactly as before: a
+ * boy nobody has placed must not be shown an invented arc.
+ */
+export function Journey({ level, ajza, pct, total, at, of }: {
   level: number | null; ajza: number | null; pct: number; total: number;
+  /** His مقرّر today, and how many the level holds. */
+  at?: number | null; of?: number;
 }) {
+  const levelled = at != null && !!of && of > 0;
+  const done = levelled ? Math.max(0, Math.min(of, at - 1)) : 0;
+  const levelPct = levelled ? Math.round((done / of) * 100) : pct;
+
   return (
     <section className={cx(CARD, 'rise px-[18px] py-4')}>
       <div className="mb-3 flex items-center justify-between gap-3">
@@ -31,7 +53,7 @@ export function Journey({ level, ajza, pct, total }: {
       </div>
 
       <div className="flex items-center gap-4">
-        <Ring size={96} stroke={8} pct={pct} tone="stroke-brand-700">
+        <Ring size={96} stroke={8} pct={levelPct} tone="stroke-brand-700">
           <Num className="font-display text-[30px] leading-none text-ink-900">{level ?? '—'}</Num>
           <span className="mt-[3px] text-2xs text-ink-500">المستوى</span>
         </Ring>
@@ -43,13 +65,31 @@ export function Journey({ level, ajza, pct, total }: {
           <p className="mt-0.5 text-xs2 text-ink-600">محفوظة حتى الآن</p>
 
           <div className="mt-3 flex items-center justify-between gap-2 text-micro text-ink-500">
-            <span>أنجزت <Num className="font-bold text-brand-800">{pct}٪</Num> من المسار</span>
-            {total > 0 && <span><Num>{total}</Num> ← <Num>1</Num></span>}
+            {levelled ? (
+              <>
+                <span>
+                  أنجزت <Num className="font-bold text-brand-800">{done}</Num> من{' '}
+                  <Num>{of}</Num> مقرّرًا
+                </span>
+                <span><Num className="font-medium text-ink-700">{levelPct}٪</Num></span>
+              </>
+            ) : (
+              <>
+                <span>أنجزت <Num className="font-bold text-brand-800">{pct}٪</Num> من المسار</span>
+                {total > 0 && <span><Num>{total}</Num> ← <Num>1</Num></span>}
+              </>
+            )}
           </div>
           <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-ink-100">
             <div className="h-full rounded-full bg-brand-700 transition-[width] duration-[1100ms] ease-brand"
-              style={{ width: `${Math.max(2, pct)}%` }} />
+              style={{ width: `${Math.max(2, levelPct)}%` }} />
           </div>
+          {levelled && (
+            <p className="mt-1.5 text-micro text-ink-400">
+              ومن المسار كله <Num>{pct}٪</Num>
+              {total > 0 && <> · <Num>{total}</Num> ← <Num>1</Num></>}
+            </p>
+          )}
         </div>
       </div>
     </section>

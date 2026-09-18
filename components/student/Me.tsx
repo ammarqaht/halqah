@@ -14,9 +14,11 @@ export type Me = {
   levelTotal: number; progressPct: number;
   eligibleForPoints: boolean; balance: number;
   mustChangePin: boolean; attendedDays: number | null;
+  /** «يحتاج مراجعة قبل الاختبار» — ما رفعه معلّمه عنه، إن رفعه. */
+  examHold: { at: string; by: string; note: string } | null;
   nextExam: {
     scheduledOn: string;
-    badge: 'BADGE_GOLDEN' | 'BADGE_DIAMOND';
+    badge: 'BADGE_GOLDEN' | 'BADGE_DIAMOND' | 'ASSOCIATION';
     level: number | null;
     daysAway: number;
   } | null;

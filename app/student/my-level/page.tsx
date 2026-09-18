@@ -7,14 +7,20 @@
    at once, any day opened with one tap — which is the prototype's shape and
    Duolingo's before it: a boy will look at a grid he can see the end of.
 
-   Still NO «today». Nothing records which day a boy actually reached, so
-   pointing at one would be a guess, and a guess here sends a child to the wrong
-   passage on the system's authority. The grid opens on the first day and he
-   finds his place on it, the way he does on paper. When the teacher's screen
-   records attendance this can preselect a day and be right.
+   AND «اليوم» IS BACK, 18 Sep 2026. This file used to say: «Still NO today.
+   Nothing records which day a boy actually reached, so pointing at one would be
+   a guess... When the teacher's screen records attendance this can preselect a
+   day and be right.» That screen shipped. `student_progress` holds the مقرّر his
+   own teacher's save moved him to, and every day the teacher recorded carries
+   the مقرّر that was recited on it — so the grid opens on his own place and the
+   مقرّرات behind him carry a tick, and neither is a guess.
+
+   When nobody has set his pointer yet, the screen is exactly what it was: the
+   sheet whole, opened at day one, with nothing marked. A boy must never be shown
+   an invented place.
    ───────────────────────────────────────────────────────────────────────── */
 import { useEffect, useRef, useState } from 'react';
-import { BookOpen, Award } from 'lucide-react';
+import { BookOpen, Award, Check } from 'lucide-react';
 import { Sheet } from '@/components/Sheet';
 import { Empty } from '@/components/ui';
 import { Num, juzPhrase } from '@/components/Num';
@@ -30,11 +36,17 @@ type Day = {
   examBadge?: 'BADGE_GOLDEN' | 'BADGE_DIAMOND' | null;
   association?: boolean;
 };
+/** «سجّلها المعلم» — the مقرّر, the day he recited it, and whether it was short. */
+export type DoneDay = { dayNo: number; on: string; incomplete: boolean };
 type Data = {
   plan: { level: number; trackAr: string; ajza: number | null; issuedAt: string;
           dayCount: number; dailyAmount: string } | null;
   reason?: string;
   days?: Day[]; nextLevel?: number; nextAjza?: number | null;
+  /** أين وقف — null until his supervisor sets it. */
+  at?: number | null;
+  awaitingExam?: 'BADGE_GOLDEN' | 'BADGE_DIAMOND' | null;
+  done?: DoneDay[];
 };
 
 const BADGE_AR = { BADGE_GOLDEN: 'اختبار الوسام الذهبي', BADGE_DIAMOND: 'الاختبار الماسي' } as const;
@@ -61,12 +73,19 @@ export default function MyLevel() {
   const { me } = useMe();
   const [d, setD] = useState<Data | null>(null);
   const [failed, setFailed] = useState(false);
-  const [picked, setPicked] = useState(1);
+  /* Null until the sheet arrives, so the grid can open on HIS day rather than
+     on day one and then jump. */
+  const [picked, setPicked] = useState<number | null>(null);
 
   useEffect(() => {
     fetch('/api/student/plan')
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error('plan'))))
-      .then(setD)
+      .then((j: Data) => {
+        setD(j);
+        /* «المقرّر اللي وصل إليه» — where his teacher's record puts him, and day
+           one only when nobody has put him anywhere. */
+        setPicked(j.at ?? 1);
+      })
       .catch(() => setFailed(true));
   }, []);
 
@@ -93,6 +112,8 @@ export default function MyLevel() {
 
   const days = d.days ?? [];
   const day = days.find((x) => x.dayNo === picked) ?? days[0] ?? null;
+  const at = d.at ?? null;
+  const done = new Map((d.done ?? []).map((x) => [x.dayNo, x]));
 
   return (
     <div className="space-y-3.5">
@@ -128,16 +149,31 @@ export default function MyLevel() {
               <Num>{day.dayNo}</Num>
             </span>
             <div className="min-w-0 flex-1">
-              <p className="text-base2 font-bold text-ink-900">
+              <p className="flex flex-wrap items-center gap-2 text-base2 font-bold text-ink-900">
                 {day.examBadge
                   ? <span className="flex flex-wrap items-center gap-1.5 text-warn-700">
                       <Award size={15} />{BADGE_AR[day.examBadge]}
                       {day.association && <span className="text-assoc-700">· اختبار الجمعية</span>}
                     </span>
                   : <>اليوم <Num>{day.dayNo}</Num></>}
+                {/* Which of the three this day is: the one in front of him, one
+                    he has recited, or one still ahead. */}
+                {at === day.dayNo && (
+                  <span className="rounded-full bg-brand-100 px-2 py-0.5 text-[11px] text-brand-800">
+                    مقرّرك الآن
+                  </span>
+                )}
+                {done.has(day.dayNo) && (
+                  <span className="flex items-center gap-1 rounded-full bg-ok-100 px-2 py-0.5 text-[11px] text-ok-700">
+                    <Check size={11} strokeWidth={3} />سمّعته
+                  </span>
+                )}
               </p>
               <p className="mt-px text-cap text-ink-500">
-                {day.examBadge ? 'يوم اختبار — لا درس جديد' : 'درس · مراجعة صغرى · مراجعة كبرى'}
+                {done.has(day.dayNo)
+                  ? <>سجّله معلمك في <Num>{formatDate(done.get(day.dayNo)!.on)}</Num></>
+                  : day.examBadge ? 'يوم اختبار — لا درس جديد'
+                  : 'درس · مراجعة صغرى · مراجعة كبرى'}
               </p>
             </div>
           </div>
@@ -198,22 +234,45 @@ export default function MyLevel() {
           {days.map((x) => {
             const exam = !!x.examBadge;
             const on = x.dayNo === picked;
+            const did = done.has(x.dayNo);
+            const here = at === x.dayNo;
             const caption = exam
               ? (x.examBadge === 'BADGE_GOLDEN' ? 'الوسام الذهبي' : 'الماسي')
               : line(x.rows.find((r) => r.kind === 'DARS') ?? x.rows[0]);
             return (
               <button key={x.dayNo} type="button" onClick={() => setPicked(x.dayNo)}
                 aria-pressed={on}
-                aria-label={`اليوم ${x.dayNo}${caption ? ` — ${caption}` : ''}`}
-                className={cx('press flex min-h-[58px] flex-col items-center justify-center gap-[3px] rounded-[13px] border px-1.5 py-2 transition-colors',
+                aria-current={here ? 'step' : undefined}
+                aria-label={`اليوم ${x.dayNo}${caption ? ` — ${caption}` : ''}`
+                  + (did ? ' — سمّعته' : here ? ' — مقرّرك الآن' : '')}
+                className={cx('press relative flex min-h-[58px] flex-col items-center justify-center gap-[3px] rounded-[13px] border px-1.5 py-2 transition-colors',
+                  /* Four states, and they are read in this order: the square the
+                     screen is SHOWING, the one he is ON, the ones he has RECITED,
+                     and the rest. The ring is what tells him where he stands even
+                     while he is looking at another day. */
                   on ? 'border-brand-700 bg-brand-100'
-                    : exam ? 'border-warn-200 bg-warn-100' : 'border-ink-150 bg-paper')}>
-                <Num className={cx('text-body', on ? 'font-bold text-brand-800' : exam ? 'font-medium text-warn-700' : 'font-medium text-ink-700')}>
+                    : did ? 'border-ok-200 bg-ok-100'
+                    : exam ? 'border-warn-200 bg-warn-100' : 'border-ink-150 bg-paper',
+                  here && !on && 'ring-2 ring-brand-700 ring-offset-1')}>
+                {/* «تعليم المقرّرات السابقة بعلامة صح في حال سجّلها المعلم» — and
+                    it is his TEACHER's tick, not the calendar's: a day nobody
+                    recorded stays blank however long ago it was. */}
+                {did && (
+                  <span aria-hidden
+                    className="absolute -end-1 -top-1 grid h-4 w-4 place-items-center rounded-full bg-ok-700 text-white">
+                    <Check size={10} strokeWidth={3.4} />
+                  </span>
+                )}
+                <Num className={cx('text-body',
+                  on ? 'font-bold text-brand-800'
+                    : did ? 'font-medium text-ok-700'
+                    : exam ? 'font-medium text-warn-700' : 'font-medium text-ink-700')}>
                   {x.dayNo}
                 </Num>
                 {caption && (
                   <span className={cx('max-w-full text-pretty text-center text-[10px] leading-[1.3]',
-                    on ? 'text-brand-800' : exam ? 'text-warn-700' : 'text-ink-500')}>
+                    on ? 'text-brand-800' : did ? 'text-ok-700'
+                      : exam ? 'text-warn-700' : 'text-ink-500')}>
                     {caption}
                   </span>
                 )}
@@ -226,6 +285,14 @@ export default function MyLevel() {
           <span className="flex items-center gap-1.5">
             <i className="h-2.5 w-2.5 rounded-sm border border-ink-150 bg-paper" />يوم درس
           </span>
+          <span className="flex items-center gap-1.5">
+            <i className="h-2.5 w-2.5 rounded-sm border border-ok-200 bg-ok-100" />سمّعته
+          </span>
+          {at != null && (
+            <span className="flex items-center gap-1.5">
+              <i className="h-2.5 w-2.5 rounded-sm bg-paper ring-2 ring-brand-700" />مقرّرك الآن
+            </span>
+          )}
           <span className="flex items-center gap-1.5">
             <i className="h-2.5 w-2.5 rounded-sm border border-warn-200 bg-warn-100" />اختبار
           </span>

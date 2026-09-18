@@ -34,6 +34,17 @@ export type Student = {
   stage: string;
   nationality: string;
   guardianPhone: string;
+  /** تاريخ الميلاد الميلادي، `YYYY-MM-DD`. Optional like the roster fields
+      around it: most of the client's own rows do not carry one. */
+  birthDate?: string | null;
+  /**
+   * «يحتاج مراجعة قبل الاختبار» — what his teacher decided, READ-ONLY here.
+   *
+   * It is written in بوابة المعلم and travels down with `GET /api/state`; the
+   * PUT whitelist has no column for it, so no browser sync can overwrite a
+   * teacher's judgement with a stale copy of it. Absent when he is not held.
+   */
+  examHold?: { at: string; by: string; note: string } | null;
   status: StudentStatus;
   currentLevel: number | null;
   /** Stable identity across re-imports. Normally the national id; suffixed when
@@ -86,10 +97,16 @@ export const ALL_GRADES = [...new Set(Object.values(GRADES_BY_STAGE).flat())];
    of its movements, so it cannot drift from its own record («الرصيد ليس رقمًا
    مخزَّنًا، بل مجموع الحركات»). A mistake is corrected by a new, opposite row. */
 
-export type TxnKind = 'MANUAL' | 'CODE' | 'EXAM' | 'PURCHASE' | 'REFUND' | 'CORRECTION';
+/** `DAILY` arrived with the teacher's portal: the fixed حضور · ثوب · تسميع
+    points the system computes from a saved card, as against `MANUAL`, which is
+    a supervisor's own decision. They are separated because the teacher has no
+    discretionary points at all — «ليس في يد المعلم نقاط يمنحها بتقديره» — and a
+    ledger that could not tell the two apart could not show that. */
+export type TxnKind =
+  'MANUAL' | 'CODE' | 'EXAM' | 'DAILY' | 'PURCHASE' | 'REFUND' | 'CORRECTION';
 
 export const TXN_KIND_AR: Record<TxnKind, string> = {
-  MANUAL: 'يدوي', CODE: 'كود', EXAM: 'اختبار',
+  MANUAL: 'يدوي', CODE: 'كود', EXAM: 'اختبار', DAILY: 'يومية',
   PURCHASE: 'شراء', REFUND: 'استرجاع', CORRECTION: 'تصحيح',
 };
 
@@ -107,7 +124,7 @@ export type PointTxn = {
   delta: number;
   kind: TxnKind;
   reason: string;
-  refType?: 'exam' | 'order' | 'code' | null;
+  refType?: 'exam' | 'order' | 'code' | 'day' | null;
   refId?: string | null;
   /** null ⇒ the student redeemed a card himself, with nobody at the keyboard. */
   createdBy: string | null;
@@ -301,6 +318,19 @@ export const BOOKING_STATUS_AR: Record<BookingStatus, string> = {
   BOOKED: 'محجوز', DONE: 'أُجري', CANCELLED: 'أُلغي',
 };
 
+/**
+ * What a booking can be FOR.
+ *
+ * The two badges are sat in front of the supervisor. الجمعية is examined
+ * elsewhere and its result arrives from قياس — but the appointment is still
+ * his to keep, and «متى يُحجز اختبار جمعية للطالب؟ بعد الوسام الماسي للمستويات
+ * الذهبية جميعها، أو بعد الوسام الماسي للمستويات الفردية للمسار الفضي»
+ * (client, 18 Sep 2026) is §4.8 said from the other end: the diamond is the
+ * proof a whole juz was completed, and only a golden level or an ODD silver one
+ * completes one. `readyForAssociation` is the one place that judges it.
+ */
+export type BookingBadge = 'BADGE_GOLDEN' | 'BADGE_DIAMOND' | 'ASSOCIATION';
+
 /** «تُسجّل من سيُختبر ومتى وفي أي مستوى ولأي وسام». */
 export type ExamBooking = {
   id: string;
@@ -308,8 +338,7 @@ export type ExamBooking = {
   /** ISO date — the day's list is built from this. */
   scheduledOn: string;
   level: number | null;
-  /** Only the two badges are sat on screen; the association exam is external. */
-  badge: 'BADGE_GOLDEN' | 'BADGE_DIAMOND';
+  badge: BookingBadge;
   status: BookingStatus;
   /** Set once the sheet is approved and an exam record exists. */
   examId: string | null;

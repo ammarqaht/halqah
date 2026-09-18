@@ -10,12 +10,27 @@ import type { CurriculumDay, ExamDayMap, StudentPlan, Track } from '@/lib/types'
    `{ plan: null }` and a 200. The UI shows an intentional empty state; an
    error would be a lie about what happened.
 
-   NO «today». The system does not record which day a boy actually reached —
-   attendance and recitation live in Ratel — so any figure here would be a
-   guess, and a guess on this screen sends a child to the wrong passage on the
-   system's authority. The sheet is shown whole and he finds his place on it,
-   the way he does on paper. `lib/studentDay.ts` holds the working-day counting
-   for when the teacher's screen records attendance and this can be exact. */
+   «أين وصلت» — RESTORED 18 Sep 2026, and it is the same feature that was pulled
+   out of this route for the right reason and can now come back for the same one.
+
+   It used to say: «NO today. The system does not record which day a boy actually
+   reached, so any figure here would be a guess, and a guess on this screen sends
+   a child to the wrong passage on the system's authority.» That was true while
+   attendance and recitation lived in Ratel and nothing here recorded either. It
+   stopped being true when the teacher's portal shipped: `student_progress` holds
+   the مقرّر he must recite TODAY, moved by his own teacher's save, and `day_entries`
+   hold every مقرّر that was actually recited and when.
+
+   So this is no longer a guess — it is his teacher's own record read back to him,
+   which is exactly what the client asked for: «تحديد المقرّر اللي وصل إليه الطالب،
+   وتعليم المقرّرات السابقة بعلامة صح في حال سجّلها المعلم» (18 Sep 2026).
+
+   Two guards keep it honest rather than optimistic:
+     · `at` is null when nobody has set his pointer, and the screen then behaves
+       exactly as it did before — the sheet whole, no «today», no tick.
+     · the ticks are matched on LEVEL AND TRACK as well as on the number. A boy
+       repeating a level starts its مقرّرات again, and last term's ticks must not
+       follow him onto this term's sheet. */
 export async function GET() {
   const g = await scope();
   if (!g.ok) return g.res;
@@ -44,6 +59,34 @@ export async function GET() {
   const days = resolvePlan(plan, curriculum as unknown as CurriculumDay[]);
   const next = nextLevel(row.level);
 
+  /* أين وقف، وما سمّعه — both from the teacher's own saves, never inferred from
+     the calendar. A day with no DARS recited did not move him and does not get a
+     tick: «الانتقال إلى المقرّر التالي» is the درس, and that is what `advances`
+     says on the teacher's side too. */
+  const [progress, entries] = await Promise.all([
+    db.studentProgress.findUnique({ where: { studentId: student.id } }),
+    db.dayEntry.findMany({
+      where: {
+        studentId: student.id,
+        level: row.level,
+        track: row.track,
+        assignmentNo: { not: null },
+        lines: { some: { kind: 'DARS', recited: true } },
+      },
+      select: { day: true, assignmentNo: true, incomplete: true },
+      orderBy: { day: 'asc' },
+    }),
+  ]);
+
+  /* One entry per مقرّر, the LAST time it was recited — a boy who repeated a day
+     after a correction has one tick on it, not two. */
+  const done = new Map<number, { dayNo: number; on: string; incomplete: boolean }>();
+  for (const e of entries) {
+    if (e.assignmentNo == null) continue;
+    done.set(e.assignmentNo, {
+      dayNo: e.assignmentNo, on: e.day, incomplete: e.incomplete });
+  }
+
   return NextResponse.json({
     plan: {
       id: plan.id, track: plan.track, trackAr: track === 'GOLDEN' ? 'ذهبي' : 'فضي',
@@ -52,6 +95,12 @@ export async function GET() {
       dailyAmount: plan.dailyAmount || dailyAmountFor(track),
     },
     days,
+    /** ما عليه اليوم — null until his teacher's supervisor sets his pointer. */
+    at: progress?.assignmentNo ?? null,
+    /** Stopped at a badge مقرّر: «لا يمضي في الحفظ قبل اختباره». */
+    awaitingExam: progress?.awaitingExam ?? null,
+    /** المقرّرات التي سجّلها معلمه — بترتيبها وتواريخها. */
+    done: [...done.values()].sort((a, b) => a.dayNo - b.dayNo),
     nextLevel: next,
     nextAjza: ajzaForLevel(track, next),
   });

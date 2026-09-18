@@ -10,13 +10,24 @@ import { PanelShell, PanelGroup, PanelItem } from '@/components/Panel';
 import { Num } from '@/components/Num';
 import { useDB } from '@/lib/store';
 
-export type SettingsSection = 'me' | 'points' | 'accounts' | 'database';
+export type SettingsSection =
+  'me' | 'points' | 'accounts' | 'teachers' | 'messages' | 'database';
 
 export const SETTINGS_SECTIONS: { id: SettingsSection; label: string; sub: string }[] = [
-  { id: 'me',       label: 'حسابي',         sub: 'كلمة المرور، والمشرفون' },
-  { id: 'points',   label: 'النقاط',        sub: 'ما يُمنح، وبنوده' },
-  { id: 'accounts', label: 'حسابات الطلاب', sub: 'اسم الدخول والرمز' },
-  { id: 'database', label: 'قاعدة البيانات', sub: 'الحجم، والتصفير' },
+  { id: 'me',       label: 'حسابي',          sub: 'كلمة المرور، والمشرفون' },
+  /* النقاط gathers EVERY figure that pays: what an exam is worth, the bands, and
+     — since 18 Sep 2026 — the daily items. Those sat under المعلمون because the
+     teacher's portal introduced them, which is where they came FROM rather than
+     what they are: «بلوك النقاط اليومية في صفحة المعلمون انقلها إلى صفحة
+     النقاط». */
+  { id: 'points',   label: 'النقاط',         sub: 'ما يُمنح، وبنوده، واليومية' },
+  { id: 'accounts', label: 'حسابات الطلاب',  sub: 'اسم الدخول والرمز' },
+  { id: 'teachers', label: 'المعلمون',       sub: 'حساباتهم، ومقرّرات طلابهم' },
+  /* Its own page rather than a card at the foot of another: it WRITES to people
+     — «قسم رسائل الإدارة عند المشرف يكون لها صفحة خاصة في الإعدادات» (client,
+     18 Sep 2026). */
+  { id: 'messages', label: 'الرسائل',        sub: 'إشعار للمعلمين والطلاب' },
+  { id: 'database', label: 'قاعدة البيانات',  sub: 'الحجم، والتصفير' },
 ];
 
 export function SettingsPanel({ onClose }: { onClose: () => void }) {

@@ -5,18 +5,19 @@
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
   Users2, BarChart3, Award, Trophy, PackageCheck, ClipboardList, Coins, FileUser,
-  CalendarRange,
+  CalendarRange, ShieldCheck, CalendarCheck, TrendingUp,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { PanelShell, PanelGroup, PanelItem } from '@/components/Panel';
 import { Combobox } from '@/components/Combobox';
+import { DateRangeField } from '@/components/DateField';
 import { Num } from '@/components/Num';
 import { useDB } from '@/lib/store';
 import { shortName } from '@/lib/normalise';
 
 export type ReportId =
   | 'halaqa' | 'student' | 'association' | 'ready' | 'points' | 'honour'
-  | 'pick-list' | 'bookings' | 'period';
+  | 'knights' | 'registration' | 'pick-list' | 'bookings' | 'period' | 'progress';
 
 /** The association sheet's five tables, each printable on its own. */
 export const ASSOC_SECTIONS: { id: string; label: string }[] = [
@@ -26,6 +27,10 @@ export const ASSOC_SECTIONS: { id: string; label: string }[] = [
   { id: 'exams',         label: 'حصيلة الاختبارات' },
   { id: 'halaqat',       label: 'الحلقات' },
 ];
+
+/** `YYYY-MM-DD` in local time — the same shape every date in this product has. */
+const iso = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 export const REPORTS: {
   id: ReportId; label: string; icon: LucideIcon;
@@ -39,13 +44,30 @@ export const REPORTS: {
   { id: 'ready',       label: 'الجاهزون لاختبار الجمعية', icon: Award,        needs: 'halaqa', optional: true },
   { id: 'points',      label: 'قائمة نقاط الحلقة',       icon: Coins,         needs: 'halaqa' },
   { id: 'honour',      label: 'لوحة الشرف',              icon: Trophy,        needs: 'halaqa', optional: true },
+  /* Beside لوحة الشرف deliberately: that one ORDERS balances over the whole
+     term, this one NAMES whoever met every requirement on every day his halaqa
+     met this week. «ويكون فيه صفحة لطباعة أسماء الفرسان عند المشرف» (client,
+     18 Sep 2026). */
+  { id: 'knights',     label: 'فرسان الأسبوع',           icon: ShieldCheck,   needs: 'halaqa', optional: true },
+  /* أسبوع حلقة على ورقة عرضية: الطلاب صفوفًا والأيام أعمدة — «تقرير تسجيل معلم»
+     (client, 18 Sep 2026). It needs a halaqa and means little without one, so
+     it is not optional. */
+  { id: 'registration', label: 'تسجيل المعلم — أسبوع',    icon: CalendarCheck, needs: 'halaqa' },
   { id: 'period',      label: 'بيانات فترة',             icon: CalendarRange, needs: 'period' },
+  /* The home screen's old «تقدّم الحلقات» — «وإحصائيات الفترة تكون في التقارير»
+     (client, 18 Sep 2026). It is the رتل file's own arithmetic and belongs
+     where a period is chosen deliberately, not on the screen that answers
+     «what is happening this afternoon». */
+  { id: 'progress',    label: 'تقدّم الحلقات — للفترة',   icon: TrendingUp },
   { id: 'pick-list',   label: 'قائمة تسليم الهدايا',     icon: PackageCheck },
   { id: 'bookings',    label: 'اختبارات اليوم',          icon: ClipboardList },
 ];
 
 export function ReportsPanel({ onClose }: { onClose: () => void }) {
   const db = useDB();
+  /* Booked for today and not yet sat — exactly what `/print/bookings` prints. */
+  const dueToday = db.bookings.filter(
+    (b) => b.status === 'BOOKED' && b.scheduledOn === iso(new Date())).length;
   const sp = useSearchParams();
   const router = useRouter();
 
@@ -74,8 +96,12 @@ export function ReportsPanel({ onClose }: { onClose: () => void }) {
       <PanelGroup label="التقرير">
         {REPORTS.map((r) => (
           <PanelItem key={r.id} active={current === r.id} onClick={() => pickReport(r.id)}
+            /* «يظهر لي أنه فيه ١٨ واحد، لكن في الورقة ما يظهر لي أحد» (client,
+               18 Sep 2026) — the badge counted every booking ever made while
+               the sheet printed the day's. The sheet was right: this is
+               «اختبارات اليوم», so the number beside it is the day's too. */
             count={r.id === 'pick-list' ? pending
-              : r.id === 'bookings' ? db.bookings.length : undefined}>
+              : r.id === 'bookings' ? (dueToday || undefined) : undefined}>
             {r.label}
           </PanelItem>
         ))}
@@ -128,19 +154,23 @@ export function ReportsPanel({ onClose }: { onClose: () => void }) {
       {report.needs === 'period' && (
         <PanelGroup label="الفترة">
           <div className="space-y-2 px-1.5">
-            {([['from', 'من تاريخ'], ['to', 'إلى تاريخ']] as const).map(([k, label]) => (
-              <label key={k} className="block">
-                <span className="mb-1 block text-micro text-ink-500">{label}</span>
-                <input type="date" value={sp.get(k) ?? ''} onChange={(e) => set(k, e.target.value)}
-                  className="h-9 w-full rounded-lg border border-ink-200 bg-paper px-2 text-panel text-ink-800" />
-              </label>
-            ))}
+            {/* ONE calendar, in the site's own identity — «خانات تحديد فترة في
+                الموقع كامل في الثلاث بوابات تكون بنفس الطريقة اللي سوّيتها في
+                لسان فترة طالب» (client, 18 Sep 2026). A native pair of
+                `<input type="date">` opens the operating system's flyout, can be
+                set to an impossible order, and looks like Windows on an Arabic
+                screen — the three complaints §7.2 answers. */}
+            <DateRangeField chrome="field"
+              from={sp.get('from') || iso(new Date(Date.now() - 29 * 86_400_000))}
+              to={sp.get('to') || iso(new Date())}
+              max={iso(new Date())}
+              label="فترة التقرير"
+              onChange={(a, b) => { set('from', a); set('to', b); }} />
             <div className="flex flex-wrap gap-1.5 pt-1">
               {([['month', 'هذا الشهر'], ['quarter', 'آخر ٣ أشهر'], ['year', 'هذه السنة']] as const)
                 .map(([k, label]) => (
                 <button key={k} onClick={() => {
                   const now = new Date();
-                  const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
                   const start = k === 'month' ? new Date(now.getFullYear(), now.getMonth(), 1)
                     : k === 'quarter' ? new Date(now.getFullYear(), now.getMonth() - 2, 1)
                     : new Date(now.getFullYear(), 0, 1);

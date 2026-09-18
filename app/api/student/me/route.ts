@@ -23,6 +23,12 @@ export async function GET() {
   const halaqa = student.halaqaId
     ? await db.halaqa.findUnique({ where: { id: student.halaqaId } }) : null;
 
+  /* رأي معلّمه في جاهزيته — مكتوب في مؤشّره. */
+  const hold = await db.studentProgress.findUnique({
+    where: { studentId: student.id },
+    select: { examHoldAt: true, examHoldBy: true, examHoldNote: true },
+  });
+
   const track = student.track as Track | null;
   const eligible = earnsPoints({ track });
   const txns = eligible
@@ -79,6 +85,17 @@ export async function GET() {
     balance: eligible ? txns.reduce((n, t) => n + t.delta, 0) : 0,
     mustChangePin: student.credential?.mustChangePin ?? false,
     attendedDays: student.attendedDays,
+    /* «ويظهر عند … الطالب ذلك أن الطالب ليس مستعدًّا للاختبار ويحتاج مراجعة»
+       (client, 18 Sep 2026). He is told what his teacher thinks, in his
+       teacher's own words where there are any — being told to prepare is the
+       whole point of telling him at all. */
+    examHold: hold?.examHoldAt
+      ? {
+          at: hold.examHoldAt.toISOString(),
+          by: hold.examHoldBy ?? '',
+          note: hold.examHoldNote,
+        }
+      : null,
     nextExam: next ? {
       scheduledOn: next.scheduledOn,
       badge: next.badge,

@@ -10,7 +10,7 @@
    screen says so rather than leaving it to be discovered. */
 import { useState } from 'react';
 import { Plus, Trash2, ArrowUp, ArrowDown, RotateCcw } from 'lucide-react';
-import { Btn, INPUT } from '@/components/ui';
+import { Btn, INPUT, INPUT_BARE } from '@/components/ui';
 import { Num } from '@/components/Num';
 import { cx } from '@/lib/cx';
 
@@ -92,7 +92,7 @@ export function ListSettings({ label, hint, items, onChange, defaults, used }: {
         <input value={fresh} onChange={(e) => setFresh(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
           placeholder="بند جديد…" aria-label={`إضافة بند إلى ${label}`}
-          className={cx(INPUT, 'h-9 w-52 px-2.5 text-panel')} />
+          className={cx(INPUT_BARE, 'h-9 w-52 px-2.5 text-panel')} />
         <Btn size="sm" icon={Plus} onClick={add} disabled={!fresh.trim()}>إضافة</Btn>
         {JSON.stringify(items) !== JSON.stringify(defaults) && (
           <Btn size="sm" icon={RotateCcw} onClick={() => onChange(defaults)}>إرجاع إلى المعتمد</Btn>

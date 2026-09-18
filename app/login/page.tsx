@@ -1,29 +1,24 @@
 'use client';
 /* ─────────────────────────────────────────────────────────────────────────────
-   تسجيل الدخول  —  DESIGN.md §5
+   تسجيل الدخول — بوابة الإشراف. DESIGN.md §5
    Structure from mockup A. Palette + type from mockup C. Opening animation §5.2.
 
-   The animation is ONE continuous motion, ~1.6s, and runs once per browser
-   session. The form is in the DOM and focusable from t=0 — motion never gates
-   input. Only transform/opacity animate.
+   The frame — the curtain, the form on the right, the ayah on the left and the
+   two doors to the other portals — is `LoginFrame`, shared with بوابة الطالب
+   وبوابة المعلم: «كلها تكون بيانات التسجيل في الجهة اليمنى والقسم الذي فيه الآية
+   في الجهة اليسرى، والستارة تظهر لهم الثلاثة» (client, 18 Sep 2026).
    ───────────────────────────────────────────────────────────────────────── */
-import { Suspense, useEffect, useRef, useState } from 'react';
+import { Suspense, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
-import { LogoFull, LogoJamiyah } from '@/components/Logo';
-import { Curtain } from '@/components/Curtain';
-import { Lattice } from '@/components/Lattice';
+import { LoginDoors, LoginFrame, useCurtain } from '@/components/LoginFrame';
 import { Btn, Field, INPUT } from '@/components/ui';
 import { Num } from '@/components/Num';
 import { cx } from '@/lib/cx';
-import { INTRO, prefersReducedMotion } from '@/lib/motion';
 import { useDB } from '@/lib/store';
 
 function LoginScreen() {
   const router = useRouter();
-  const [markVisible, setMarkVisible] = useState(false);
-  const [up, setUp] = useState(false);
-  const [done, setDone] = useState(false);
   const [busy, setBusy] = useState(false);
   const [id, setId] = useState('');
   const [pw, setPw] = useState('');
@@ -37,28 +32,7 @@ function LoginScreen() {
      like the password stopped working. */
   const reason = search.get('reason');
 
-  /* Plays on every visit, reloads included. The page underneath is fully
-     rendered the whole time, so the curtain reveals it rather than the page
-     fading in — and the form is usable the moment the curtain clears.
-     The timeline waits for the mark to decode: otherwise a cold load spends
-     the hold staring at an empty ground. */
-  useEffect(() => {
-    if (prefersReducedMotion()) { setDone(true); idRef.current?.focus(); return; }
-
-    let tHold: ReturnType<typeof setTimeout>, tDone: ReturnType<typeof setTimeout>;
-    const start = () => {
-      setMarkVisible(true);
-      tHold = setTimeout(() => setUp(true), INTRO.hold);
-      tDone = setTimeout(() => { setDone(true); idRef.current?.focus(); },
-                         INTRO.hold + INTRO.lift);
-    };
-    const img = new Image();
-    const cap = setTimeout(start, 900);          // never wait on a slow network
-    img.onload = img.onerror = () => { clearTimeout(cap); start(); };
-    img.src = '/assets/masjid.png';
-
-    return () => { clearTimeout(cap); clearTimeout(tHold); clearTimeout(tDone); };
-  }, []);
+  const curtain = useCurtain(() => idRef.current?.focus());
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,128 +55,86 @@ function LoginScreen() {
   };
 
   return (
-    <div className="relative min-h-screen bg-page">
-      {!done && (
-        <Curtain up={up} markVisible={markVisible}
-                 fadeIn={INTRO.fadeIn} lift={INTRO.lift} height={104} />
-      )}
-
-      {/* form first ⇒ in RTL it sits on the RIGHT, where the eye starts reading */}
-      <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[500px_1fr]">
-
-        {/* form column */}
-        <main className="flex flex-col justify-center px-6 py-12 sm:px-12">
-          <div className="mx-auto w-full max-w-[23rem]">
-            <div className="lg:hidden"><LogoFull height={46} /></div>
-
-            <h1 className="mt-8 font-display text-d1 text-ink-900 lg:mt-0">تسجيل الدخول</h1>
-            <p className="mt-2 text-base2 text-ink-600">
-              ادخل ببيانات الحساب الذي زوّدك به المشرف.
-            </p>
-
-            <form onSubmit={submit} className="mt-8 space-y-4">
-              <Field label="اسم المستخدم" htmlFor="nid">
-                <input id="nid" ref={idRef} autoComplete="username"
-                  value={id} onChange={(e) => setId(e.target.value)} placeholder="admin"
-                  className={INPUT} />
-              </Field>
-              <Field label="كلمة المرور" htmlFor="pw">
-                <div className="relative">
-                  <input id="pw" type={showPw ? 'text' : 'password'} autoComplete="current-password"
-                    value={pw} onChange={(e) => setPw(e.target.value)} placeholder="••••••••"
-                    className={cx(INPUT, 'pe-11')} />
-                  <button type="button" onClick={() => setShowPw((v) => !v)}
-                    aria-label={showPw ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
-                    aria-pressed={showPw}
-                    className="absolute inset-y-0 end-0 flex w-11 items-center justify-center rounded-e-md text-ink-400 transition-colors hover:text-ink-700">
-                    {showPw ? <EyeOff size={17} strokeWidth={1.9} /> : <Eye size={17} strokeWidth={1.9} />}
-                  </button>
-                </div>
-              </Field>
-
-              <div className="flex items-center justify-between pt-0.5">
-                <label className="flex cursor-pointer items-center gap-2 text-xs2 text-ink-600">
-                  <input type="checkbox" defaultChecked
-                    className="h-4 w-4 rounded-sm border-ink-300 accent-brand-800" />
-                  تذكّرني على هذا الجهاز
-                </label>
-                <button type="button" className="text-xs2 text-brand-800 hover:underline">
-                  نسيت كلمة المرور؟
-                </button>
+    <LoginFrame curtain={curtain}
+      foot={
+        /* Real figures, read from what this installation actually holds —
+           never hard-coded, and never a student's name on a public screen. */
+        db.students.length > 0 ? (
+          <div className="flex items-end gap-10">
+            {[[db.halaqat.length, 'حلقات'], [db.students.length, 'طالبًا']].map(([n, l]) => (
+              <div key={String(l)}>
+                <div className="font-display text-t1 text-white"><Num>{n}</Num></div>
+                <div className="mt-0.5 text-xs2 text-white/55">{l}</div>
               </div>
-
-              {!err && reason && (
-                <p className="rounded-md border border-warn-200 bg-warn-100 px-3 py-2.5 text-panel text-warn-700">
-                  {reason === 'idle'
-                    ? 'أُقفلت الجلسة تلقائيًا بعد ثلاثين دقيقة دون نشاط. سجّل الدخول للمتابعة.'
-                    : 'انتهت صلاحية الجلسة. سجّل الدخول للمتابعة.'}
-                </p>
-              )}
-
-              {err && (
-                <p role="alert" className="rounded-md border border-risk-200 bg-risk-100 px-3 py-2.5 text-panel text-risk-700">
-                  {err}
-                </p>
-              )}
-
-              <Btn type="submit" variant="primary" size="xl" className="w-full" disabled={busy}>
-                {busy ? <><Loader2 size={17} className="animate-spin" />جارٍ الدخول…</> : 'دخول'}
-              </Btn>
-              {/* Two portals, one domain. A student typing his national id here
-                  gets «غير صحيحة» and no idea why — this is the supervisor's
-                  door, and his is next to it. */}
-              <p className="pt-1 text-center text-xs2 text-ink-500">
-                طالب؟{' '}
-                <a href="/student/login" className="font-medium text-brand-800 hover:underline">
-                  ادخل من بوابة الطالب
-                </a>
-              </p>
-            </form>
-
-            <p className="mt-10 text-micro leading-relaxed text-ink-500">
-              للاستفسار عن الحساب: مكتب الإشراف — حلقات جامع محمد العبدالكريم.
-            </p>
+            ))}
           </div>
-        </main>
+        ) : (
+          <p className="text-xs2 text-white/55">منصة إدارة الحلقات — الطلاب والمستويات والنقاط والاختبارات</p>
+        )
+      }>
+      <h1 className="font-display text-d1 text-ink-900">تسجيل الدخول</h1>
+      <p className="mt-2 text-base2 text-ink-600">ادخل ببيانات الحساب الذي زوّدك به المشرف.</p>
 
-        {/* brand panel — the only deep field in the product (DESIGN.md §1.3) */}
-        <aside className="relative hidden flex-col justify-between overflow-hidden bg-brand-900 p-12 text-white lg:flex">
-          <Lattice className="pointer-events-none absolute inset-0 h-full w-full text-white" opacity={0.07} />
-          <div className="pointer-events-none absolute -left-32 -top-32 h-[26rem] w-[26rem] rounded-full bg-white/[.035]" />
-          <div className="pointer-events-none absolute -bottom-40 -left-16 h-[30rem] w-[30rem] rounded-full bg-white/[.025]" />
-
-          <div className="relative flex items-center justify-between gap-8">
-            <LogoFull height={62} white />
-            <span className="h-10 w-px bg-white/15" />
-            <LogoJamiyah height={40} white className="opacity-70" />
+      <form onSubmit={submit} className="mt-8 space-y-4">
+        <Field label="اسم المستخدم" htmlFor="nid">
+          <input id="nid" ref={idRef} autoComplete="username"
+            value={id} onChange={(e) => setId(e.target.value)} placeholder="admin"
+            className={INPUT} />
+        </Field>
+        <Field label="كلمة المرور" htmlFor="pw">
+          <div className="relative">
+            <input id="pw" type={showPw ? 'text' : 'password'} autoComplete="current-password"
+              value={pw} onChange={(e) => setPw(e.target.value)} placeholder="••••••••"
+              className={cx(INPUT, 'pe-11')} />
+            <button type="button" onClick={() => setShowPw((v) => !v)}
+              aria-label={showPw ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
+              aria-pressed={showPw}
+              className="absolute inset-y-0 end-0 flex w-11 items-center justify-center rounded-e-md text-ink-400 transition-colors hover:text-ink-700">
+              {showPw ? <EyeOff size={17} strokeWidth={1.9} /> : <Eye size={17} strokeWidth={1.9} />}
+            </button>
           </div>
+        </Field>
 
-          {/* The ayah carries this panel on its own — the mosque is already
-              named by the lockup above it, so repeating it only crowds. */}
-          <div className="relative my-auto max-w-[34rem] py-10">
-            <p className="font-display text-d2 leading-[1.95] text-white lg:text-d1 lg:leading-[1.85]">
-              وَلَقَدْ يَسَّرْنَا الْقُرْآنَ لِلذِّكْرِ فَهَلْ مِن مُّدَّكِرٍ
-            </p>
-            <cite className="mt-5 block text-sm2 not-italic text-white/55">سورة القمر — الآية ١٧</cite>
-          </div>
+        <div className="flex items-center justify-between pt-0.5">
+          <label className="flex cursor-pointer items-center gap-2 text-xs2 text-ink-600">
+            <input type="checkbox" defaultChecked
+              className="h-4 w-4 rounded-sm border-ink-300 accent-brand-800" />
+            تذكّرني على هذا الجهاز
+          </label>
+          <button type="button" className="text-xs2 text-brand-800 hover:underline">
+            نسيت كلمة المرور؟
+          </button>
+        </div>
 
-          {/* Real figures, read from what this installation actually holds —
-              never hard-coded, and never a student's name on a public screen. */}
-          <div className="relative flex items-end gap-10 border-t border-white/12 pt-7">
-            {db.students.length > 0 ? (
-              [[db.halaqat.length, 'حلقات'], [db.students.length, 'طالبًا']].map(([n, l]) => (
-                <div key={String(l)}>
-                  <div className="font-display text-t1 text-white"><Num>{n}</Num></div>
-                  <div className="mt-0.5 text-xs2 text-white/55">{l}</div>
-                </div>
-              ))
-            ) : (
-              <p className="text-xs2 text-white/55">منصة إدارة الحلقات — الطلاب والمستويات والنقاط والاختبارات</p>
-            )}
-          </div>
-        </aside>
-      </div>
-    </div>
+        {!err && reason && (
+          <p className="rounded-md border border-warn-200 bg-warn-100 px-3 py-2.5 text-panel text-warn-700">
+            {reason === 'idle'
+              ? 'أُقفلت الجلسة تلقائيًا بعد ثلاثين دقيقة دون نشاط. سجّل الدخول للمتابعة.'
+              : 'انتهت صلاحية الجلسة. سجّل الدخول للمتابعة.'}
+          </p>
+        )}
+
+        {err && (
+          <p role="alert" className="rounded-md border border-risk-200 bg-risk-100 px-3 py-2.5 text-panel text-risk-700">
+            {err}
+          </p>
+        )}
+
+        <Btn type="submit" variant="primary" size="xl" className="w-full" disabled={busy}>
+          {busy ? <><Loader2 size={17} className="animate-spin" />جارٍ الدخول…</> : 'دخول'}
+        </Btn>
+      </form>
+
+      {/* THREE portals, one domain. A student typing his national id here gets
+          «غير صحيحة» and no idea why, and so does a teacher typing his
+          four-digit number — this is the supervisor's door, and the other two
+          are next to it. */}
+      <LoginDoors here="admin" />
+
+      <p className="mt-8 text-micro leading-relaxed text-ink-500">
+        للاستفسار عن الحساب: مكتب الإشراف — حلقات جامع محمد العبدالكريم.
+      </p>
+    </LoginFrame>
   );
 }
 

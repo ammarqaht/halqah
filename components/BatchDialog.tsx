@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Printer } from 'lucide-react';
 import { Modal, Btn, Field, INPUT } from '@/components/ui';
 import { Combobox } from '@/components/Combobox';
+import { DateField } from '@/components/DateField';
 import { useBands } from '@/lib/useBands';
 import { Num, cardWord, pointWord } from '@/components/Num';
 import { store } from '@/lib/store';
@@ -83,8 +84,8 @@ export function BatchDialog({ open, onClose, onIssued }: {
               options={purposes.map((p) => ({ value: p, label: p }))} />
           </Field>
           <Field label="تاريخ الانتهاء" hint="اختياري — حتى لا تبقى بطاقة قديمة صالحة إلى الأبد">
-            <input type="date" className={INPUT} value={expires} min={isoDate(new Date())}
-              onChange={(e) => setExpires(e.target.value)} />
+            <DateField value={expires || isoDate(new Date())} onChange={setExpires} chrome="field"
+              min={isoDate(new Date())} label="تاريخ انتهاء الدفعة" />
           </Field>
         </div>
 

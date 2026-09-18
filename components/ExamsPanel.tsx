@@ -6,14 +6,28 @@
    zero. It appears here when its screen ships. */
 import { useMemo } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Plus } from 'lucide-react';
 import { PanelShell, PanelGroup, PanelItem } from '@/components/Panel';
 import { plural } from '@/components/Num';
 import { useDB } from '@/lib/store';
 import { EXAM_TYPE_AR, type ExamType } from '@/lib/points';
+import { type BookingBadge } from '@/lib/types';
 import { shortName } from '@/lib/normalise';
+import { isoDate } from '@/lib/dates';
 
 const TYPES: ExamType[] = ['BADGE_GOLDEN', 'BADGE_DIAMOND', 'ASSOCIATION', 'MOCK', 'TAJWEED'];
+
+/* دفتر المواعيد يُقرأ بسؤال في الذهن: من يجلس اليوم، وما بقي مفتوحًا، وما أُجري.
+   «خيارات التصفية تكون في البار الجانبي وليس فوق» (client, 18 Sep 2026) — and
+   the side panel is where every other screen keeps them (DESIGN.md §4), so the
+   table gets its width back and the filters sit where the eye already looks for
+   them. They live in the URL, so a cut of the book is a link. */
+const WHEN: { id: string; label: string }[] = [
+  { id: 'done', label: 'أُجري' },
+  { id: 'today', label: 'اليوم' },
+  { id: 'booked', label: 'محجوز' },
+  { id: 'cancelled', label: 'أُلغي' },
+];
+const BADGES: BookingBadge[] = ['BADGE_GOLDEN', 'BADGE_DIAMOND', 'ASSOCIATION'];
 
 export function ExamsPanel({ onClose }: { onClose: () => void }) {
   const db = useDB();
@@ -21,10 +35,10 @@ export function ExamsPanel({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const sp = useSearchParams();
 
-  const set = (key: string, val: string | null) => {
+  const set = (key: string, val: string | null, path = '/admin/exams') => {
     const next = new URLSearchParams(sp.toString());
     if (val === null || next.get(key) === val) next.delete(key); else next.set(key, val);
-    router.replace(`/admin/exams${next.toString() ? `?${next}` : ''}`, { scroll: false });
+    router.replace(`${path}${next.toString() ? `?${next}` : ''}`, { scroll: false });
   };
 
   const counts = useMemo(() => {
@@ -51,6 +65,22 @@ export function ExamsPanel({ onClose }: { onClose: () => void }) {
   const type = sp.get('type');
   const halaqa = sp.get('halaqa');
   const onLog = path === '/admin/exams';
+  const onBook = path.startsWith('/admin/exams/onsite');
+
+  /* The same four cuts the screen applies, counted here so the shape of the
+     book is readable before anything is clicked — and a cut with nothing in it
+     is still shown, because «لا شيء ألغي» is an answer. */
+  const today = isoDate(new Date());
+  const book = useMemo(() => ({
+    all: db.bookings.length,
+    done: db.bookings.filter((b) => b.status === 'DONE').length,
+    today: db.bookings.filter((b) => b.status === 'BOOKED' && b.scheduledOn === today).length,
+    booked: db.bookings.filter((b) => b.status === 'BOOKED').length,
+    cancelled: db.bookings.filter((b) => b.status === 'CANCELLED').length,
+    byBadge: (x: string) => db.bookings.filter((b) => b.badge === x).length,
+  }), [db.bookings, today]);
+  const when = sp.get('when');
+  const badge = sp.get('badge');
 
   return (
     <PanelShell title="الاختبارات"
@@ -69,6 +99,36 @@ export function ExamsPanel({ onClose }: { onClose: () => void }) {
           count={dueToday || undefined}
           tone={dueToday > 0 ? 'warn' : undefined}>حجوزات الاختبارات</PanelItem>
       </PanelGroup>
+
+      {onBook && db.bookings.length > 0 && (
+        <>
+          <PanelGroup label="الوقت">
+            <PanelItem active={!when} onClick={() => set('when', null, '/admin/exams/onsite')}
+              count={book.all}>الكل</PanelItem>
+            {WHEN.map((w) => (
+              <PanelItem key={w.id} active={when === w.id}
+                onClick={() => set('when', w.id, '/admin/exams/onsite')}
+                count={book[w.id as 'done' | 'today' | 'booked' | 'cancelled']}
+                tone={w.id === 'today' && book.today > 0 ? 'warn' : undefined}>
+                {w.label}
+              </PanelItem>
+            ))}
+          </PanelGroup>
+
+          <PanelGroup label="الوسام">
+            <PanelItem active={!badge} onClick={() => set('badge', null, '/admin/exams/onsite')}>
+              كل الأوسمة
+            </PanelItem>
+            {BADGES.map((b) => (
+              <PanelItem key={b} active={badge === b}
+                onClick={() => set('badge', b, '/admin/exams/onsite')}
+                count={book.byBadge(b) || undefined}>
+                {EXAM_TYPE_AR[b]}
+              </PanelItem>
+            ))}
+          </PanelGroup>
+        </>
+      )}
 
       {onLog && db.exams.length > 0 && (
         <>
@@ -112,10 +172,6 @@ export function ExamsPanel({ onClose }: { onClose: () => void }) {
         </>
       )}
 
-      <button onClick={() => router.push('/admin/exams/new')}
-        className="mt-1 flex w-full items-center gap-2 rounded-md border border-dashed border-ink-300 px-2 py-2 text-panel text-ink-600 transition-colors hover:border-brand-400 hover:bg-brand-50 hover:text-brand-800">
-        <Plus size={15} strokeWidth={2} /> تسجيل اختبار
-      </button>
     </PanelShell>
   );
 }

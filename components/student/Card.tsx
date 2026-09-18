@@ -5,12 +5,15 @@
    طا-٢ opens with «رصيد النقاط بخطّ كبير في أعلى الشاشة», so the balance lives
    ON the card rather than below the fold.
 
-   It STICKS (DESIGN.md §11.1). The prototype's move, and Apple Wallet's before
-   it: the card fills the top and stays there while the sheet of detail climbs
-   over it, the card retreating a third of the scroll distance and fading as it
-   goes. That only works if the card owns the top of the screen, so الرئيسية
-   hides the phone's top bar — which is why خروج is here. Above `md` the portal
-   has its own sticky bar and the card goes back to being a card.
+   ONE PAGE, NOT TWO LAYERS. It used to STICK while the sheet of detail climbed
+   over it, the card retreating a third of the scroll and fading as it went —
+   Apple Wallet's move, and DESIGN.md §11.1's. The client asked for the two to be
+   «صفحة وحدة» with the card's own detail staying put: «فالتفاصيل اللي موجودة في
+   الهيرو ما تختفي ولا تتحرك مع السكرول» (18 Sep 2026).
+
+   So it is a card at the top of an ordinary page now. It looks exactly as it
+   did, and simply scrolls away with everything else. It still carries خروج,
+   because الرئيسية still hides the phone's top bar for it.
 
    The label «بطاقة الطالب» went: a card need not announce that it is one. The
    two large buttons under it went too — شحن كود and المتجر are both already
@@ -22,47 +25,42 @@
    A talqeen student gets the same card with his identity and a calm sentence
    where the balance would be — not a disabled button and not a greyed-out
    teaser of something he is not allowed to want.
+
+   No entrance either, and no watermark: the mark on the roof of the card is the
+   same mark, and a second one ghosted into the corner was decoration rather
+   than identification.
    ───────────────────────────────────────────────────────────────────────── */
 import Link from 'next/link';
 import { LogOut, Trophy } from 'lucide-react';
 import { LogoMark } from '@/components/Logo';
 import { Num, pointWord } from '@/components/Num';
-import { useCountUp, usePhone, useScrollY } from '@/components/student/motion';
+import { useCountUp } from '@/components/student/motion';
 import { SignOutButton } from '@/components/student/SignOut';
 import { COPY } from '@/content/student';
 import type { Me } from '@/components/student/Me';
 
-/* Retreat a third of the distance travelled, to a stop; gone by 300px. Both are
-   transform and opacity, so the whole thing rides the compositor and never
-   competes with the scroll driving it. */
-const SHIFT_CAP = 320;
-const SHIFT_RATE = 0.32;
-const FADE_OVER = 300;
-
-export function StudentCard({ me, standing }: {
+export function StudentCard({ me, standing, bell }: {
   me: Me;
   /** His place in his own halaqa, when the board has loaded. */
   standing?: { rank: number; total: number } | null;
+  /** الجرس — «أضف زرّ الجرس للطالب» (client, 18 Sep 2026). Passed in rather than
+      read here, because the alerts are the home screen's own request and the
+      card must not fetch anything to draw itself. */
+  bell?: React.ReactNode;
 }) {
   const balance = useCountUp(me.balance, 900);
-  const phone = usePhone();
-  const y = useScrollY(phone);
-
-  const shift = Math.min(y, SHIFT_CAP) * SHIFT_RATE;
-  const fade = Math.max(0, 1 - y / FADE_OVER);
 
   return (
-    <header className="card-field rise sticky top-0 z-0 -mx-5 -mt-4 px-5 pb-12 pt-[calc(22px+env(safe-area-inset-top))] shadow-pop md:static md:mx-0 md:mt-0 md:rounded-[20px] md:px-6 md:pb-6 md:pt-5">
-      {/* the mark, watermarked — never redrawn, never recoloured */}
-      <div aria-hidden className="pointer-events-none absolute bottom-4 end-5 opacity-[.07]">
-        <LogoMark height={92} white />
-      </div>
-
-      <div className="relative will-change-transform"
-        style={phone ? { transform: `translateY(${shift}px)`, opacity: fade } : undefined}>
-        <div className="flex items-center gap-3">
+    /* Curved at the foot even full-bleed, like the teacher's — «هيرو الطالب
+       خلّه كيرف» (client, 18 Sep 2026). It reaches both edges and the top of
+       the screen because it IS the top of the screen; its bottom is where
+       the card ends and the page begins, and a card ends with a corner. */
+    <header className="card-field -mx-5 -mt-4 rounded-b-[26px] px-5 pb-6 pt-[calc(22px+env(safe-area-inset-top))] shadow-pop md:mx-0 md:mt-0 md:rounded-[20px] md:px-6 md:pb-6 md:pt-5">
+      <div className="relative">
+        <div className="flex items-center gap-2">
           <LogoMark height={28} white />
           <span className="min-w-0 flex-1" />
+          {bell}
           {/* On a phone this is the only way out, because the bar that used to
               carry it is hidden on this screen. */}
           <SignOutButton label="تسجيل الخروج"

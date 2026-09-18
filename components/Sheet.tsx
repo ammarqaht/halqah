@@ -10,11 +10,16 @@ export function Sheet({ children, className, pad = true }:
 }
 
 export function SheetHead({ title, meta, action }:
-  { title: string; meta?: string; action?: React.ReactNode }) {
+  /* `title` takes a node as well as a string: a heading sometimes needs a chip
+     beside it — which window it is showing, say — and that is part of the
+     heading rather than a subtitle under it. */
+  { title: React.ReactNode; meta?: React.ReactNode; action?: React.ReactNode }) {
   return (
     <div className="mb-5 flex items-start justify-between gap-4">
       <div className="min-w-0">
-        <h2 className="text-lg2 font-bold text-ink-900">{title}</h2>
+        <h2 className="flex flex-wrap items-center gap-2 text-lg2 font-bold text-ink-900">
+          {title}
+        </h2>
         {meta && <p className="mt-1 text-xs2 text-ink-500">{meta}</p>}
       </div>
       {action}

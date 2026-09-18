@@ -8,6 +8,18 @@
            layout on 1 Sep 2026 so the sheet prints on ONE page, with the
            «الدرجة من ١٠ لكل مقرّر» rule kept — each of the three has its own
            score box, beside it.
+
+   EACH مقرّر IS ONE CELL, and that is a reversal. It was four — من سورة، آية،
+   إلى سورة، آية — on the reasoning that a teacher reads down a column of surahs
+   and a column of ayat. Seventeen columns across 703mm is what that cost, and
+   at that width every name was ellipsised: «قالب الخطة الآن مب واضح وفيه أشياء
+   متداخلة ومختفية. أبغى عمود من سورة والآية إلى سورة والآية في كل مقرّر تكون
+   خلية وحدة، يعني ثلاث خلايا» (client, 18 Sep 2026).
+
+   He is right, and the reason is worth keeping: a range is ONE fact. «الحديد ١
+   — الحديد ١١» split across four boxes is read by reassembling it, and a sheet
+   that has to be reassembled at every row is the sheet he described. Eight
+   columns give each range the width to be printed whole.
    Days 12 and 24 carry the two badges **with a date box and no recitation
    range**, exactly as the client's own file does.
    Footer: the printed tajweed reference (§5.4). No signature lines.
@@ -34,27 +46,32 @@ const BADGE_AR = { BADGE_GOLDEN: 'الوسام الذهبي', BADGE_DIAMOND: 'ا
 
 
 /**
- * One مقرّر across its four columns.
+ * One مقرّر, whole, in one cell.
  *
  * The editor saves whatever was typed — no completeness check — so a HALF
  * filled range must print as visibly incomplete rather than as ambiguous: an
- * empty slot stays empty, and «إلى سورة» repeats the surah when the range sits
- * inside one, because a blank there would read on paper as «nothing set».
+ * empty side stays empty rather than borrowing the other one's surah.
+ *
+ * The surah is said ONCE when both ends sit inside it: «الحديد ١ — ١١» is how
+ * it is spoken, and repeating the name in the same breath is how a cell this
+ * width ends up ellipsised again.
  */
-function RangeCells({ r, cell, ayahCell, bold = false }: {
-  r: PlanRow | undefined; cell: string; ayahCell: string; bold?: boolean;
-}) {
-  const ay = (v: string | undefined) => (!v ? '' : v === 'آخر' ? v : v);
+function Range({ r }: { r: PlanRow | undefined }) {
   const from = r?.fromSurah ?? '';
-  const to = r?.toSurah || (from ? from : '');
-  const w = bold ? 'font-medium' : '';
+  const to = r?.toSurah ?? '';
+  const fa = r?.fromAyah ?? '';
+  const ta = r?.toAyah ?? '';
+  if (!from && !to && !fa && !ta) return null;
+
+  const same = !to || to === from;
   return (
-    <>
-      <td className={`${cell} text-start ${w}`}>{from}</td>
-      <td className={ayahCell}>{ay(r?.fromAyah)}</td>
-      <td className={`${cell} text-start ${w}`}>{to}</td>
-      <td className={ayahCell}>{ay(r?.toAyah)}</td>
-    </>
+    <span className="leading-tight">
+      <span className="font-medium">{from}</span>
+      {fa && <> <span className="tabular-nums">{fa}</span></>}
+      <span className="mx-1 text-ink-400">—</span>
+      {!same && <span className="font-medium">{to} </span>}
+      {ta && <span className="tabular-nums">{ta}</span>}
+    </span>
   );
 }
 
@@ -112,21 +129,16 @@ function PlanSheetInner({ params }: { params: Promise<{ planId: string }> }) {
   }
 
   const cell = 'border border-ink-300 px-1.5 py-1 text-center align-middle';
-  /* Tighter, because seventeen columns cannot each afford six pixels a side.
-     `truncate` is the guard of last resort: a surah name that still will not
-     fit is clipped rather than allowed to widen its column. */
-  /* Read at arm's length on a desk, often photocopied. Bumped a point and a
-     half and darkened: the printer's grey at 9.5px was the reason the sheet
-     looked washed out. `align-middle` centres each cell vertically — the
-     scoring boxes are taller than a line of text, so without it every entry
-     sat on the ceiling of its box. */
-  const tcell = 'border border-ink-400 px-1 py-1.5 text-center align-middle truncate '
-    + 'text-ink-900';
-  /* Ayah cells never truncate. «٤…» is not a shortened 45 — it is a different
-     number, on a sheet a child recites from. The column is wide enough for
-     three digits, and a fourth would shrink rather than be cut. */
-  const acell = 'border border-ink-400 px-0.5 py-1.5 text-center align-middle '
-    + 'whitespace-nowrap text-ink-900';
+  /* Read at arm's length on a desk, often photocopied. Darkened, because the
+     printer's grey was the reason the sheet looked washed out. `align-middle`
+     centres each cell vertically — the scoring boxes are taller than a line of
+     text, so without it every entry sat on the ceiling of its box.
+
+     NOTHING TRUNCATES any more. It used to, as the guard of last resort behind
+     seventeen columns; at eight there is room for the whole range, and a
+     clipped «المجاد…» on a sheet a child recites from was never a
+     shortened name — it was a different one. A long one wraps inside its cell. */
+  const tcell = 'border border-ink-400 px-1 py-1.5 text-center align-middle text-ink-900';
 
   return (
     <>
@@ -181,62 +193,46 @@ function PlanSheetInner({ params }: { params: Promise<{ planId: string }> }) {
         </table>
 
         {/* ── الجدول — صفّ واحد لكل يوم، والدرجة بجنب كل مقرّر ─────────── */}
-        {/* A4 at 12mm margins leaves ~703px, and seventeen columns will not
-            find their own way into that. `table-fixed` with an explicit width
-            per column is what keeps this one page: the browser stops measuring
-            content and honours the numbers, so a long surah name ellipsises
-            instead of pushing the sheet onto a second sheet. */}
-        <table className="w-full table-fixed border-collapse text-[11px] font-medium">
+        {/* `table-fixed` with an explicit width per column is what keeps this
+            one page: the browser stops measuring content and honours the
+            numbers, so a long surah name wraps inside its cell instead of
+            pushing the sheet onto a second sheet. */}
+        <table className="w-full table-fixed border-collapse text-[10.5px] font-medium">
           <colgroup>
-            <col style={{ width: '3.8%' }} />{/* اليوم */}
+            <col style={{ width: '4.5%' }} />{/* اليوم */}
             {[0, 1, 2].map((i) => (
               <Fragment key={i}>
-                <col style={{ width: '8.2%' }} />{/* من سورة */}
-                <col style={{ width: '4.6%' }} />{/* آية — ثلاث خانات تسع «٢٨٦» كاملة */}
-                <col style={{ width: '8.2%' }} />{/* إلى سورة */}
-                <col style={{ width: '4.6%' }} />{/* آية — ثلاث خانات تسع «٢٨٦» كاملة */}
-                <col style={{ width: '4.6%' }} />{/* الدرجة — written in by hand */}
+                <col style={{ width: '19%' }} />{/* المقرّر كاملًا في خلية */}
+                <col style={{ width: '6%' }} />{/* الدرجة — تُكتب باليد */}
               </Fragment>
             ))}
-            <col style={{ width: '5.5%' }} />{/* ملاحظات */}
+            <col style={{ width: '20.5%' }} />{/* الملاحظة — أطول خلية في السطر */}
           </colgroup>
-          {/* Two header rows: the مقرّر spans its four columns, and each names
-              what goes under it. «الحديد ١-٥» in one cell was compact but not
-              what the teacher reads down — he reads a column of surahs and a
-              column of ayat, so they are columns. */}
           <thead>
             <tr className="bg-page/60 text-[10px] text-ink-700">
-              <th className={tcell} rowSpan={2}>اليوم</th>
-              <th className={tcell} colSpan={4}>مراجعة كبرى</th>
-              <th className={tcell} rowSpan={2}>درجة</th>
-              <th className={tcell} colSpan={4}>مراجعة صغرى</th>
-              <th className={tcell} rowSpan={2}>درجة</th>
-              <th className={tcell} colSpan={4}>الدرس</th>
-              <th className={tcell} rowSpan={2}>درجة</th>
-              <th className={tcell} rowSpan={2}>ملاحظات</th>
-            </tr>
-            <tr className="bg-page/60 text-[9px] text-ink-600">
-              {[0, 1, 2].map((i) => (
-                <Fragment key={i}>
-                  <th className={tcell}>من سورة</th>
-                  <th className={acell}>آية</th>
-                  <th className={tcell}>إلى سورة</th>
-                  <th className={acell}>آية</th>
-                </Fragment>
-              ))}
+              <th className={tcell}>اليوم</th>
+              <th className={tcell}>مراجعة كبرى</th>
+              <th className={tcell}>درجة</th>
+              <th className={tcell}>مراجعة صغرى</th>
+              <th className={tcell}>درجة</th>
+              <th className={tcell}>الدرس</th>
+              <th className={tcell}>درجة</th>
+              <th className={tcell}>ملاحظات</th>
             </tr>
           </thead>
           <tbody>
             {days.map((d) => {
               if (d.examBadge) {
-                /* «يظهران في الورقة بصفّهما وخانة تاريخ … لا بمقرّر حفظ» */
+                /* «يظهران في الورقة بصفّهما وخانة تاريخ … لا بمقرّر حفظ», and
+                   since 18 Sep 2026 the row is THREE cells: «خلية الوسام تكون
+                   على ٣ أعمدة: الأول اسم الوسام، والثاني التاريخ وتُكتب كلمة
+                   التاريخ في نفس الخلية، والثالثة الملاحظة». The word stays in
+                   the cell because the box is filled in by hand months later,
+                   by whoever is holding the sheet. */
                 return (
-                  <tr key={d.dayNo} className="keep h-[28px] bg-brand-50">
+                  <tr key={d.dayNo} className="keep h-[26px] bg-brand-50">
                     <td className={`${tcell} font-medium`}><Num>{d.dayNo}</Num></td>
-                    {/* The badge spans everything but the last column, so the
-                        date it asks for lands in the widest cell on the row
-                        rather than in a scoring box too narrow to hold it. */}
-                    <td className={`${tcell} font-medium text-brand-800`} colSpan={14}>
+                    <td className={`${tcell} font-medium text-brand-800`} colSpan={3}>
                       {BADGE_AR[d.examBadge]}
                       {/* «واختبار الجمعية معه» on the levels the file marks —
                           the boy and his teacher both need to know the day
@@ -245,7 +241,12 @@ function PlanSheetInner({ params }: { params: Promise<{ planId: string }> }) {
                         <span className="text-assoc-700"> · اختبار الجمعية</span>
                       )}
                     </td>
-                    <td className={`${tcell} text-ink-500`}>التاريخ</td>
+                    <td className={`${tcell} text-start font-normal text-ink-500`} colSpan={2}>
+                      التاريخ
+                    </td>
+                    <td className={`${tcell} text-start font-normal text-ink-400`} colSpan={2}>
+                      ملاحظة
+                    </td>
                   </tr>
                 );
               }
@@ -258,20 +259,20 @@ function PlanSheetInner({ params }: { params: Promise<{ planId: string }> }) {
                 ? noted.map((r) => `${PLAN_KIND_AR[r.kind]}: ${r.note}`).join(' · ')
                 : (noted[0]?.note ?? '');
               return (
-                <tr key={d.dayNo} className="keep h-[28px]">
+                <tr key={d.dayNo} className="keep h-[26px]">
                   <td className={`${tcell} font-medium`}>
                     <Num>{d.dayNo}</Num>
                     {d.association && (
                       <span className="block text-[7.5px] leading-none text-assoc-700">جمعية</span>
                     )}
                   </td>
-                  <RangeCells r={mk} cell={tcell} ayahCell={acell} />
+                  <td className={tcell}><Range r={mk} /></td>
                   <td className={tcell} />
-                  <RangeCells r={ms} cell={tcell} ayahCell={acell} />
+                  <td className={tcell}><Range r={ms} /></td>
                   <td className={tcell} />
-                  <RangeCells r={dars} cell={tcell} ayahCell={acell} bold />
+                  <td className={tcell}><Range r={dars} /></td>
                   <td className={tcell} />
-                  <td className={`${tcell} text-start text-[8.5px]`}>
+                  <td className={`${tcell} text-start text-[8.5px] font-normal`}>
                     {/* Clamped: an unbounded note would grow the row and spill
                         the sheet onto a second page — the merge's whole point. */}
                     <span title={notes} style={{
@@ -287,21 +288,25 @@ function PlanSheetInner({ params }: { params: Promise<{ planId: string }> }) {
           </tbody>
         </table>
 
-        {/* ── ذيل التجويد — §5.4 ───────────────────────────────────────── */}
-        <section className="keep mt-4 rounded border border-ink-200 p-2.5">
-          <h2 className="mb-1.5 text-center text-xs2 font-bold text-ink-800">
+        {/* ── ذيل التجويد — §5.4 ─────────────────────────────────────────
+            «أبي بلوك مرجع التجويد يكون أصغر لكي لا ينتقل إلى صفحة أخرى»
+            (client, 18 Sep 2026). It is a reference, not a lesson: it is read
+            once by whoever is unsure, and every millimetre it takes is a
+            millimetre the twenty-four rows above it do not have. */}
+        <section className="keep mt-2.5 rounded border border-ink-200 px-2 py-1.5">
+          <h2 className="mb-1 text-center text-[9.5px] font-bold text-ink-800">
             مرجع التجويد — أحكام النون الساكنة والتنوين
           </h2>
-          <div className="grid grid-cols-3 gap-x-4 gap-y-1">
+          <div className="grid grid-cols-3 gap-x-3 gap-y-0.5">
             {TAJWEED_FOOTER.map((t) => (
-              <p key={t.title} className="text-[10px] text-ink-700">
+              <p key={t.title} className="text-[8.5px] leading-snug text-ink-700">
                 <span className="font-medium text-ink-900">{t.title}:</span> {t.body}
               </p>
             ))}
           </div>
         </section>
 
-        <p className="keep mt-3 text-center text-[9px] text-ink-500">
+        <p className="keep mt-1.5 text-center text-[8.5px] text-ink-500">
           الدرجة من <Num>{10}</Num> لكل مقرّر ·
           يوما <Num>{plan.examDays.BADGE_GOLDEN}</Num> و
           <Num>{plan.examDays.BADGE_DIAMOND}</Num> للاختبار

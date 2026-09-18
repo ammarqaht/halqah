@@ -17,8 +17,21 @@ import type { Prisma } from '@prisma/client';
 
 const iso = (d: Date | null | undefined) => (d ? d.toISOString() : null);
 
+/** What `/api/teacher/day` stamps on the point rows it writes. The ONE string
+    that keeps the teacher's ledger out of the supervisor's bulk save; it is
+    written in `lib/day.ts` and read here, and the two must not drift. */
+const DAY_REF = 'day';
+
 export async function GET() {
   if (!await readSession()) return NextResponse.json({ error: 'غير مصرّح' }, { status: 401 });
+
+  const holdRows = await db.studentProgress.findMany({
+    where: { examHoldAt: { not: null } },
+    select: { studentId: true, examHoldAt: true, examHoldBy: true, examHoldNote: true },
+  });
+  const holds = new Map(holdRows.map((h) => [h.studentId, {
+    at: h.examHoldAt!.toISOString(), by: h.examHoldBy ?? '', note: h.examHoldNote,
+  }]));
 
   const [students, halaqat,
          txns, batches, codes, gifts, orders, exams, questions, bookings,
@@ -48,7 +61,14 @@ export async function GET() {
        so every browser showed its own copy of the students and disagreed with
        the server about who they were and what رتل last said about them. That
        is why «أوجه الحفظ» read 0.00 on screen while the database held 0.6. */
-    students: students.map(toStudent),
+    /* «ويظهر عند المشرف» — the teacher's opinion rides down with the roster.
+       READ-ONLY by construction: `student_progress` is a teacher-portal table,
+       and the PUT whitelist below has no column for it, so no browser sync can
+       overwrite a judgement made in the other portal. */
+    students: students.map((s) => {
+      const h = holds.get(s.id);
+      return h ? { ...toStudent(s), examHold: h } : toStudent(s);
+    }),
     halaqat: halaqat.map(toHalaqa),
     txns: txns.map((t) => ({ ...t, createdAt: t.createdAt.toISOString() })),
     batches: batches.map((b) => ({
@@ -213,6 +233,10 @@ export async function PUT(req: Request) {
           stage: String(st.stage ?? ''),
           nationality: String(st.nationality ?? ''),
           guardianPhone: String(st.guardianPhone ?? ''),
+          /* Written like every other field the supervisor types. The whitelist
+             is the guard: a column absent from it is one a browser can never
+             overwrite, which is how the teacher-portal tables stay safe. */
+          birthDate: (st.birthDate as string) || null,
           status: String(st.status ?? 'ACTIVE'),
           currentLevel: st.currentLevel == null ? null : Number(st.currentLevel),
           dedupeKey: (st.dedupeKey as string) || null,
@@ -253,7 +277,23 @@ export async function PUT(req: Request) {
       await tx.examQuestion.deleteMany();
       await tx.pointCode.deleteMany();
       await tx.order.deleteMany();
-      await tx.pointTxn.deleteMany();
+      /* NOT the teacher's rows.
+         The ledger is the one table both portals write into: the supervisor's
+         grants, cards and exam awards come through here, and the fixed daily
+         حضور·ثوب·تسميع points are written by /api/teacher/day, which this
+         browser has never seen and cannot send back. Deleting the lot and
+         recreating it from his copy would erase an afternoon of التحضير every
+         time he pressed save — and silently, because the rows he sent would all
+         land. So the teacher's rows are recognised by `refType` and left alone,
+         and the incoming list is filtered to match below. */
+      /* `NOT { refType: 'day' }` is `ref_type <> 'day'` in SQL, and that is
+         UNKNOWN for a NULL — so every row with no refType survived the delete
+         and then arrived again in the incoming list, colliding on its own id.
+         The supervisor's «تصحيح حركة» writes exactly such a row. NULLs are
+         named explicitly, and «keep» means what it says: the teacher's rows,
+         and nothing else. */
+      await tx.pointTxn.deleteMany({
+        where: { OR: [{ refType: { not: DAY_REF } }, { refType: null }] } });
       await tx.examBooking.deleteMany();
       await tx.exam.deleteMany();
       await tx.studentPlan.deleteMany();
@@ -300,7 +340,12 @@ export async function PUT(req: Request) {
         createdAt: d(o.createdAt) ?? new Date(), deliveredAt: d(o.deliveredAt),
       })) as Prisma.OrderCreateManyInput[] });
 
-      const txns = mine<{ studentId: string } & Record<string, unknown>>(s.txns ?? []);
+      /* The browser HAS the teacher's rows — GET sends them, because the
+         supervisor's balances and ledger must include them. They simply are not
+         his to write, so they are dropped on the way back in rather than
+         colliding with the rows that were just preserved. */
+      const txns = mine<{ studentId: string } & Record<string, unknown>>(
+        (s.txns ?? []).filter((t: Record<string, unknown>) => t.refType !== DAY_REF));
       if (txns.length) await tx.pointTxn.createMany({ data: txns.map((t) => ({
         ...t, createdAt: d(t.createdAt) ?? new Date() })) as Prisma.PointTxnCreateManyInput[] });
 

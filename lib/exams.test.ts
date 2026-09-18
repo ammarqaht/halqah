@@ -145,6 +145,32 @@ describe('ready for the association exam — §4.8 / §13.6', () => {
       .toEqual({ ready: true, ajza: 1, reason: null });
   });
 
+  /* ── متى يُحجز اختبار الجمعية ────────────────────────────────────────────
+     «بعد الوسام الماسي للمستويات الذهبية جميعها، أو بعد الوسام الماسي للمستويات
+     الفردية للمسار الفضي» (client, 18 Sep 2026).
+
+     Which is this rule read from the other end, and worth pinning down as he
+     said it: the diamond is the proof a JUZ was finished, and a juz is what the
+     association examines. Every golden level is one juz; on the silver track it
+     takes two, so only the ODD levels land on a whole one — 59 ends the first
+     juz, 57 the second. `ajzaForLevel` returning null on an even silver level
+     is the same fact, and it is why nothing extra is checked here. */
+  it('opens after EVERY golden level — each one is a whole juz', () => {
+    for (const [level, ajza] of [[30, 1], [29, 2], [28, 3]] as const) {
+      expect(readyForAssociation({ track: 'GOLDEN', level, exams: [diamond(ajza)] }))
+        .toEqual({ ready: true, ajza, reason: null });
+    }
+  });
+
+  it('opens on the ODD silver levels — the even ones sit mid-juz', () => {
+    // 59 is the end of the first juz, 57 of the second: both open it
+    expect(readyForAssociation({ track: 'SILVER', level: 59, exams: [diamond(1)] }).ready).toBe(true);
+    expect(readyForAssociation({ track: 'SILVER', level: 57, exams: [diamond(2)] }).ready).toBe(true);
+    // 58 has finished a juz and a half, so nothing is due on it by itself
+    expect(readyForAssociation({ track: 'SILVER', level: 58, exams: [] }))
+      .toEqual({ ready: false, ajza: null, reason: 'المستوى لم يُتمّ جزءًا كاملًا بعد' });
+  });
+
   it('reports the furthest juz when several await the association', () => {
     const r = readyForAssociation({ track: 'GOLDEN', level: 27, exams: [diamond(1), diamond(2)] });
     expect(r).toEqual({ ready: true, ajza: 2, reason: null });

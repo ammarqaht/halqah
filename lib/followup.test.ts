@@ -194,8 +194,12 @@ describe('حان موعد اختباره — the appointment the supervisor set 
     expect(dueForExamCount([booking({})], NOW)).toBe(1);
   });
 
-  it('counts yesterday too — a sitting nobody held is not less urgent', () => {
-    expect(dueForExamCount([booking({ scheduledOn: '2026-08-25' })], NOW)).toBe(1);
+  /* It used to count yesterday's as well, on the reasoning that a sitting
+     nobody held is more urgent rather than less. The client reads the alert as
+     a diary: «المفروض يحط اللي عندهم اختبار اليوم فقط» (18 Sep 2026). The ones
+     nobody closed are still on the bookings screen under «محجوز». */
+  it('leaves yesterday alone — this alert is the day, not the backlog', () => {
+    expect(dueForExamCount([booking({ scheduledOn: '2026-08-25' })], NOW)).toBe(0);
   });
 
   it('leaves tomorrow alone', () => {

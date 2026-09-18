@@ -157,6 +157,231 @@ This is the load-bearing phase. Everything later reads from it.
 
 ---
 
+## Phase 10 — بوابة المعلم (5 days foundation + 9 screens)
+
+From «متطلبات بوابة المعلم — النسخة الثالثة» (15 Sep 2026). The document was held against this
+codebase before a line was written, and **five of the portal's pillars had no table under them** —
+which is why this phase is foundation-then-screens and not screens.
+
+### 10.0 The foundation that did not exist  ✅
+- [x] `teachers` — a teacher was a NAME in `halaqat.teacher`. Accounts are derived from those names,
+      never typed again; `halaqat.teacher_id` is `@unique`, so «لكل معلم حلقة واحدة» is a constraint
+      and not a comment
+- [x] `day_entries` + `recitation_lines` + `day_entry_revisions` — a dated attendance and recitation
+      record. `students.attended_days` was a 0–7 count from رتل with no dates behind it, so no
+      absence list and no repeat-absence rule could exist
+- [x] `student_progress` — **the مقرّر pointer**, «أخطر النواقص». The system recorded that a plan was
+      ISSUED, never how far into it a student got. Its own table, NOT a column on `student_plans`:
+      that table is deleted and rewritten by every supervisor save
+- [x] `admin_messages` + reads — «رسائل الإدارة» on the teacher's home screen
+- [x] `settings.daily_points` + `settings.halaqa_weekdays`
+- [x] `point_txns.effective_on` — «تُسجَّل بتاريخ يومها لا بتاريخ إدخالها»
+- [x] **`PUT /api/state` no longer deletes the teacher's ledger rows.** The one table both portals
+      write into; without this, a save from the supervisor's laptop erased an afternoon of التحضير
+      silently, every time
+
+### 10.1 Rules and tests  ✅
+- [x] `lib/teacher.ts` — calendar, pointer, daily points, absence, Umm al-Qura dates
+- [x] `lib/teacher.test.ts` — **45 assertions**, each quoting the sentence it came from rather than
+      the implementation, so the suite fails if the code drifts from what was agreed
+
+### 10.2 Screens  ✅
+- [x] `/teacher/login` · `/teacher/password` — four digits from 2001, and a real password
+- [x] `/teacher` — بطاقة اليوم, four figures, تنبيهات حلقتي
+- [x] `/teacher/register` — **the heart**: the three modes, 25 cards on one page, save per card,
+      and an offline outbox designed in from the first line rather than retrofitted
+- [x] `/teacher/students` + `/teacher/students/[id]`
+- [x] `/teacher/points` — balances, ledger by source, honour board, orders (read-only)
+- [x] `/teacher/reports` + seven printed sheets under `/teacher/print/*`
+- [x] `الإعدادات → المعلمون` on the supervisor's side: accounts, daily points, halaqa weekdays
+
+### 10.2a Client's pass over the running portal (18 Sep 2026)  ✅
+Shown the working portal, the client reshaped it. Two of these changed the DATABASE, not the screen:
+
+- [x] **«غائب بعذر» removed** — from the `AttendanceStatus` enum, the rules, the reports and the
+      prints. It contradicts مع-٣-ب, which names four states; recorded as the client's decision in
+      the migration, in `lib/teacher.ts` and in `DESIGN.md` §12.4
+- [x] **`recitation_lines.note`** — a note per مقرّر, beside the passage it is about. §٩'s note on
+      the DAY stays; they are two different remarks
+- [x] **`teacher_alert_reads`** replaced `admin_message_reads` — five of the six alert kinds are
+      computed from rows and had no id to mark, so the key is derived from the alert itself
+- [x] الرئيسية rebuilt on the student's shapes: a ring and an attendance bar, the exam rail, five
+      alerts with unread dots and a modal for the rest, the point ledger
+- [x] التسجيل: the same hero as الرئيسية with the three modes inside it; search, `احفظ الكل` (one
+      request), a `الحاضرون فقط` filter; one-row attendance; full مقرّر names; whole-block toggle;
+      labelled errors; per-line note; recitation gated on attendance; re-press clears
+- [x] وضع «يوم سابق» keeps its own date, and «اليوم» is always today
+- [x] **The teacher can no longer set a مقرّر** — so `الإعدادات ← المعلمون ← مقرّرات الطلاب` was
+      built for the supervisor, and `/api/admin/progress` behind it. Without it the teacher's
+      «راجع المشرف» is a door nobody can open
+- [x] No entrance animation on either portal's hero
+
+### 10.2b Second pass over the running portal (18 Sep 2026)  ✅
+- [x] **`DateField`** — the calendar drawn in the site's own identity instead of the operating
+      system's, with the Hijri date the native control cannot show, day steppers, and `max` enforced
+      on the grid, the month arrow and the steppers alike. Used by التسجيل, فترة لطالب and التقارير
+- [x] Both portals' heroes: **one page** — no sticky, no parallax, no watermark, no climbing sheet
+- [x] `.portal` wears the supervisor's `.thin-scroll` rather than hiding its scrollbar
+- [x] **Clearing a saved day is a save**: the entry is deleted, its points come back as a reversing
+      row (append-only holds), and the boy returns to the مقرّر that day recorded
+- [x] The hero's big button is a stated prop, not inferred from `data` — it was flashing on التسجيل
+      and sitting permanently in فترة لطالب
+- [x] Recitation lines on one row with a 24px tick; sort chips toggle direction; ملف الطالب
+      reorganised into a fact grid with print at the top, histories capped at 5 (ledger 10), and the
+      read-only note replaced by a «صحّح أيامه» button that lands on فترة لطالب with the boy chosen
+- [x] كشف حلقتي gained «مضى عليه» and «آخر اختبار»; تقارير الطالب الواحد removed from التقارير
+
+### 10.2c Third pass over the running portal (18 Sep 2026)  ✅
+- [x] **«امسح تسجيله» only at its time** — a card that WAS saved and has just been cleared, not every
+      untouched card on the screen
+- [x] **`نقاط يومه`** on the save row, at the start of it: the day's total for that boy, computed from
+      the DRAFT by the same `dailyAward` the server pays by, over the point table the route now hands
+      down with the day. Reverses §١٢-ب's «ولا نقاط ولا حسابات في هذه الصفحة» — DESIGN.md §12.5b
+- [x] حال اليوم on a non-halaqa day is the headline alone; the paragraph's content is the button
+- [x] The hero's bottom corners curve full-bleed; the section under it gets the ordinary entrance
+- [x] The **document's** scrollbar wears the indicator (`html`, not `.portal` — a nested div cannot
+      paint the page's own bar)
+- [x] سجل التسميع: three equal boxes instead of wrapping pills, no subtitle, «صحّح السجل» on one line
+- [x] **`<HijriText>`** — the one place `<Num>`'s forced LTR is wrong, and it was wrong in all four
+      places a Hijri date appeared. DESIGN.md §12.5c
+- [x] **التنبيهات**: every kind carries its date, ordered newest-first, and a **bell in the hero**
+      beside خروج opens them all. Read-marking moved into `MeProvider`, since two things now show the
+      same list. DESIGN.md §12.5d
+- [x] **فرسان الأسبوع** in «ما يُرسل ويُعلَّق» — beside لوحة الشرف's term-long balances.
+      DESIGN.md §12.6b
+- [x] حركات النقاط on صفحة النقاط capped at ten, with «عرض الكل» opening the rest in a window
+
+### 10.2d Fourth pass, and two things put back (18 Sep 2026)  ✅
+- [x] **`Modal` is a sheet**: it rises from the edge it is anchored to, falls when dismissed, and can
+      be **dragged away by the header**. Five phases, only arrival a keyframe — DESIGN.md §7.1
+- [x] The **student's** hero gets the curved foot the teacher's has
+- [x] **مقرّر اليوم is back on the student's home**, and **his plan grid opens on his own مقرّر with a
+      tick on every one his teacher recorded**. Removed originally because nothing recorded where a
+      boy stood; the teacher's portal records it, so it is his teacher's own save read back to him
+      rather than a guess. DESIGN.md §11.3a and §11.4
+- [x] **فرسان الأسبوع redefined to the client's own criteria** — الحضور، الثوب، التسميع كامل، في كل
+      يوم حلقة مسجَّل خلال الأسبوع. A title, not a ranking. `knightOfWeek` in lib/teacher.ts with nine
+      tests; `lib/knights.ts` read by BOTH sheets. DESIGN.md §12.6b
+- [x] **A supervisor's sheet for the فرسان** — `/print/knights`, in التقارير beside لوحة الشرف, for
+      one halaqa or the whole mosque
+- [x] The bell's number is the **unread** count, and nothing when nothing is unread
+- [x] **رسائل الإدارة at the supervisor's end** — `الإعدادات ← المعلمون`, with the recipients chosen
+      by name, a read count on what was sent, and withdrawal. DESIGN.md §12.6c. This closes one of
+      §10.3's open items
+
+### 10.2e Fifth pass — a bug, a calendar, and two portals' polish (18 Sep 2026)  ✅
+- [x] **A saved day keeps the مقرّر it recorded.** The card read the live pointer, so saving Tuesday
+      made Tuesday show Wednesday's passages. `day_entries` already held the anchor and nothing read
+      it. DESIGN.md §12.4a — the one real defect in this pass
+- [x] **فرسان الأسبوع: a passed exam is a met day on its own** — «إذا اختبر واجتاز يُحسب ذلك اليوم».
+      Three more tests; `lib/knights.ts` reads the exams beside the entries
+- [x] **`DateRangeField`** — one calendar, first tap «من» and second «إلى», the range tinted between
+      them, earlier taps re-choosing the start, and the FUTURE faded to 30%. Replaces the two fields
+      on التقارير and on فترة لطالب. DESIGN.md §7.2
+- [x] **`ScrollProgress`** — a white hairline across the top of both portals, filling from the right.
+      DESIGN.md §7.3
+- [x] The student's مسيرتي ring measures THIS LEVEL, not the whole track. DESIGN.md §11.3
+- [x] وضع «فترة لطالب»: the picker is cards with the level and the مقرّر, search on top, staggered —
+      and the chosen boy's name comes off all fourteen day cards. DESIGN.md §12.5a1
+- [x] سجل التسميع on ملف الطالب is a WEEK, not a count of five
+- [x] بوابة المعلم has a door on the sign-in page, beside the student's
+
+### 10.2f Sixth pass — a dead button, a systemic width, and the student's bell (18 Sep 2026)  ✅
+- [x] **«امسح تسجيله» did nothing in وضع «فترة لطالب»** — its save returned early on a card with no
+      status, which is exactly what a cleared card is. DESIGN.md §12.5a2
+- [x] **`INPUT_BARE`** — `cx(INPUT, 'w-20')` is a coin flip, and it had been losing: every narrow
+      numeric box in الإعدادات rendered at the width of a paragraph. DESIGN.md §7.1a
+- [x] **مقرّرات الطلاب rebuilt** as a list, and المعلمون tidied with it. DESIGN.md §12.5a3
+- [x] **النقاط اليومية**: two typed columns instead of a multiplier, the factor now a button that
+      fills the golden one (الحضور والثوب included), the notes removed, and the card moved to
+      الإعدادات ← النقاط. Migration keeps an old database paying what it paid. DESIGN.md §12.6c1
+- [x] **تنبيهات الطالب** — a bell on his card and a block under his exams: his teacher's notes from
+      the recitation screen, his results, his bookings, his gifts, and the administration's
+      messages. New `/api/student/alerts` + `student_alert_reads`. DESIGN.md §11.3b
+- [x] **رسائل الإدارة**: its own settings page, **to students as well as teachers** (`audience`), and
+      a door in the top bar of الرئيسية. DESIGN.md §12.6c
+- [x] **`SlideRoute`** — the bottom bar and the in-page strips slide right and left. DESIGN.md §7.4
+- [x] **No side scrollbar in the portals** at all; the top hairline is the one indicator.
+      DESIGN.md §7.5
+- [x] وضع «فترة لطالب»: the picker is cards on the page, and the «اعرض» button is gone
+- [x] سجل التسميع is a week; the student's ring measures his level; بوابة المعلم has a door on the
+      sign-in page *(carried from 10.2e and verified again here)*
+
+### 10.2g Seventh pass — the mark, the talqeen boy, and the week on one sheet (18 Sep 2026)  ✅
+- [x] **The page slide is reverted; the BAR's mark slides instead** — measured, pinned to the physical
+      left edge, and read after commit rather than in a frame. DESIGN.md §7.4
+- [x] **مسار التلقين: آخر سورة وآخر آية**, and «يبدأ من» on the next day's card — with the roll-over
+      into the next surah. Two columns on the day and on the pointer; four tests. DESIGN.md §12.4b
+- [x] **تقرير تسجيل المعلم** — a landscape week: students in rows, days in columns, four marks each,
+      the day tinted by its status, «—» for absent, and a فارس column. DESIGN.md §12.6d
+- [x] **الرسائل**: four ways to name the students (الكل · بالحلقة · بالمسار · بأعيانهم), a two-letter
+      search with ↑↓ and Enter, and **one card per send** with its recipients. DESIGN.md §12.6c
+- [x] **تصفير النقاط** — its own lever under صفحة النقاط, with the database reset's own confirm
+- [x] «يستحق الاختبار» moved to the left of the card's own row, off its own line
+- [x] مقرّرات الطلاب: a «صدّر خطته» button for a student without one, and the site's own halaqa list
+      in place of the operating system's `<select>`
+- [x] **Every date picker in the three portals is the site's own** — no `<input type="date">` left
+- [x] The messages door moved from the top bar into «اختصارات»; the note at the foot of التقارير went
+
+### 10.2h Eighth pass — one door, short lists, and the sheet that names the boy (18 Sep 2026)  ✅
+- [x] **The three sign-in pages share one frame** — form on the right, ayah on the left, the curtain
+      on all three, and two rectangles to the other portals. DESIGN.md §5.3
+- [x] **قائمة السور بتصميم الموقع** in the talqeen card, with a تنبيه when what was typed is not one
+      of the 114 — because the server drops it rather than storing it. DESIGN.md §12.4b
+- [x] **الرسائل**: every teacher shown whole, and halaqat chosen SEVERAL at a time as rectangles with
+      their counts — one send, one card, one withdrawal. DESIGN.md §12.6c
+- [x] **تصفير النقاط** wears the database reset's own block, down to the warn strip and the red word
+- [x] **تقرير تسجيل المعلم** gains المسار والمستوى والمقرّر, a narrower name, and `table-fixed` so the
+      slack goes into the mark cells. DESIGN.md §12.6d
+
+### 10.2i Ninth pass — the appointment book, the plan sheet, and a save that had stopped saving (18 Sep 2026)  ✅
+- [x] **A bug found while verifying, and fixed**: `PUT /api/state` had been failing with a 500 since
+      the first «امسح تسجيله» or «تصحيح حركة». `NOT { refType: 'day' }` is `<> 'day'` in SQL, which is
+      UNKNOWN for NULL — so a row with no refType survived the delete and arrived again in the same
+      save, colliding on its own id. The clear-correction now carries `refType: 'day'` (it IS a
+      teacher row; only the refId had to go), the delete names NULLs explicitly, and a migration
+      repairs the rows already written. **The supervisor could not save at all until this.**
+- [x] **حجوزات الاختبارات**: filters by وقت (أُجري · اليوم · محجوز · أُلغي) and by وسام, a pencil that
+      corrects a booking instead of cancelling it, and «في السجلّ» landing on the sitting itself.
+      DESIGN.md §12.6e
+- [x] **اختبار الجمعية is bookable**, and only for a boy §4.8 says is ready — «بعد الوسام الماسي
+      للمستويات الذهبية جميعها، أو بعد الوسام الماسي للمستويات الفردية للمسار الفضي». Two tests state
+      the rule in the client's own terms
+- [x] **«يحتاج مراجعة قبل الاختبار»** — the teacher raises it, the supervisor sees it on the booking
+      screen and in the follow-up lists, and the boy is told in his own portal. DESIGN.md §12.4c
+- [x] **ورقة الخطة**: each مقرّر is one cell, the badge rows are three, and مرجع التجويد shrank so the
+      sheet stays one page. DESIGN.md §8.1
+- [x] **تقدّم الحلقات**: today's own figures on the home screen — same table, same columns — and the
+      رتل term totals moved to a report. DESIGN.md §12.6f
+- [x] **تاريخ الميلاد** in تسجيل طالب: three boxes, the month by name or number, February clamped
+- [x] الأخطاء التجويدية joined the question rows in تفاصيل الاختبار; the note column became an icon
+      with its text on hover; «حان موعد اختباره» and «اختبارات اليوم» count the DAY, not the backlog;
+      the date fields wear the form's chrome (DESIGN.md §7.2a); «لست هنا؟» and the duplicate
+      «تسجيل اختبار» button are gone
+
+### 10.2j Tenth pass — الأوجه، والتصفية في البار، ومن ينتظر اختباره (18 Sep 2026)  ✅
+- [x] **حسبة الأوجه** من ورقة «مسارات الحفظ»، في `settings.memorisation_pages` — لا في الشيفرة، ولا
+      تُطبع تفاصيلها في أي شاشة. `lib/pages.ts` + اثنا عشر اختبارًا. DESIGN.md §12.6g
+- [x] **عمودا «أوجه الحفظ» و«أوجه المراجعة»** في تقدّم الحلقات، محسوبان من السطور التي سُمِّعت اليوم،
+      وتحتهما عدد من سمّع
+- [x] **تصفية الحجوزات انتقلت إلى البار الجانبي** وصارت في الرابط (`?when=`, `?badge=`)
+- [x] **«من يستحق اختبارًا»** قائمةً قائمة في بلوك اختبارات المعلم — بمن حُجز له ومن رُفع عنه «يحتاج
+      مراجعة» — بدل تنبيهٍ يمرّ
+- [x] زرّ الجاهزية أصفر، وقرص «يحتاج مراجعة» في صفحة طلابي
+
+### 10.3 Still open
+- [ ] **Answer needed on the daily point figures.** `settings.weekly_sheet_points` (seeded from the
+      FIRST requirements document) and §١٣ of the third disagree on three of five items, and the
+      first also answers the golden-doubling question the third leaves open. Both are shown side by
+      side on the settings card with their totals; the supervisor picks. Until he does, §١٣ ships
+- [ ] The supervisor's own copy of صفحة التسجيل, for the day a teacher is absent. The ROUTES already
+      accept him (`/api/teacher/*` takes an admin session with `?halaqa=` and stamps the save
+      `SUPERVISOR`); what is missing is the screen in بوابة الإدارة that calls them
+- [ ] Phase two of §17: full multi-day offline with deferred sync, barcode attendance, the weekly
+      summary that builds itself each Thursday, and direct WhatsApp send
+
+---
+
 ## Cross-cutting, from day one
 
 - **RTL:** logical CSS properties only. Test every screen at 375 px. (`DESIGN.md` §9)

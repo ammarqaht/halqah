@@ -6,7 +6,7 @@ type DbStudent = {
   id: string; fullName: string; nationalId: string | null; nationalIdFlag: string | null;
   dedupeKey: string | null; track: string | null; halaqaId: string | null;
   grade: string; stage: string; nationality: string; guardianPhone: string;
-  status: string; currentLevel: number | null;
+  birthDate: string | null; status: string; currentLevel: number | null;
   attendedDays: number | null; hifzPages: unknown; reviewPages: unknown;
 };
 
@@ -24,6 +24,7 @@ export const toStudent = (s: DbStudent): Student => ({
   stage: s.stage,
   nationality: s.nationality,
   guardianPhone: s.guardianPhone,
+  birthDate: s.birthDate ?? null,
   status: s.status as StudentStatus,
   currentLevel: s.currentLevel,
   attendedDays: num(s.attendedDays),

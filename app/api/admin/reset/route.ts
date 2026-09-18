@@ -25,12 +25,26 @@ const WIPE = [
   'student_plans',
   'curriculum_days',
   'tajweed_topics',
+  /* And what the teacher's portal added. The first four cascade from students
+     and would have gone anyway; `teachers` and the messages name no student and
+     would have quietly survived a «تصفير كامل» — leaving seven accounts bound
+     to halaqat that no longer exist. Accounts go with the roster they were
+     derived from: «فتُشتقّ منها الحسابات ولا تُكتب من جديد», so a re-import
+     issues them again. */
+  'day_entry_revisions',
+  'recitation_lines',
+  'day_entries',
+  'student_progress',
+  'admin_message_reads',
+  'admin_messages',
   'students',
   'halaqat',
+  'teachers',
 ] as const;
 
 /* Deliberately NOT wiped: admin_users (you would lock yourself out) and
-   settings (the decided rules from §13, which are configuration, not data). */
+   settings (the decided rules from §13 and the daily point items and halaqa
+   weekdays from the teacher's portal, which are configuration, not data). */
 
 /* The confirmation the client asked for.
 

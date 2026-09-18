@@ -31,21 +31,37 @@ enum IdFlag {
   DUPLICATE
 }
 
+/**
+ * التحضير — ثلاث حالات: حاضر، ومتأخر، وغائب.
+ * مع-٣-ب asks for FOUR, with «غائب بعذر» among them. The client removed it on
+ * 18 Sep 2026 — «احذفها من الموقع كامل» — and it is recorded here rather than
+ * only on the screen, so nothing can write a state no report knows how to
+ * count. It goes with a rule: §١٥'s «والغياب بعذر لا يُحتسب فيه، ولا يقطع
+ * التتابع» has nothing left to describe, so repeat absence now counts every
+ * absence there is.
+ */
+enum AttendanceStatus {
+  PRESENT
+  LATE
+  ABSENT
+}
+
 enum AdminRole {
   SUPERVISOR
 }
 
 model AdminUser {
-  id           String   @id @default(cuid())
-  fullName     String   @map("full_name")
-  username     String   @unique
-  passwordHash String   @map("password_hash")
+  id           String    @id @default(cuid())
+  fullName     String    @map("full_name")
+  username     String    @unique
+  passwordHash String    @map("password_hash")
   role         AdminRole @default(SUPERVISOR)
-  active       Boolean  @default(true)
+  active       Boolean   @default(true)
   lastLoginAt  DateTime? @map("last_login_at")
-  createdAt    DateTime @default(now()) @map("created_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
 
   audits AuditLog[]
+
   @@map("admin_users")
 }
 
@@ -62,6 +78,17 @@ model Halaqa {
   active    Boolean  @default(true)
   createdAt DateTime @default(now()) @map("created_at")
 
+  /**
+   * Who signs in and records this halaqa's day.
+   * `teacher` above stays: it is what the roster file says and what every
+   * screen has printed since the first import, and a halaqa whose teacher has
+   * no account yet must still name him. This is the ACCOUNT, and it is
+   * `@unique` because «لكل معلم حلقة واحدة لا أكثر» — the constraint says so
+   * rather than a comment hoping for it.
+   */
+  teacherId   String?  @unique @map("teacher_id")
+  teacherUser Teacher? @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+
   students Student[]
 
   @@index([mosque, timeSlot])
@@ -71,6 +98,15 @@ model Halaqa {
 model Student {
   id       String @id @default(cuid())
   fullName String @map("full_name")
+  /**
+   * تاريخ الميلاد — ميلادي، `YYYY-MM-DD`.
+   *
+   * A date and not an age: an age is a fact with a shelf life, and a roster
+   * that stores one is wrong by one every year. Nullable because the client's
+   * own files do not carry it for everyone, and a guessed birthday is worse
+   * than a blank.
+   */
+  birthDate    String? @map("birth_date")
 
   // Stored exactly as found: abs() of the roster value, no length validation.
   // NOT unique — the client's roster legitimately carries one id on two rows.
@@ -90,30 +126,46 @@ model Student {
   currentLevel  Int?          @map("current_level")
 
   // last snapshot from a Ratel import
-  /** «الحضور» is a COUNT OF DAYS in the roster — 0 to 7 — not a yes/no.
-      Read as a boolean, a boy present three days out of three came back «غائب». */
-  attendedDays Int?    @map("attended_days") 
-  hifzPages   Decimal? @map("hifz_pages")   @db.Decimal(6, 2)
-  reviewPages Decimal? @map("review_pages") @db.Decimal(6, 2)
+  /**
+   * /**
+   * /**
+   * /** «الحضور» is a COUNT OF DAYS in the roster — 0 to 7 — not a yes/no.
+   * Read as a boolean, a boy present three days out of three came back «غائب».
+   */
+  attendedDays Int?     @map("attended_days")
+  hifzPages    Decimal? @map("hifz_pages") @db.Decimal(6, 2)
+  reviewPages  Decimal? @map("review_pages") @db.Decimal(6, 2)
 
   createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt      @map("updated_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  halaqa    Halaqa?          @relation(fields: [halaqaId], references: [id], onDelete: SetNull)
-  transfers HalaqaTransfer[]
+  halaqa     Halaqa?            @relation(fields: [halaqaId], references: [id], onDelete: SetNull)
+  transfers  HalaqaTransfer[]
+  /**
+   * Everything a student accumulates, now that it lives in the database.
+   */
+  credential StudentCredential?
+  txns       PointTxn[]
+  orders     Order[]
+  exams      Exam[]
+  bookings   ExamBooking[]
+  plans      StudentPlan[]
+  /**
+   * What his teacher records about him, day by day.
+   */
+  days       DayEntry[]
+  progress   StudentProgress?
+  /**
+   * رسائل الإدارة الموجَّهة إليه وحده، وما قرأه من تنبيهاته.
+   */
+  messages   AdminMessage[]
+  alertReads StudentAlertRead[]
 
   @@index([halaqaId])
   @@index([track])
   @@index([status])
   @@index([nationalId])
   @@map("students")
-  /* Everything a student accumulates, now that it lives in the database. */
-  credential  StudentCredential?
-  txns        PointTxn[]
-  orders      Order[]
-  exams       Exam[]
-  bookings    ExamBooking[]
-  plans       StudentPlan[]
 }
 
 model HalaqaTransfer {
@@ -174,20 +226,22 @@ model Setting {
   @@map("settings")
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   Everything below lived in the browser alone.
+/**
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Everything below lived in the browser alone.
+ * Eleven entities — the whole points ledger, every exam, every plan, the
+ * curriculum, the store and its orders — were held in localStorage. That is not
+ * a sync problem so much as a durability one: the supervisor's work existed in
+ * one browser profile on one machine, and clearing site data or opening the
+ * system on the phone showed an empty system.
+ * They are tables now, with the foreign keys that make them one system rather
+ * than eleven lists that happen to share ids.
+ * ─────────────────────────────────────────────────────────────────────────
+ */
 
-   Eleven entities — the whole points ledger, every exam, every plan, the
-   curriculum, the store and its orders — were held in localStorage. That is not
-   a sync problem so much as a durability one: the supervisor's work existed in
-   one browser profile on one machine, and clearing site data or opening the
-   system on the phone showed an empty system.
-
-   They are tables now, with the foreign keys that make them one system rather
-   than eleven lists that happen to share ids.
-   ───────────────────────────────────────────────────────────────────────── */
-
-/** §3.5 — append-only. A balance is the sum of its rows, never a column. */
+/**
+ * §3.5 — append-only. A balance is the sum of its rows, never a column.
+ */
 model PointTxn {
   id        String   @id
   studentId String   @map("student_id")
@@ -200,8 +254,22 @@ model PointTxn {
   createdBy String?  @map("created_by")
   createdAt DateTime @default(now()) @map("created_at")
 
+  /**
+   * THE DAY THE POINTS BELONG TO, `YYYY-MM-DD` — not the day they were typed.
+   * «تُسجَّل بتاريخ يومها لا بتاريخ إدخالها، فيبقى سجّل الطالب صادقًا، ولا
+   * تُحسب شهرًا كسبه في يوم» (المسألة ١٣). A teacher catching up on fifteen
+   * days at once is owed all of it, and his student's ledger must still read
+   * like fifteen days rather than one enormous afternoon.
+   * `createdAt` is left alone deliberately: it orders the ledger and answers
+   * «متى أُدخل هذا؟», and bending it to the halaqa's date would scramble both.
+   * Null on every row written before the teacher's portal, and on every grant
+   * whose only date is the moment it was made.
+   */
+  effectiveOn String? @map("effective_on")
+
   @@index([studentId])
   @@index([refType, refId])
+  @@index([effectiveOn])
   @@map("point_txns")
 }
 
@@ -223,7 +291,9 @@ model PointCode {
   id         String         @id
   batchId    String         @map("batch_id")
   batch      PointCodeBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  /** Ten characters, random — never sequential, or the next card is guessable. */
+  /**
+   * Ten characters, random — never sequential, or the next card is guessable.
+   */
   code       String         @unique
   redeemedBy String?        @map("redeemed_by")
   redeemedAt DateTime?      @map("redeemed_at")
@@ -236,7 +306,9 @@ model Gift {
   id                String   @id
   name              String
   description       String   @default("")
-  /** A data URL until an object store exists — lib/image.ts downscales it. */
+  /**
+   * A data URL until an object store exists — lib/image.ts downscales it.
+   */
   image             String?
   pointsCost        Int      @map("points_cost")
   quantity          Int
@@ -251,20 +323,26 @@ model Gift {
 
 model Order {
   id               String    @id
-  /** Short, human, and quotable at the desk: «رقم طلبي ٧٣». */
+  /**
+   * Short, human, and quotable at the desk: «رقم طلبي ٧٣».
+   */
   number           Int       @unique
   studentId        String    @map("student_id")
   student          Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  /** Nullable, and severed rather than cascaded when the gift goes.
-      An order is a record of something that happened and must outlive the
-      shelf it was bought from — but the relation used to be required, so a
-      supervisor deleting a purchased gift produced a foreign-key violation
-      that aborted the WHOLE save: not the gift, not the deletion, nothing at
-      all was written, and the screen said «تعذّر الحفظ». The snapshots below
-      are what the order actually needs. */
+  /**
+   * Nullable, and severed rather than cascaded when the gift goes.
+   * An order is a record of something that happened and must outlive the
+   * shelf it was bought from — but the relation used to be required, so a
+   * supervisor deleting a purchased gift produced a foreign-key violation
+   * that aborted the WHOLE save: not the gift, not the deletion, nothing at
+   * all was written, and the screen said «تعذّر الحفظ». The snapshots below
+   * are what the order actually needs.
+   */
   giftId           String?   @map("gift_id")
   gift             Gift?     @relation(fields: [giftId], references: [id], onDelete: SetNull)
-  /** Snapshots: the gift's price and name may change, what he paid may not. */
+  /**
+   * Snapshots: the gift's price and name may change, what he paid may not.
+   */
   pointsSpent      Int       @map("points_spent")
   giftNameSnapshot String    @map("gift_name_snapshot")
   status           String    @default("PENDING")
@@ -281,8 +359,10 @@ model Exam {
   id            String         @id
   studentId     String         @map("student_id")
   student       Student        @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  /** Denormalised deliberately: a student may move halaqa later, and the
-      record of who examined him must not move with him. */
+  /**
+   * Denormalised deliberately: a student may move halaqa later, and the
+   * record of who examined him must not move with him.
+   */
   halaqaId      String?        @map("halaqa_id")
   track         String?
   type          String
@@ -298,7 +378,9 @@ model Exam {
   pointsPaid    Boolean        @default(false) @map("points_paid")
   note          String         @default("")
   examiner      String         @default("")
-  /** One sitting, several rules — a tajweed exam covers as many as were set. */
+  /**
+   * One sitting, several rules — a tajweed exam covers as many as were set.
+   */
   tajweedTopics String[]       @map("tajweed_topics")
   source        String         @default("MANUAL")
   createdAt     DateTime       @default(now()) @map("created_at")
@@ -343,7 +425,9 @@ model ExamBooking {
   @@map("exam_bookings")
 }
 
-/** Reference data — one row per (track, level, day, kind). */
+/**
+ * Reference data — one row per (track, level, day, kind).
+ */
 model CurriculumDay {
   track     String
   level     Int
@@ -361,24 +445,23 @@ model CurriculumDay {
 }
 
 model StudentPlan {
-  id           String            @id
-  studentId    String            @map("student_id")
-  student      Student           @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  id           String   @id
+  studentId    String   @map("student_id")
+  student      Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
   track        String
   level        Int
-  issuedAt     String            @map("issued_at")
-  issuedBy     String?           @map("issued_by")
-  dayCount     Int               @default(24) @map("day_count")
-  examDays     Json              @map("exam_days")
-  dailyAmount  String            @default("") @map("daily_amount")
-  printedCount Int               @default(0) @map("printed_count")
-  createdAt    DateTime          @default(now()) @map("created_at")
+  issuedAt     String   @map("issued_at")
+  issuedBy     String?  @map("issued_by")
+  dayCount     Int      @default(24) @map("day_count")
+  examDays     Json     @map("exam_days")
+  dailyAmount  String   @default("") @map("daily_amount")
+  printedCount Int      @default(0) @map("printed_count")
+  createdAt    DateTime @default(now()) @map("created_at")
 
   @@unique([studentId, track, level])
   @@index([studentId])
   @@map("student_plans")
 }
-
 
 model TajweedTopic {
   id     String  @id
@@ -388,14 +471,11 @@ model TajweedTopic {
   @@map("tajweed_topics")
 }
 
-
 /**
  * A student's own sign-in.
- *
  * Created from the roster, never self-registered: «النظام يُنشئ حسابات الطلاب
  * تلقائيًا عند استيراد ملف الحلقات». He signs in with his national id and a
  * five-digit PIN the supervisor prints and hands to his teacher.
- *
  * A PIN, not a password, because the boy may be six years old and is typing it
  * on a phone in a mosque. Five digits is 100,000 combinations — thin on its
  * own, which is why the lockout below is not optional: five wrong tries and the
@@ -404,14 +484,85 @@ model TajweedTopic {
  * it beyond what his own teacher already knows.
  */
 model StudentCredential {
+  id             String    @id @default(cuid())
+  studentId      String    @unique @map("student_id")
+  student        Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  /**
+   * What the boy types. His national id — suffixed when two boys share one.
+   */
+  username       String    @unique
+  pinHash        String    @map("pin_hash")
+  /**
+   * True until he replaces the printed PIN with one of his own.
+   */
+  mustChangePin  Boolean   @default(true) @map("must_change_pin")
+  active         Boolean   @default(true)
+  failedAttempts Int       @default(0) @map("failed_attempts")
+  lockedUntil    DateTime? @map("locked_until")
+  lastLoginAt    DateTime? @map("last_login_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@map("student_credentials")
+}
+
+/**
+ * ─────────────────────────────────────────────────────────────────────────────
+ * بوابة المعلم — the foundation the screens stand on.
+ * Five of the portal's pillars had no table behind them (القسم الثالث of the
+ * third requirements document, verified against this file line by line): the
+ * teacher himself, a dated attendance record, a recitation record, the pointer
+ * that says where a student stopped in his plan, and the daily point items.
+ * None of them were hard; the thing they described simply did not exist.
+ * EVERY TABLE BELOW IS THE SERVER'S ALONE.
+ * `PUT /api/state` replaces the supervisor's whole working set wholesale — it
+ * deletes and rewrites exams, plans, points, orders and curriculum from
+ * whatever his browser holds. That is right for lists one supervisor owns and
+ * catastrophic for a record seven teachers write into from the mosque floor: a
+ * save from his laptop would erase an afternoon of التحضير without anyone
+ * touching it. So none of these rows travel through that endpoint. They are
+ * written only by `/api/teacher/*` and `/api/admin/*`, scoped on the server to
+ * the halaqa of whoever is asking — the same discipline `/api/student/*`
+ * already keeps.
+ * And there is no calendar table. «أيّ يوم يكون فيه تحضير يُعتبر يوم حلقة»
+ * (client, 17 Sep 2026) — so the attendance record IS the calendar: Sunday to
+ * Thursday open themselves, a Friday is opened by hand when a halaqa is held
+ * on one, and a day nobody registered is simply not a halaqa day. Absence is
+ * therefore counted over registered days only, and an Eid holiday cannot
+ * produce a single false غياب because no such day exists to be absent from.
+ * ─────────────────────────────────────────────────────────────────────────
+ */
+
+/**
+ * A teacher's own sign-in — «جديد على النظام كله».
+ * Until now a teacher was a NAME: `halaqat.teacher`, a string carried in from
+ * the roster file. The seven names are already there, so the accounts are
+ * derived from them rather than typed again.
+ * He signs in with a four-digit number from 2001 and a password the supervisor
+ * sets, which he changes on first use. Four digits keeps both portals on one
+ * shape, and starting at 2001 keeps his number clear of the students' 1001–1117
+ * — so a number read off the wrong sheet opens nothing rather than somebody
+ * else's halaqa. And unlike the students, his password is NOT his national id:
+ * he holds a hundred and seventeen boys' levels, exams and attendance, and his
+ * screen is open in a room full of them.
+ */
+model Teacher {
   id                 String    @id @default(cuid())
-  studentId          String    @unique @map("student_id")
-  student            Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  /** What the boy types. His national id — suffixed when two boys share one. */
+  fullName           String    @map("full_name")
+  /**
+   * Only to tell two teachers of one name apart, and never shown on a screen
+   * a student can see. Optional: the roster gives us names, not ids.
+   */
+  nationalId         String?   @map("national_id")
+  /**
+   * Four digits from 2001. What he types.
+   */
   username           String    @unique
-  pinHash            String    @map("pin_hash")
-  /** True until he replaces the printed PIN with one of his own. */
-  mustChangePin      Boolean   @default(true) @map("must_change_pin")
+  passwordHash       String    @map("password_hash")
+  /**
+   * True until he replaces what the supervisor handed him.
+   */
+  mustChangePassword Boolean   @default(true) @map("must_change_password")
   active             Boolean   @default(true)
   failedAttempts     Int       @default(0) @map("failed_attempts")
   lockedUntil        DateTime? @map("locked_until")
@@ -419,5 +570,324 @@ model StudentCredential {
   createdAt          DateTime  @default(now()) @map("created_at")
   updatedAt          DateTime  @updatedAt @map("updated_at")
 
-  @@map("student_credentials")
+  /**
+   * His one halaqa, or none yet. Stopping him is not deleting him:
+   * «إيقاف معلم لا يمسّ بيانات حلقته ولا سجّلها السابق».
+   */
+  halaqa   Halaqa?
+  messages AdminMessage[]
+
+  @@map("teachers")
+}
+
+/**
+ * بطاقة الطالب في يومه — one row per student per halaqa day.
+ * «والحفظ للبطاقة لا لليوم كله» (مع-٣-ج): the teacher finishes with a boy and
+ * saves him, so two devices open on the same afternoon can only ever collide on
+ * one named student rather than on the whole halaqa. This row and its three
+ * lines are written in one transaction, and the previous values go to
+ * `DayEntryRevision` rather than being overwritten into nothing.
+ * `day` is the date the HALAQA was held, never the date this was typed — the
+ * three recording modes exist precisely so a teacher can register a day he
+ * missed, and a row dated by its entry would make that a lie.
+ */
+model DayEntry {
+  id        String  @id @default(cuid())
+  studentId String  @map("student_id")
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  /**
+   * Denormalised on purpose, like `Exam.halaqaId`: a boy may move halaqa, and
+   * the record of the afternoon he was present at must not move with him.
+   */
+  halaqaId  String? @map("halaqa_id")
+  /**
+   * `YYYY-MM-DD`, local to the mosque.
+   */
+  day       String
+
+  status AttendanceStatus
+  /**
+   * «وعلامة الثوب بجانب كل حاضر بضغطة، لأنها بند نقاط مستقل في ورقتكم».
+   */
+  thobe  Boolean          @default(false)
+
+  /**
+   * Which مقرّر he recited, as his pointer stood on the day — kept here as
+   * well as on `StudentProgress` because the pointer moves on and this row
+   * must still say what was recited. Null for a talqeen boy, and for a boy
+   * whose plan has not been issued: «تُفتح له خانات الحضور والثوب فقط».
+   */
+  assignmentNo Int?    @map("assignment_no")
+  level        Int?
+  track        String?
+  /**
+   * «سمّع الدرس دون المراجعة» — the day advances him and is marked short.
+   */
+  incomplete   Boolean @default(false)
+
+  /**
+   * مسار التلقين: «آخر سورة قرأها وآخر آية حفظها» (client, 18 Sep 2026).
+   * A talqeen boy has no plan and no مقرّر — «لا مستوى له ولا منهج» — so the only
+   * record of where he is, is where his teacher left him. Kept on the DAY as
+   * well as on the pointer for the same reason `assignmentNo` is: the pointer
+   * moves on, and this row must still say what was read that afternoon.
+   */
+  talqeenSurah String? @map("talqeen_surah")
+  talqeenAyah  Int?    @map("talqeen_ayah")
+
+  /**
+   * «وخانة ملاحظة قصيرة اختيارية» — تعليمية على التسميع، ظاهرة للمشرف.
+   * There is deliberately nowhere here for a behavioural or medical note:
+   * «لا بيانات حساسة» (§١٧), so the field that would hold one does not exist.
+   */
+  note String @default("")
+
+  /**
+   * Who saved it, in which chair. Not a foreign key: this is either a teacher
+   * or the supervisor registering for an absent one, and «يظهر في السجل باسم
+   * المشرف لا باسم المعلم» needs both to be nameable in one column.
+   * The name is snapshotted so the log still reads correctly years later.
+   */
+  savedById   String?  @map("saved_by_id")
+  savedByRole String   @default("TEACHER") @map("saved_by_role")
+  savedByName String   @default("") @map("saved_by_name")
+  savedAt     DateTime @default(now()) @map("saved_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  lines     RecitationLine[]
+  revisions DayEntryRevision[]
+
+  /**
+   * One card per boy per day — the constraint that makes «آخِر حفظ يغلب» a
+   * single-row upsert rather than a race between two inserts.
+   */
+  @@unique([studentId, day])
+  @@index([halaqaId, day])
+  @@index([day])
+  @@map("day_entries")
+}
+
+/**
+ * سطر التسميع — «واحد من الثلاثة في كل مقرّر: م.ك، وم.ص، والدرس».
+ * «ويُسجَّل لكل سطر شيئان لا ثالث لهما: هل سمّعه، وكم خطأ فيه» — so there is no
+ * grade column, no mastery column and no repeat column. The line's point value
+ * is fixed and errors never reduce it: «فالتسميع اليومي ليس اختبارًا».
+ */
+model RecitationLine {
+  id      String   @id @default(cuid())
+  entryId String   @map("entry_id")
+  entry   DayEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  /**
+   * `DARS` · `MURAJAA_SUGHRA` · `MURAJAA_KUBRA` — a string, matching
+   * `curriculum_days.kind`, so a join never has to translate an enum.
+   */
+  kind    String
+  recited Boolean  @default(false)
+  /**
+   * «لكل سطر عدّاده، وحدّه خمسون — وما جاوزها فهو خطأ إدخال لا تسميع».
+   */
+  errors  Int      @default(0)
+  /**
+   * A note on THIS مقرّر, not on the day.
+   * §٩ gives the day one note and `DayEntry.note` still carries it. This is the
+   * other thing a teacher wants to write: «تعثّر في الآيات الأخيرة» belongs to
+   * the line it is about, and a boy's file is far more useful when the remark
+   * sits beside the passage than when it floats over the afternoon.
+   */
+  note    String   @default("")
+
+  @@unique([entryId, kind])
+  @@map("recitation_lines")
+}
+
+/**
+ * سجل التعديل — «وكل إدخال مسجَّل بصاحبه ووقته وقيمته السابقة».
+ * The portal has no delete: «حذف يوم أو حركة نقاط — التصحيح مسجَّل لا محذوف».
+ * So when a saved card is opened and saved again, what it held goes here first.
+ * Two devices on one boy resolve to last-write-wins with the loser preserved,
+ * which is the only outcome that answers «أيّهما يغلب؟» without losing work.
+ */
+model DayEntryRevision {
+  id      String   @id @default(cuid())
+  entryId String   @map("entry_id")
+  entry   DayEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  before  Json
+  after   Json
+  byId    String?  @map("by_id")
+  byRole  String   @default("TEACHER") @map("by_role")
+  byName  String   @default("") @map("by_name")
+  at      DateTime @default(now())
+
+  @@index([entryId, at])
+  @@map("day_entry_revisions")
+}
+
+/**
+ * مؤشّر المقرّر — «أخطر النواقص» (الناقص الرابع), and the one every rule in §١٥
+ * stands on.
+ * The system records that a plan was ISSUED, never how far into it a student
+ * got: it knows a boy is on level 27 and not that he is on its fifth مقرّر. So
+ * «الانتقال إلى المقرّر التالي» and «الوقوف عند ١٢ و٢٤» and «يبقى على مقرّره
+ * حتى يسمّعه» had nothing to move.
+ * It lives in its OWN table rather than as a column on `student_plans`, and the
+ * reason is not taste: that table is deleted and rewritten by every supervisor
+ * save, so a pointer stored there would be reset to whatever his browser last
+ * held, silently, on an ordinary afternoon.
+ * `assignmentNo` is what the student must recite TODAY — not the last thing he
+ * recited. «المقرّر ٧ من ٢٤» on his card is the passage in front of him, and
+ * every rule below reads it that way. Null means nobody has said yet: the
+ * hundred and seventeen students already halfway through their levels are not
+ * given a 1 that would send them back to the start of a plan they finished
+ * months ago. Their teacher sets it once, from the card itself.
+ */
+model StudentProgress {
+  studentId    String  @id @map("student_id")
+  student      Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  /**
+   * The plan this pointer walks — a pointer without them cannot be resolved
+   * to a passage, and a level change must reset it rather than carry over.
+   */
+  track        String?
+  level        Int?
+  assignmentNo Int?    @map("assignment_no")
+
+  /**
+   * Set when he reaches an exam مقرّر: `BADGE_GOLDEN` or `BADGE_DIAMOND`.
+   * «ويبقى الطالب على مقرّره حتى تُسجَّل نتيجته، فلا يمضي في الحفظ قبل
+   * اختباره» — the pointer stops here and only the supervisor's recorded
+   * result releases it.
+   */
+  awaitingExam String? @map("awaiting_exam")
+
+  setById      String?  @map("set_by_id")
+  setByRole    String   @default("TEACHER") @map("set_by_role")
+  setByName    String   @default("") @map("set_by_name")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  /**
+   * مسار التلقين — أين وقف، لا أين يجب أن يقف.
+   * «وفي اليوم التالي يعرض من أين يبدأ» (client, 18 Sep 2026): his card opens on
+   * the ayah after the last one he memorised, which is what his teacher reads
+   * off it before either of them opens a mushaf.
+   */
+  talqeenSurah String?  @map("talqeen_surah")
+  talqeenAyah  Int?     @map("talqeen_ayah")
+
+  /**
+   * «الطالب ليس مستعدًّا للاختبار ويحتاج مراجعة» — رأي معلّمه.
+   *
+   * The pointer already says when a boy has REACHED his exam مقرّر; it never
+   * said whether he is ready to sit it, and the only person who knows that
+   * hears him five afternoons a week. «عند المعلم في صفحة الاختبارات أبي يظهر
+   * زر أن الطالب مب جاهز للاختبار ويحتاج مراجعة، ويظهر عند المشرف والطالب»
+   * (client, 18 Sep 2026).
+   *
+   * An OPINION, not a gate: it blocks no booking and cancels no sitting. The
+   * supervisor is told before he books, the boy is told he has work to do, and
+   * whoever sets it is named — a judgement nobody signs is one nobody lifts.
+   */
+  examHoldAt   DateTime? @map("exam_hold_at")
+  examHoldBy   String?   @map("exam_hold_by")
+  examHoldNote String    @default("") @map("exam_hold_note")
+
+  @@map("student_progress")
+}
+
+/**
+ * رسائل الإدارة — «ما ترسلونه إلى معلم بعينه أو إلى المعلمين جميعًا … يظهر في
+ * المكان نفسه، فلا يحتاج المعلم إلى قناة أخرى» (مع-٢).
+ * Deliberately one-way. The portal is not a chat: a teacher who needs to reply
+ * has the supervisor's phone, and a half-built inbox is worse than none.
+ */
+model AdminMessage {
+  id            String   @id @default(cuid())
+  body          String
+  /**
+   * `TEACHERS` or `STUDENTS` — «ويمكن يرسل رسائل للطلاب والمعلمين» (client,
+   * 18 Sep 2026). It is stated rather than inferred from which id is set,
+   * because a BROADCAST has neither, and «to everyone» must still say to
+   * everyone of WHICH kind.
+   */
+  audience      String   @default("TEACHERS")
+  /**
+   * Null with `audience = TEACHERS` is «to every teacher».
+   */
+  teacherId     String?  @map("teacher_id")
+  teacher       Teacher? @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  /**
+   * Null with `audience = STUDENTS` is «to every student».
+   */
+  studentId     String?  @map("student_id")
+  student       Student? @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  /**
+   * One SEND, however many rows it wrote.
+   * Addressing is a row per reader so each copy can be ticked off on its own,
+   * but that made the supervisor's «ما أُرسل» list one card per PERSON for a
+   * message he wrote once: «بلوك ما أُرسل يظهر كل رسالة في بطاقة وحدة ومعها لمن
+   * أُرسلت» (client, 18 Sep 2026). The rows still carry the readers; this is
+   * what puts them back together.
+   */
+  groupId       String?  @map("group_id")
+  /**
+   * How the readers were chosen — «كل الطلاب» · «حلقة فلان» · «المسار الذهبي».
+   * Stored rather than derived: a halaqa a boy has since left would otherwise
+   * make an old send describe itself wrongly.
+   */
+  scopeLabel    String   @default("") @map("scope_label")
+  createdById   String?  @map("created_by_id")
+  createdByName String   @default("") @map("created_by_name")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([teacherId, createdAt])
+  @@index([studentId, createdAt])
+  @@index([audience, createdAt])
+  @@index([groupId])
+  @@map("admin_messages")
+}
+
+/**
+ * ما قرأه الطالب من تنبيهاته — the student's half of `TeacherAlertRead`.
+ * «أضف زرّ الجرس للطالب، وبلوك التنبيهات كذلك» (client, 18 Sep 2026), and his
+ * alerts have the same property his teacher's do: most are COMPUTED from rows —
+ * a result, a booking, a note his teacher wrote beside a مقرّر, a gift that came
+ * in — so there is no id to hang a marker on and the key is derived from what
+ * the alert is ABOUT.
+ */
+model StudentAlertRead {
+  studentId String   @map("student_id")
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  /**
+   * `KIND:id` — see `alertKey` in app/api/student/alerts/route.ts.
+   */
+  key       String
+  readAt    DateTime @default(now()) @map("read_at")
+
+  @@id([studentId, key])
+  @@index([studentId, readAt])
+  @@map("student_alert_reads")
+}
+
+/**
+ * ما قرأه المعلم من تنبيهاته.
+ * «والتنبيه غير المقروء فيه دائرة خضراء صغيرة» (client, 18 Sep 2026) — and a
+ * teacher's alerts are not one kind of thing: five of the six are COMPUTED from
+ * rows (a stopped مقرّر, a booking, a result, a delivered plan, a run of
+ * absences) and only the sixth is a stored message. A read-marker table for
+ * messages alone would have left the other five permanently unread.
+ * So the key is a string the alert derives from itself — `EXAM_DUE:<studentId>`,
+ * `RESULT:<examId>`, `MESSAGE:<id>` — stable for as long as the alert means the
+ * same thing, and naturally gone when it stops applying. Server-side rather than
+ * in the browser, because a teacher who read it on his phone has read it.
+ * It replaced `admin_message_reads`, which could only ever mark one of the six.
+ */
+model TeacherAlertRead {
+  teacherId String   @map("teacher_id")
+  /**
+   * `KIND:id` — see `alertKey` in app/api/teacher/me/route.ts.
+   */
+  key       String
+  readAt    DateTime @default(now()) @map("read_at")
+
+  @@id([teacherId, key])
+  @@index([teacherId, readAt])
+  @@map("teacher_alert_reads")
 }

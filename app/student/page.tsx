@@ -7,9 +7,12 @@
    ranking figures, and those arrive already reduced to «place out of total» by
    a route that names nobody (see app/api/student/rank).
 
-   No «today» card. `/api/student/plan` deliberately points at no day — nothing
-   records which one a boy actually reached — so this screen does not invent one
-   either. It links to the whole sheet instead.
+   مقرّر اليوم IS BACK, 18 Sep 2026. This file used to say: «No today card.
+   /api/student/plan deliberately points at no day — nothing records which one a
+   boy actually reached — so this screen does not invent one either.» The
+   teacher's portal records it now, so the block is his teacher's own save read
+   back to him. It sits directly under the card, above everything but a coming
+   exam, because «ما عليّ اليوم» is what a boy opens this screen to find.
    ───────────────────────────────────────────────────────────────────────── */
 import { useEffect, useState } from 'react';
 import { ClipboardCheck, TrendingUp } from 'lucide-react';
@@ -17,8 +20,12 @@ import { Sheet } from '@/components/Sheet';
 import { Empty } from '@/components/ui';
 import { useMe } from '@/components/student/Me';
 import { StudentCard } from '@/components/student/Card';
-import { NextExam } from '@/components/student/NextExam';
+import { ExamHold, NextExam } from '@/components/student/NextExam';
 import { Journey, ExamRail, RankTiles, Ledger, type ExamRow } from '@/components/student/Tiles';
+import { TodayAssignment, type StudentPlanPayload } from '@/components/student/Today';
+import {
+  StudentAlertsBell, StudentAlertsBlock, StudentAlertsModal, useStudentAlerts,
+} from '@/components/student/Alerts';
 import { COPY, LEDGER_ON_HOME } from '@/content/student';
 import { formatDate } from '@/lib/dates';
 
@@ -31,12 +38,19 @@ export default function StudentHome() {
   const [moves, setMoves] = useState<Move[] | null>(null);
   const [inHalaqa, setInHalaqa] = useState<Standing>(null);
   const [overall, setOverall] = useState<Standing>(null);
+  /* One read of his sheet, shared: مقرّر اليوم names the level and the ring in
+     مسيرتي measures it, so they must be the same answer. */
+  const [plan, setPlan] = useState<StudentPlanPayload | null>(null);
+  const [allAlerts, setAllAlerts] = useState(false);
+  const alerts = useStudentAlerts();
 
   const eligible = me?.eligibleForPoints ?? false;
 
   useEffect(() => {
     fetch('/api/student/exams').then((r) => (r.ok ? r.json() : { exams: [] }))
       .then((d) => setExams(d.exams ?? [])).catch(() => setExams([]));
+    fetch('/api/student/plan').then((r) => (r.ok ? r.json() : null))
+      .then((d) => setPlan(d)).catch(() => { /* the block simply is not there */ });
   }, []);
 
   useEffect(() => {
@@ -63,23 +77,29 @@ export default function StudentHome() {
 
   return (
     <div>
-      <StudentCard me={me} standing={inHalaqa} />
+      <StudentCard me={me} standing={inHalaqa}
+        bell={<StudentAlertsBell unread={alerts.unread} onOpen={() => setAllAlerts(true)} />} />
 
-      {/* The sheet of detail, which on a phone climbs over the card as he
-          scrolls: full-bleed, its own opaque ground, and a higher layer than
-          the hero it covers. Above `md` the card is just a card again and this
-          goes back to being the rest of the page. */}
-      <div className="relative z-10 -mx-5 -mt-7 space-y-3.5 rounded-t-[28px] bg-page px-5 pt-4 shadow-[0_-14px_36px_-18px_rgba(10,64,60,.6)] md:mx-0 md:mt-3.5 md:rounded-none md:bg-transparent md:px-0 md:pt-0 md:shadow-none">
-        <div aria-hidden="true"
-          className="mx-auto -mt-1 mb-1 h-[5px] w-10 rounded-full bg-ink-200 md:hidden" />
+      {/* One page: the hero is the card at the top of it, not a layer under it. */}
+      <div className="mt-3.5 space-y-3.5">
 
         {/* Above everything but the card: an exam he has not prepared for is the
             most useful thing this screen can tell him. */}
         <NextExam me={me} />
 
+      {/* ما قاله معلّمه عن جاهزيته — فوق كل شيء إلا البطاقة والموعد، لأنه
+          الشيء الوحيد في الصفحة الذي يطلب منه عملًا اليوم. */}
+      <ExamHold me={me} />
+
+      {/* ما عليّ اليوم — الدرس والمراجعتان، كما سجّلها معلمه. It shows nothing
+          when nobody has set his pointer: a boy must never be sent to an
+          invented passage. */}
+      {levelled && <TodayAssignment d={plan} />}
+
       {levelled && (
         <Journey level={me.currentLevel} ajza={me.ajza}
-          pct={me.progressPct} total={me.levelTotal} />
+          pct={me.progressPct} total={me.levelTotal}
+          at={plan?.at ?? null} of={plan?.plan?.dayCount ?? 0} />
       )}
 
       {/* آخر اختباراتي */}
@@ -94,6 +114,13 @@ export default function StudentHome() {
       ) : (
         <ExamRail exams={exams.slice(0, 8)} passed={passed} formatDate={formatDate} />
       )}
+
+      {/* «وبلوك التنبيهات كذلك أسفل بلوك الاختبارات» — his exams are the thing
+          he opens this screen for, and what his teacher wrote about today comes
+          straight after them. */}
+      <StudentAlertsBlock alerts={alerts.alerts} loading={alerts.loading}
+        unread={alerts.unread} markRead={alerts.markRead}
+        onAll={() => setAllAlerts(true)} />
 
       {eligible && <RankTiles halaqa={inHalaqa} all={overall} />}
 
@@ -112,6 +139,10 @@ export default function StudentHome() {
         )
       )}
       </div>
+
+      {/* الجرس والبلوك يفتحان النافذة نفسها — بابان وغرفة واحدة. */}
+      <StudentAlertsModal open={allAlerts} onClose={() => setAllAlerts(false)}
+        alerts={alerts.alerts} unread={alerts.unread} markRead={alerts.markRead} />
     </div>
   );
 }

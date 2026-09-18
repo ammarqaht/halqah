@@ -1,11 +1,12 @@
 'use client';
 /* الرئيسية — نظرة عامة  (SPEC.md §6.1 · إد-٢)
    Every figure is computed from what the supervisor imported. Nothing seeded. */
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   Users, CircleDot, UploadCloud, AlertTriangle, FileText, ClipboardCheck, Ticket,
-  ArrowLeft, Inbox, Printer } from 'lucide-react';
+  ArrowLeft, Inbox, Printer,
+} from 'lucide-react';
 import { TopBar } from '@/components/TopBar';
 import { Sheet, SheetHead } from '@/components/Sheet';
 import { KPI, Split } from '@/components/Stat';
@@ -16,6 +17,7 @@ import { useDB } from '@/lib/store';
 import { isoDate } from '@/lib/dates';
 import { derive } from '@/lib/derive';
 import { cx } from '@/lib/cx';
+import { TodayProgress } from '@/components/TodayProgress';
 import { useMyName, greeting, shortGreetingName } from '@/lib/useMe';
 
 const TRACK_TONE: Record<string, string> = {
@@ -54,7 +56,11 @@ export default function OverviewPage() {
     <>
       <TopBar title="الرئيسية" crumbs={['حلقات جامع محمد العبدالكريم']} panelOpen={panelOpen}
         onOpenPanel={() => setPanelOpen(true)}
-        />
+        /* The door to الرسائل moved into «اختصارات» on the panel — «أبي زرّ
+           رسالة للمعلمين والطلاب تكون ضمن الاختصارات وليس في الترويسة» (client,
+           18 Sep 2026). The bar carries the screen's own title and its search;
+           a destination among those reads as an action ON this screen, which it
+           is not. */ />
 
       <div className="mx-auto max-w-column px-6 py-8 pb-16">
         <header className="rise mb-9">
@@ -109,72 +115,16 @@ export default function OverviewPage() {
           </Sheet>
         )}
 
-        <Sheet className="rise mb-4">
-          <SheetHead title="تقدّم الحلقات"
-            meta="من آخر ملف رتل مرفوع — المجموع، ومتوسّطه لكل طالب تحته"
-            action={<Link href="/admin/students" className="flex items-center gap-1 text-xs2 text-brand-800 hover:underline">
-              الطلاب والحلقات <ArrowLeft size={14} strokeWidth={2} /></Link>} />
-          <div className="-mx-2 overflow-x-auto">
-            <table className="w-full min-w-[38rem] border-collapse text-body">
-              <thead>
-                <tr className="border-b border-ink-200 text-cap text-ink-500">
-                  {['الحلقة', 'الطلاب', 'المسار', 'أوجه الحفظ', 'أوجه المراجعة', 'أيام الحضور'].map((h) => (
-                    <th key={h} className="px-2 pb-2.5 text-start font-medium">{h}</th>))}
-                </tr>
-              </thead>
-              <tbody>
-                {d.byHalaqa.map((h) => (
-                  <tr key={h.id} className="border-b border-ink-150 last:border-0 transition-colors hover:bg-brand-50">
-                    <td className="px-2 py-3 font-medium text-ink-900">{h.teacher}</td>
-                    <td className="px-2 py-3">
-                      <span className="text-panel text-ink-700"><Num>{h.n}</Num></span>
-                    </td>
-                    <td className="px-2 py-3">
-                      <div className="flex gap-1">
-                        {Object.entries(h.tracks).map(([k, v]) => (
-                          <span key={k} className="inline-flex items-center gap-1 rounded bg-ink-100 px-1.5 py-0.5 text-2xs text-ink-700">
-                            <span className={cx('h-1.5 w-1.5 rounded-full', TRACK_TONE[k] ?? 'bg-ink-300')} />
-                            {k} <Num>{v}</Num>
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                    {/* The total first, because that is the figure the client's
-                        own رتل sheet prints; the per-student average under it,
-                        because that is the one that compares two halaqat of
-                        different sizes. */}
-                    {([[h.hpTotal, h.hp], [h.rpTotal, h.rp]] as const).map(([total, mean], i) => (
-                      <td key={i} className="px-2 py-3">
-                        <span className="block text-panel text-ink-800">
-                          <Num>{total.toFixed(2)}</Num>
-                        </span>
-                        <span className="block text-micro text-ink-500">
-                          <Num>{mean.toFixed(2)}</Num> للطالب
-                        </span>
-                      </td>
-                    ))}
-                    <td className="px-2 py-3">
-                      {/* Days, not a percentage. When «الحضور» stopped being a
-                          yes/no and became the count رتل actually reports, this
-                          kept its «٪» and its 60/40 thresholds — so «حضر نصف
-                          يوم» printed as «٠٫٥٪» and every halaqa read red. */}
-                      {h.att === null ? <span className="text-micro text-ink-400">—</span> : (
-                        <span>
-                          <span className="block text-panel text-ink-800">
-                            <Num>{h.attTotal}</Num>
-                          </span>
-                          <span className="block text-micro text-ink-500">
-                            <Num>{h.att}</Num> للطالب
-                          </span>
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Sheet>
+        {/* ── تقدّم الحلقات — اليوم ─────────────────────────────────────────
+            «أبيك تعرض إحصائيات اليوم فقط، ولا تعرض متوسطات بل إجمالي،
+            وإحصائيات الفترة تكون في التقارير» (client, 18 Sep 2026).
+
+            This table used to be the last رتل file: a term's totals and their
+            per-student averages, on the screen he opens every afternoon to ask
+            what is happening NOW. The term's figures are a report — they moved
+            to «تقدّم الحلقات — للفترة» — and this is the day itself, counted
+            from what the teachers have registered. */}
+        <TodayProgress />
 
         <div className="mb-4 grid gap-4 md:grid-cols-3">
           {[

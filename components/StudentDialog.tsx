@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import { Modal, Btn, Field, INPUT } from '@/components/ui';
+import { Modal, Btn, Field, INPUT, INPUT_BARE } from '@/components/ui';
 import { Combobox } from '@/components/Combobox';
 import { cx } from '@/lib/cx';
 import { store, useDB } from '@/lib/store';
@@ -12,8 +12,88 @@ const blank = (halaqaId: string | null, track: Track | null = null): Student => 
   id: Math.random().toString(36).slice(2, 10),
   fullName: '', nationalId: null, nationalIdFlag: null, track,
   halaqaId, grade: '', stage: '', nationality: '', guardianPhone: '',
-  status: 'ACTIVE', currentLevel: null,
+  birthDate: null, status: 'ACTIVE', currentLevel: null,
 });
+
+/* ── تاريخ الميلاد ──────────────────────────────────────────────────────────
+   «أضف خانة تاريخ الميلاد وتكون ثلاث خانات (اليوم — الشهر — السنة) بالميلادي،
+   والشهر يكون في قائمة منسدلة قابلة للبحث بالاسم أو الكتابة بالرقم» (client,
+   18 Sep 2026).
+
+   Three boxes rather than one calendar, because this is the one date on the
+   screen nobody PICKS: it is copied off a card, and a calendar asks whoever
+   is typing to walk back a hundred and fifty months to reach 2013. The month
+   is the box that goes wrong — «٠٣» and «مارس» and «٣» are the same month and
+   only one of them sorts — so it is chosen from the twelve, by name or by its
+   number, and stored as a number either way. */
+const MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+  'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+
+const pad2 = (n: number) => String(n).padStart(2, '0');
+
+/** How long a Gregorian month is — February cannot be answered without the year. */
+const daysIn = (m: number, y: number) =>
+  m === 2 ? (((y % 4 === 0 && y % 100 !== 0) || y % 400 === 0) ? 29 : 28)
+    : ([4, 6, 9, 11].includes(m) ? 30 : 31);
+
+/** Whole years to today — shown, never stored. */
+function ageOn(iso: string): number | null {
+  const [y, m, d] = iso.split('-').map(Number);
+  if (!y || !m || !d) return null;
+  const now = new Date();
+  let age = now.getFullYear() - y;
+  const had = now.getMonth() + 1 > m || (now.getMonth() + 1 === m && now.getDate() >= d);
+  if (!had) age -= 1;
+  return age >= 0 && age < 120 ? age : null;
+}
+
+function BirthDate({ value, onChange }: {
+  value: string | null | undefined;
+  onChange: (iso: string | null) => void;
+}) {
+  const [day, setDay] = useState(() => (value ? String(Number(value.slice(8, 10))) : ''));
+  const [month, setMonth] = useState(() => (value ? value.slice(5, 7) : ''));
+  const [year, setYear] = useState(() => (value ? value.slice(0, 4) : ''));
+
+  /* A date is only a date when all three are there. Anything short of that is
+     half-typed, not «no birthday» — so it is held on the screen and reported
+     upward as nothing, rather than saved as a third of a date. */
+  const push = (d: string, m: string, y: string) => {
+    const dd = Number(d), mm = Number(m), yy = Number(y);
+    if (!dd || !mm || y.length !== 4 || !yy) { onChange(null); return; }
+    onChange(`${yy}-${pad2(mm)}-${pad2(Math.min(dd, daysIn(mm, yy)))}`);
+  };
+
+  const age = value ? ageOn(value) : null;
+
+  return (
+    <Field label="تاريخ الميلاد"
+      hint={age != null ? `عمره اليوم ${age} سنة` : 'ميلادي — اليوم والشهر والسنة'}>
+      <div className="flex items-center gap-2">
+        <input value={day} inputMode="numeric" dir="ltr" aria-label="اليوم" placeholder="اليوم"
+          onChange={(e) => {
+            const v = e.target.value.replace(/\D/g, '').slice(0, 2);
+            setDay(v); push(v, month, year);
+          }}
+          className={`${INPUT_BARE} h-11 w-16 text-center`} />
+        <div className="min-w-0 flex-1">
+          <Combobox value={month} placeholder="الشهر" searchPlaceholder="بالاسم أو بالرقم…"
+            emptyText="لا شهر بهذا الاسم"
+            onChange={(v) => { setMonth(v); push(day, v, year); }}
+            options={MONTHS.map((label, i) => ({
+              value: pad2(i + 1), label, hint: String(i + 1),
+            }))} />
+        </div>
+        <input value={year} inputMode="numeric" dir="ltr" aria-label="السنة" placeholder="السنة"
+          onChange={(e) => {
+            const v = e.target.value.replace(/\D/g, '').slice(0, 4);
+            setYear(v); push(day, month, v);
+          }}
+          className={`${INPUT_BARE} h-11 w-20 text-center`} />
+      </div>
+    </Field>
+  );
+}
 
 export function StudentDialog({ open, student, defaultHalaqa, onClose }:
   { open: boolean; student: Student | null; defaultHalaqa: string | null; onClose: () => void }) {
@@ -130,6 +210,13 @@ export function StudentDialog({ open, student, defaultHalaqa, onClose }:
           <input className={`${INPUT} num`} dir="ltr" inputMode="numeric" value={f.guardianPhone}
             onChange={(e) => setF({ ...f, guardianPhone: e.target.value })} />
         </Field>
+
+        {/* Keyed on the student, so opening the dialog on another boy starts
+            the three boxes from HIS date rather than from the last one read. */}
+        <div className="sm:col-span-2">
+          <BirthDate key={f.id} value={f.birthDate}
+            onChange={(iso) => setF((p) => ({ ...p, birthDate: iso }))} />
+        </div>
 
         <Field label="الحلقة" hint="يمكن نقله لاحقًا دون فقد تاريخه">
           <Combobox value={f.halaqaId ?? ''} onChange={setHalaqa}

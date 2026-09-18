@@ -15,6 +15,11 @@ import { BandsSettingsCard } from '@/components/BandsSettings';
 import { AccountsSettingsCard } from '@/components/AccountsSettings';
 import { SETTINGS_SECTIONS, type SettingsSection } from '@/components/SettingsPanel';
 import { SupervisorSettingsCard } from '@/components/SupervisorSettings';
+import { TeacherSettingsCard } from '@/components/TeacherSettings';
+import { MessagesSettingsCard } from '@/components/MessagesSettings';
+import { DailySettingsCard } from '@/components/DailySettings';
+import { ProgressSettingsCard } from '@/components/ProgressSettings';
+import { PointsResetCard } from '@/components/PointsReset';
 
 type Stats = { students: number; halaqat: number; imports: number; audit: number; bytes: number };
 
@@ -94,10 +99,25 @@ function SettingsScreen() {
 
         {section === 'points' && <>
           <PointsSettingsCard />
+          <DailySettingsCard />
           <BandsSettingsCard />
+          {/* Last on the page, as the database reset is last on its own: a lever
+              with no undo belongs under everything it would undo. */}
+          <PointsResetCard />
         </>}
 
+        {section === 'messages' && <MessagesSettingsCard />}
+
         {section === 'accounts' && <AccountsSettingsCard />}
+
+        {/* بوابة المعلم — the accounts, then the two settings every figure in
+            that portal is computed from. */}
+        {section === 'teachers' && <>
+          <TeacherSettingsCard />
+          {/* «المعلم لا يمكن أن يحدد مقرر الطالب … عليه التوجه إلى مشرف الحلقة»
+              — and this is where the supervisor answers that. */}
+          <ProgressSettingsCard />
+        </>}
 
         {section === 'database' && <>
 

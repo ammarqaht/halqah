@@ -5,14 +5,15 @@ import { jwtVerify } from 'jose';
    It only checks that the cookie is a valid, unexpired token FOR THE RIGHT
    AUDIENCE; every route handler still authorises properly on the server.
 
-   Two audiences, never interchangeable. The supervisor's token opens /admin
+   Three audiences, never interchangeable. The supervisor's token opens /admin
    and /print — the sheets carry a hundred and seventeen boys' names, levels
-   and scores. A student's token opens /student and nothing else, and reaches
-   only his own rows once it gets there. An admin token presented to a student
-   route is refused, and the reverse: they are different people, not different
-   permissions on one account. */
+   and scores. A teacher's token opens /teacher and reaches ONE halaqa once it
+   gets there. A student's token opens /student and nothing else, and reaches
+   only his own rows. A token presented at the wrong door is refused on its
+   audience: they are different people, not different permissions on one
+   account. */
 
-async function valid(token: string | undefined, audience: 'admin' | 'student') {
+async function valid(token: string | undefined, audience: 'admin' | 'student' | 'teacher') {
   const secret = process.env.AUTH_SECRET;
   if (!token || !secret) return false;
   try {
@@ -49,6 +50,26 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  /* ── the teacher's surface ───────────────────────────────────────────── */
+  if (pathname.startsWith('/teacher') || pathname.startsWith('/api/teacher')) {
+    if (pathname === '/teacher/login' || pathname.startsWith('/api/teacher/auth')) {
+      return NextResponse.next();
+    }
+    const tt = req.cookies.get('halqah_teacher')?.value;
+    if (await valid(tt, 'teacher')) return NextResponse.next();
+
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'غير مصرّح' }, { status: 401 });
+    }
+
+    const url = req.nextUrl.clone();
+    url.pathname = '/teacher/login';
+    url.search = '';
+    url.searchParams.set('next', pathname + search);
+    if (tt) url.searchParams.set('reason', 'expired');
+    return NextResponse.redirect(url);
+  }
+
   /* ── the supervisor's surface ────────────────────────────────────────── */
   const token = req.cookies.get('halqah_session')?.value;
   if (await valid(token, 'admin')) return NextResponse.next();
@@ -62,5 +83,9 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*', '/print/:path*', '/student/:path*', '/api/student/:path*'],
+  matcher: [
+    '/admin/:path*', '/print/:path*',
+    '/student/:path*', '/api/student/:path*',
+    '/teacher/:path*', '/api/teacher/:path*',
+  ],
 };

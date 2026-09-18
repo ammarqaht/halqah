@@ -1,9 +1,30 @@
 /* DESIGN.md §2.2 — bidi isolation.
    Without it RTL reorders "4:45 – 6:15" into "6:15 – 4:45" and scrambles phones. */
+import { hijriParts } from '@/lib/teacher';
 import { cx } from '@/lib/cx';
 
 export function Num({ children, className }: { children: React.ReactNode; className?: string }) {
   return <bdi dir="ltr" className={cx('num', className)}>{children}</bdi>;
+}
+
+/**
+ * A Hijri date inside an Arabic line — «٧ ربيع الآخر ١٤٤٨».
+ *
+ * `<Num>` is the wrong tool for it, and this is the exception that proves what
+ * §2.2 is for. `Num` forces LTR so a figure cannot be taken apart by the
+ * paragraph around it; a DATE is not one figure but two with an Arabic word
+ * between them, and forcing the whole phrase LTR lays it out left-to-right —
+ * the day number ending up on the far side of the month from where an Arabic
+ * reader looks for it, and the year on the other side again.
+ *
+ * So the two numbers are isolated and the phrase between them is left to flow
+ * with the line. «نص التاريخ … يكون بشكل أرتب من هذا» (client, 18 Sep 2026).
+ */
+export function HijriText({ day, arabic }: { day: string | Date; arabic?: boolean }) {
+  const h = hijriParts(day);
+  const f = (v: string) => (arabic ? toArabicDigits(v) : v);
+  if (!h.month) return <>{h.day}</>;
+  return <><Num>{f(h.day)}</Num> {h.month} <Num>{f(h.year)}</Num></>;
 }
 
 const AR = '٠١٢٣٤٥٦٧٨٩';

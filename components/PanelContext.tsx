@@ -123,6 +123,12 @@ export function PanelContext({ onClose }: { onClose: () => void }) {
           <PanelItem onClick={() => router.push('/admin/points/codes')}>إصدار أكواد</PanelItem>
           <PanelItem onClick={() => router.push('/admin/plans')}>طباعة خطة لطالب</PanelItem>
           <PanelItem onClick={() => router.push('/admin/exams')}>تسجيل اختبار</PanelItem>
+          {/* «أبي زرّ رسالة للمعلمين والطلاب تكون ضمن الاختصارات» (client,
+              18 Sep 2026) — it is a destination like the five above it, not an
+              action on the screen the bar belongs to. */}
+          <PanelItem onClick={() => router.push('/admin/settings?s=messages')}>
+            رسالة للمعلمين والطلاب
+          </PanelItem>
         </PanelGroup>
       </PanelShell>
     );

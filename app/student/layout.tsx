@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation';
 import { MeProvider, useMe } from '@/components/student/Me';
 import { StudentNav } from '@/components/student/Nav';
 import { LoadingMark } from '@/components/LoadingMark';
+import { ScrollProgress } from '@/components/ScrollProgress';
 
 function Shell({ children }: { children: React.ReactNode }) {
   const { me } = useMe();
@@ -14,7 +15,9 @@ function Shell({ children }: { children: React.ReactNode }) {
   if (!me) return <LoadingMark show />;
 
   return (
-    <div className="student-body min-h-screen bg-page">
+    <div className="portal min-h-screen bg-page">
+      {/* «من يمينها إلى يسارها» across the top — see components/ScrollProgress. */}
+      <ScrollProgress />
       <StudentNav />
       <main className="mx-auto max-w-column px-5 pb-28 pt-4 md:px-6 md:pb-16 md:pt-8">
         {children}
@@ -26,6 +29,6 @@ function Shell({ children }: { children: React.ReactNode }) {
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   /* Signing in cannot require being signed in. */
-  if (path === '/student/login') return <div className="student-body">{children}</div>;
+  if (path === '/student/login') return <div className="portal">{children}</div>;
   return <MeProvider><Shell>{children}</Shell></MeProvider>;
 }

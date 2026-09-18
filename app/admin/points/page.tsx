@@ -30,7 +30,7 @@ type View = 'BALANCES' | 'LEDGER' | 'HONOUR';
 type SortKey = 'balance' | 'name' | 'last';
 
 const KIND_TONE: Record<TxnKind, 'ok' | 'brand' | 'info' | 'risk' | 'warn' | 'ink'> = {
-  MANUAL: 'ink', CODE: 'brand', EXAM: 'info',
+  MANUAL: 'ink', CODE: 'brand', EXAM: 'info', DAILY: 'ok',
   PURCHASE: 'risk', REFUND: 'warn', CORRECTION: 'warn',
 };
 

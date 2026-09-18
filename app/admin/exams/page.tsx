@@ -9,10 +9,12 @@
    The counters across the top are his own file's totals, computed rather than
    tallied by hand: «سجلّاتكم تحوي: ١٧٢ وسامًا ذهبيًا، ١٥٧ اختبار جمعية،
    ١٣٩ وسامًا ماسيًا، و٤٧ اختبار تجويد». */
-import { Fragment, Suspense, useMemo, useState } from 'react';
+import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { ClipboardCheck, Plus, Search, Coins, AlertTriangle, Inbox, ChevronLeft, Trash2 } from 'lucide-react';
+import {
+  ClipboardCheck, Plus, Search, Coins, AlertTriangle, Inbox, ChevronLeft, StickyNote, Trash2,
+} from 'lucide-react';
 import { TopBar } from '@/components/TopBar';
 import { Sheet } from '@/components/Sheet';
 import { Btn, Empty, Chip, Modal, INPUT } from '@/components/ui';
@@ -88,6 +90,23 @@ function ExamsScreen() {
 
   const typeFilter = sp.get('type');
   const halaqaFilter = sp.get('halaqa');
+
+  /* Arrived from a closed booking: `/admin/exams?exam=<id>` — «وزر في السجل
+     ينقلني لصفحة الاختبار التي ضغطت عليها مباشرة» (client, 18 Sep 2026). The
+     log is a log of four hundred sittings, and finding one by scrolling is not
+     an answer. Applied once, so closing the record does not reopen it. */
+  const wanted = sp.get('exam');
+  const [opened, setOpened] = useState<string | null>(null);
+  useEffect(() => {
+    if (!wanted || opened === wanted) return;
+    const e = db.exams.find((x) => x.id === wanted);
+    if (!e) return;
+    setOpened(wanted);
+    setDetail(e);
+    /* And his earlier sittings are unfolded under him, so the record opens in
+       its own context rather than on its own. */
+    setExpanded(e.studentId);
+  }, [wanted, opened, db.exams]);
 
   const nameOf = (id: string) => db.students.find((s) => s.id === id)?.fullName ?? '—';
   const halaqaOf = (id: string | null) => {
@@ -411,7 +430,7 @@ function ExamDetail({ exam, studentName, halaqaName, onClose }: {
               <table className="w-full min-w-[30rem] border-collapse text-body">
                 <thead>
                   <tr className="border-b border-ink-200 bg-page/50 text-cap text-ink-500">
-                    {['#', 'السورة', 'من آية', 'الأخطاء', 'التنبيهات'].map((h) => (
+                    {['#', 'السورة', 'من آية', 'الأخطاء', 'التنبيهات', 'الأخطاء التجويدية'].map((h) => (
                       <th key={h} className="px-3 py-2.5 text-start font-medium">{h}</th>))}
                   </tr>
                 </thead>
@@ -428,6 +447,16 @@ function ExamDetail({ exam, studentName, halaqaName, onClose }: {
                       <td className="px-3 py-2.5">
                         <Num className={cx('font-medium', qq.warnings > 0 ? 'text-warn-700' : 'text-ink-400')}>
                           {qq.warnings}</Num>
+                      </td>
+                      {/* The third counter was collected per question all along
+                          and only ever shown as a total — «أضف عمود الأخطاء
+                          التجويدية في صفوف الأسئلة» (client, 18 Sep 2026). A
+                          boy who lost five marks on one surah and none on the
+                          others is a different boy from one who lost them
+                          evenly. */}
+                      <td className="px-3 py-2.5">
+                        <Num className={cx('font-medium', qq.tajweedErrors > 0 ? 'text-info-700' : 'text-ink-400')}>
+                          {qq.tajweedErrors}</Num>
                       </td>
                     </tr>
                   ))}
@@ -536,12 +565,18 @@ function ExamCells({ e, halaqaOf, dim = false, onDelete }: {
               </button>
         ) : <span className="text-ink-400">—</span>}
       </td>
-      <td className="max-w-[12rem] px-3 py-3 text-panel text-ink-600">
+      {/* «عمود الملاحظة يكون أيقونة، إذا أشّرت عليها يعرض الهوفر، بحيث ما تأخذ
+          مساحة كبيرة في الجدول» (client, 18 Sep 2026). A note is the exception
+          on this screen and most rows have none; a column sized for the longest
+          one narrowed the eight that are read every time. */}
+      <td className="w-10 px-3 py-3 text-center">
         {e.note
-          ? <Tooltip content={<span className="leading-relaxed">{e.note}</span>}>
-              <span className="block max-w-[11rem] truncate">{e.note}</span>
+          ? <Tooltip content={<span className="block max-w-[22rem] leading-relaxed">{e.note}</span>}>
+              <span className="inline-grid h-6 w-6 place-items-center rounded text-ink-500 transition-colors hover:bg-brand-50 hover:text-brand-800">
+                <StickyNote size={15} strokeWidth={1.9} aria-label="له ملاحظة" />
+              </span>
             </Tooltip>
-          : '—'}
+          : <span className="text-ink-300">—</span>}
       </td>
       <td className="w-9 px-2 py-3">
         {onDelete && (

@@ -12,6 +12,22 @@
 @layer base{
   html,body,#__next{height:100%}
   body{background:#F4F5F1;color:#191E1C;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  /* THE PAGE'S OWN SCROLLBAR — the supervisor's, and his alone.
+
+     It was given to every surface so the portals would have one; the portals
+     then got `ScrollProgress` across their top instead (§7.3), and the client
+     asked for the side rail to go with it: «احذف السكرول الجانبي» (18 Sep 2026).
+     `:has()` scopes it — the document keeps its indicator everywhere except on a
+     page whose shell is `.portal`, which is the phone surface and now says «كم
+     بقي» along its top edge. */
+  html{scrollbar-width:thin;scrollbar-color:#D6DCD6 transparent}
+  html::-webkit-scrollbar{width:11px;height:11px}
+  html::-webkit-scrollbar-thumb{background:#D6DCD6;border-radius:9px;
+    border:3px solid transparent;background-clip:content-box}
+  html::-webkit-scrollbar-thumb:hover{background:#B4BDB8;background-clip:content-box}
+  html::-webkit-scrollbar-track{background:transparent}
+  html:has(.portal){scrollbar-width:none}
+  html:has(.portal)::-webkit-scrollbar{width:0;height:0;display:none}
   ::selection{background:#CFE2DF;color:#0A403C}
   /* DESIGN.md §9.2 — every interactive element carries a visible ring */
   :where(a,button,input,select,textarea,[tabindex]):focus-visible{
@@ -39,6 +55,15 @@
 @keyframes wipeStart{from{opacity:0;transform:translateX(-32px)}to{opacity:1;transform:none}}
 @keyframes markIn{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:none}}
 @keyframes shimmer{100%{transform:translateX(-100%)}}
+/* النوافذ — «تطلع من تحت وتنزل من فوق» (client, 18 Sep 2026). A sheet that
+   arrives from the edge it is anchored to reads as a thing being handed up,
+   rather than a box appearing in the middle of the screen. Transform and
+   opacity only, per the note at the top of this section. */
+@keyframes sheetUp{from{opacity:0;transform:translateY(100%)}to{opacity:1;transform:none}}
+/* On a wide screen it is centred rather than anchored, so it rises a short way
+   and settles instead of travelling the height of the viewport. Leaving is a
+   transition in every case — see `.sheet-leave`. */
+@keyframes sheetInMd{from{opacity:0;transform:translateY(24px) scale(.985)}to{opacity:1;transform:none}}
 @keyframes ringPulse{0%{opacity:.55;transform:scale(.94)}70%{opacity:0;transform:scale(1.35)}100%{opacity:0;transform:scale(1.35)}}
 /* The between-screens moment: a halo breathing behind the mark, and the mark
    itself easing with it. Both are opacity+transform, so they run on the
@@ -51,6 +76,31 @@
 .fade{animation:fadeIn .5s ease both}
 .wipe{animation:wipeStart .68s cubic-bezier(.22,.61,.36,1) both}
 .mark-in{animation:markIn .5s cubic-bezier(.22,.61,.36,1) both}
+
+/* The sheet, and the hand on it.
+
+   FOUR PHASES, AND ONLY THE FIRST IS A KEYFRAME. Arrival is an animation because
+   it starts from a known place; everything after it starts from wherever the
+   thumb left the sheet, which no keyframe can know. So the drag writes `--sheet-y`
+   with the animation switched off, and both settling back and leaving are
+   TRANSITIONS of that same property — which means a sheet flicked halfway down
+   carries on from halfway rather than snapping back to be animated away.
+
+   `sheet-rest` is the state between them: no animation at all, so re-entering a
+   phase never replays the arrival under the reader's thumb. */
+.sheet-in{animation:sheetUp .34s cubic-bezier(.22,.61,.36,1) both}
+.sheet-rest{animation:none;transform:none}
+.sheet-drag{animation:none;transform:translateY(var(--sheet-y,0px))}
+.sheet-settle{animation:none;transform:none;
+  transition:transform .26s cubic-bezier(.22,.61,.36,1)}
+.sheet-leave{animation:none;transform:translateY(var(--sheet-y,110%));opacity:0;
+  transition:transform .24s cubic-bezier(.4,0,1,1),opacity .24s ease}
+@media (min-width:640px){
+  .sheet-in{animation-name:sheetInMd}
+}
+/* A dragged sheet must not also be selecting its own text under the thumb. */
+.sheet-grip{touch-action:none;-webkit-user-select:none;user-select:none;cursor:grab}
+.sheet-grip:active{cursor:grabbing}
 
 .skel{position:relative;overflow:hidden;background:#E3E7E1;border-radius:6px}
 .skel::after{content:'';position:absolute;inset:0;transform:translateX(100%);
@@ -69,12 +119,22 @@
 .sheet-a4{width:794px;min-height:1123px;margin:0 auto;background:#fff;
   padding:14mm 12mm;box-shadow:0 12px 32px -12px rgba(25,30,28,.28)}
 
+/* الورقة الأسبوعية is the one sheet that cannot be portrait: it is a GRID of
+   five halaqa days across, each day carrying حضور، ثوب and the three recitation
+   lines — twenty-nine columns. The paper the halaqa fills in by hand is landscape
+   for exactly this reason, and §١٤'s «ورقة واحدة» is a promise about the number
+   of pages, not about their orientation. Everything else stays portrait. */
+.sheet-a4.landscape{width:1123px;min-height:794px}
+
 @page{size:A4;margin:12mm}
 
 @media print{
   html,body{background:#fff!important}
   .no-print{display:none!important}
   .sheet-a4{width:auto;min-height:0;margin:0;padding:0;box-shadow:none}
+  /* A page box is per-DOCUMENT, so a landscape sheet declares its own and the
+     route that prints it is the only thing in the document. */
+  .sheet-a4.landscape{width:auto}
   /* A card must never be cut in half by a page break, and a long table keeps
      its header on every sheet. */
   .keep{break-inside:avoid;page-break-inside:avoid}
@@ -94,40 +154,62 @@
 
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   The student portal. Everything here is scoped under `.student-body` so it
-   cannot leak into the admin screens — the surfaces share a palette and a
-   typeface, not a look.
+   The phone portals — the student's and the teacher's.
+
+   Everything here is scoped under `.portal` so it cannot leak into the admin
+   screens: those surfaces share a palette and a typeface with these, not a
+   look. The supervisor is at 1440px with a mouse reading tables; a boy and his
+   teacher are both standing in a mosque holding a phone, and that is the thing
+   the two portals have in common.
+
+   It was `.student-body` until the teacher's portal arrived and wanted the same
+   card, the same press, the same thumb-scrolled rails. Nothing in here was ever
+   about being a student.
    ───────────────────────────────────────────────────────────────────────── */
 
 /* The student card is an OBJECT, not a surface: DESIGN.md §1.3 names the rail
    and the sign-in panel as the product's deep fields, and this is the third
    and last. A card you could put in a wallet, not a region of the page. */
-.student-body .card-field{
+.portal .card-field{
   background:linear-gradient(135deg,#0A403C 0%,#0B5F59 55%,#0E8D83 140%);
   position:relative;overflow:hidden}
 /* Film grain, so a large flat teal does not band on a cheap phone screen. */
-.student-body .card-field::before{
+.portal .card-field::before{
   content:'';position:absolute;inset:0;pointer-events:none;opacity:.055;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E")}
 /* One corner glow. One. */
-.student-body .card-field::after{
+.portal .card-field::after{
   content:'';position:absolute;inset-inline-end:-18%;top:-42%;width:78%;aspect-ratio:1;
   border-radius:50%;pointer-events:none;
   background:radial-gradient(circle,rgba(93,209,199,.30) 0%,rgba(93,209,199,0) 68%)}
 
 /* A jewel tile: hairline, a 3px accent along the top, a lift on hover.
    `inset-inline` and not `left`, or it mirrors wrong in RTL. */
-.student-body .tile{position:relative;transition:transform .2s cubic-bezier(.22,.61,.36,1),
+.portal .tile{position:relative;transition:transform .2s cubic-bezier(.22,.61,.36,1),
   box-shadow .2s cubic-bezier(.22,.61,.36,1)}
-.student-body .tile::before{content:'';position:absolute;inset-inline:0;top:0;height:3px;
+.portal .tile::before{content:'';position:absolute;inset-inline:0;top:0;height:3px;
   border-start-start-radius:16px;border-start-end-radius:16px;background:var(--tile-accent,#0E8D83)}
-@media (hover:hover){.student-body .tile:hover{transform:translateY(-2px)}}
+@media (hover:hover){.portal .tile:hover{transform:translateY(-2px)}}
 
 /* Every tap target on a phone. */
-.student-body a,.student-body button{-webkit-tap-highlight-color:transparent}
-.student-body .press:active{transform:scale(.985)}
+.portal a,.portal button{-webkit-tap-highlight-color:transparent}
+.portal .press:active{transform:scale(.985)}
 
-/* The horizontal rails on the portal — the exam cards and the level ladder —
-   scroll by thumb, and a phone shows no scrollbar for them. */
-.student-body .no-bar{scrollbar-width:none}
-.student-body .no-bar::-webkit-scrollbar{display:none}
+/* NO SIDE RAIL IN THE PORTALS — «احذف السكرول الجانبي» (client, 18 Sep 2026).
+
+   This went back and forth and the third answer is the right one. It began
+   hidden; §12.5a gave it the supervisor's indicator, because a rail with no sign
+   it can be scrolled is a rail nobody scrolls; then §7.3 put a hairline across
+   the TOP of the screen instead, which says the same thing where the eye already
+   is. With that bar in place the side rail is a second answer to a question
+   already answered, and on a horizontal row of cards it is a grey line under
+   them that reads as a border.
+
+   So both go: the horizontal rails and the page's own. The supervisor's surface
+   keeps `.thin-scroll` — he is at 1440px with a mouse, reading tables, and has
+   no bar across his top. */
+.portal .no-bar{scrollbar-width:none;-ms-overflow-style:none}
+.portal .no-bar::-webkit-scrollbar{display:none}
+
+.portal,.portal *{scrollbar-width:none}
+.portal ::-webkit-scrollbar,.portal::-webkit-scrollbar{width:0;height:0;display:none}

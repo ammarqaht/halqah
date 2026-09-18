@@ -156,12 +156,16 @@ export function listRows(rows: FollowUpRow[], list: ListKey): FollowUpRow[] {
    it. It belongs beside them because it is the same question asked of a
    different table: who is waiting on you today. */
 
-/** Bookings still open whose day has arrived or passed. Overdue ones count:
-    a sitting nobody held yesterday is more urgent than one due this afternoon,
-    not less. */
+/** Bookings still open whose day is TODAY.
+    It used to reach back over every day that had passed, on the reasoning that
+    a sitting nobody held yesterday is more urgent than one due this afternoon.
+    The client reads it as a diary rather than a debt: «المفروض يحط اللي عندهم
+    اختبار اليوم فقط» (18 Sep 2026) — and the ones nobody closed are still on
+    the bookings screen under «محجوز», where they can be sat, moved or
+    cancelled. */
 export const dueBookings = (bookings: ExamBooking[], now: Date = new Date()) => {
   const today = isoDate(now);
-  return bookings.filter((b) => b.status === 'BOOKED' && b.scheduledOn <= today);
+  return bookings.filter((b) => b.status === 'BOOKED' && b.scheduledOn === today);
 };
 
 /** Counted by STUDENT, not by booking — two sittings for one boy are one name

@@ -5,6 +5,7 @@
    places to be. «مستواي وخطتي» is labelled «مستواي» in the bar since الترتيب
    joined it — five labels have to fit across a 360px phone. */
 import Link from 'next/link';
+import { useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { Home, Ticket, Store, BookOpen, Trophy, LogOut } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -12,6 +13,7 @@ import { LogoMark } from '@/components/Logo';
 import { TABS, DESKTOP_TABS, REDEEM_TAB } from '@/content/student';
 import { useMe } from '@/components/student/Me';
 import { SignOutButton } from '@/components/student/SignOut';
+import { TabPill, useTabPill } from '@/components/TabPill';
 import { cx } from '@/lib/cx';
 
 const ICONS: Record<string, LucideIcon> = {
@@ -22,6 +24,8 @@ const ICONS: Record<string, LucideIcon> = {
 
 export function StudentNav() {
   const path = usePathname();
+  const bar = useRef<HTMLElement>(null);
+  const pill = useTabPill(bar, path);
   const { me } = useMe();
   const active = (href: string) => (href === '/student' ? path === href : path.startsWith(href));
 
@@ -87,10 +91,13 @@ export function StudentNav() {
       {/* phone — four tabs with the disc between them. The middle column is a
           fixed 76px so the pairs either side keep an equal share and nothing
           shuffles when a label changes width. */}
-      <nav aria-label="التنقّل"
+      <nav ref={bar} aria-label="التنقّل"
         className={cx('fixed inset-x-0 bottom-0 z-40 grid items-start gap-1 border-t border-ink-150 bg-paper/90 px-3 pt-2 backdrop-blur-lg md:hidden',
           points ? 'grid-cols-[1fr_1fr_76px_1fr_1fr]' : 'grid-cols-2')}
         style={{ paddingBottom: 'calc(14px + env(safe-area-inset-bottom))' }}>
+        {/* The mark travels; the tabs do not. It never lands on the raised disc,
+            which is not in the bar but above it. See components/TabPill.tsx. */}
+        <TabPill pill={pill} className="top-2 h-[52px] rounded-xl bg-brand-50" />
         {(points ? tabs.slice(0, 2) : tabs).map(
           (t) => <Tab key={t.href} tab={t} on={active(t.href)} />)}
 
@@ -122,9 +129,11 @@ export function StudentNav() {
 function Tab({ tab, on }: { tab: { href: string; label: string }; on: boolean }) {
   const I = ICONS[tab.href];
   return (
-    <Link href={tab.href} aria-current={on ? 'page' : undefined}
-      className={cx('relative flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-xl px-1 transition-colors',
-        on ? 'bg-brand-50 text-brand-800' : 'text-ink-500')}>
+    <Link href={tab.href} data-tab aria-current={on ? 'page' : undefined}
+      /* No background of its own any more: the one behind it is the mark, and
+         two of them would cross-fade against each other as it travelled. */
+      className={cx('relative z-10 flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-xl px-1 transition-colors',
+        on ? 'text-brand-800' : 'text-ink-500')}>
       <I size={20} strokeWidth={on ? 2.1 : 1.8} />
       <span className="text-[10.5px] leading-none">{tab.label}</span>
     </Link>

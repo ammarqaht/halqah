@@ -241,3 +241,174 @@ export const hashPin = (secret: string) => bcrypt.hash(secret, 12);
 
 /** «١٠٠١، ١٠٠٢، …» — sequential, so a teacher can read a column of them out. */
 export const loginIdFor = (index: number) => String(LOGIN_ID_FIRST + index);
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Teacher sessions.
+
+   A third cookie and a third JWT audience. The three are never interchangeable:
+   a teacher's token presented to an admin route is refused on its audience, and
+   so is a supervisor's at a teacher route. They are different people, not
+   different permissions on one account — and this one matters most of the
+   three, because a teacher's token must open ONE halaqa and no other.
+   ───────────────────────────────────────────────────────────────────────── */
+
+const TEACHER_COOKIE = 'halqah_teacher';
+
+/**
+ * Thirty days, and it does NOT lapse on idleness.
+ *
+ * «فالمعلم يفتح جواله بين طلابه ولا يحتمل دخولًا كل عصر» — the supervisor's
+ * thirty minutes protects a laptop left open on a mosque desk, and applying it
+ * here would sign a teacher out in the middle of التسميع, standing in front of
+ * twenty-five boys, which is exactly how a portal stops being used.
+ *
+ * Shorter than the student's half-year on purpose: his phone carries his whole
+ * halaqa's record — every boy's level, attendance and exam results — where a
+ * boy's carries only his own.
+ */
+export const TEACHER_SESSION_DAYS = 30;
+
+/**
+ * Sign-in is a four-digit LOGIN NUMBER from 2001, and a password.
+ *
+ * Four digits keeps both portals on one shape — «ليكون النظام واحدًا» — and
+ * 2001 upward keeps a teacher's number clear of the students' 1001–1117, so a
+ * number read off the wrong sheet opens nothing rather than somebody else's
+ * screen.
+ *
+ * The password is NOT his national id. The students' is, deliberately and with
+ * its reasoning recorded above; a teacher's is not, for two reasons. He holds a
+ * hundred and seventeen boys' levels, attendance and exam results, where a boy
+ * holds only his own. And his screen is open in a room full of the people who
+ * would most like to read it. The supervisor sets it, he replaces it on first
+ * use, and the supervisor can reset it when he forgets.
+ */
+export const TEACHER_ID_FIRST = 2001;
+export const isTeacherLoginId = (v: unknown) => /^2\d{3}$/.test(String(v ?? ''));
+
+/** «٢٠٠١، ٢٠٠٢، …» — in halaqa order, so a column of them reads down a sheet. */
+export const teacherLoginIdFor = (index: number) => String(TEACHER_ID_FIRST + index);
+
+/** Eight characters at least. He types this once a month, not once an afternoon,
+    so it can afford to be a real password — and it guards more than his own row. */
+export const TEACHER_PASSWORD_MIN = 8;
+
+export type TeacherSession = {
+  sub: string; name: string; username: string;
+  /** His one halaqa, carried in the token so no route has to trust a body. */
+  halaqaId: string | null;
+};
+
+export async function createTeacherSession(t: {
+  id: string; fullName: string; username: string; halaqaId: string | null;
+}) {
+  const token = await new SignJWT({ name: t.fullName, username: t.username, halaqaId: t.halaqaId })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setSubject(t.id)
+    .setAudience('teacher')
+    .setIssuedAt()
+    .setExpirationTime(`${TEACHER_SESSION_DAYS}d`)
+    .sign(secret());
+
+  (await cookies()).set(TEACHER_COOKIE, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: TEACHER_SESSION_DAYS * 24 * 60 * 60,
+  });
+}
+
+export async function readTeacherSession(): Promise<TeacherSession | null> {
+  const token = (await cookies()).get(TEACHER_COOKIE)?.value;
+  if (!token) return null;
+  try {
+    const { payload } = await jwtVerify(token, secret(), { audience: 'teacher' });
+    return {
+      sub: String(payload.sub),
+      name: String(payload.name ?? ''),
+      username: String(payload.username ?? ''),
+      halaqaId: payload.halaqaId ? String(payload.halaqaId) : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function destroyTeacherSession() {
+  (await cookies()).delete(TEACHER_COOKIE);
+}
+
+export async function requireTeacherSession(): Promise<TeacherSession> {
+  const s = await readTeacherSession();
+  if (!s) throw new Error('UNAUTHENTICATED');
+  return s;
+}
+
+/* The same lockout the students have, and for a stronger reason: a four-digit
+   number is a small space to guess in, and what is behind a teacher's is a
+   whole halaqa. */
+export const TEACHER_MAX_ATTEMPTS = 5;
+export const TEACHER_LOCK_MINUTES = 10;
+export const TEACHER_LOCKED = 'حاولت مرات كثيرة. انتظر عشر دقائق ثم أعد المحاولة.';
+/** Never says which field was wrong — §٧: «ورسالة الخطأ لا تكشف أيّ الحقلين». */
+export const TEACHER_BAD = 'رقم الدخول أو كلمة المرور غير صحيحة.';
+
+export type TeacherAuthResult =
+  | {
+      ok: true;
+      teacher: { id: string; fullName: string; halaqaId: string | null };
+      username: string;
+      mustChangePassword: boolean;
+    }
+  | { ok: false; reason: 'BAD' | 'LOCKED' | 'NO_HALAQA' };
+
+export async function authenticateTeacher(
+  username: string, password: string,
+): Promise<TeacherAuthResult> {
+  const u = String(username ?? '').replace(/\s+/g, '').trim();
+  const t = u
+    ? await db.teacher.findUnique({ where: { username: u }, include: { halaqa: true } })
+    : null;
+
+  /* Hash a dummy when there is no such account, so a wrong number and a wrong
+     password take the same time and cannot be told apart by timing. */
+  if (!t || !t.active) {
+    await bcrypt.compare(password, '$2b$12$invalidinvalidinvalidinvalidinvalidinvalidinvalidinvalidin');
+    return { ok: false, reason: 'BAD' };
+  }
+
+  if (t.lockedUntil && t.lockedUntil > new Date()) return { ok: false, reason: 'LOCKED' };
+
+  if (!(await verifyPassword(password, t.passwordHash))) {
+    const failed = t.failedAttempts + 1;
+    await db.teacher.update({
+      where: { id: t.id },
+      data: failed >= TEACHER_MAX_ATTEMPTS
+        ? { failedAttempts: 0, lockedUntil: new Date(Date.now() + TEACHER_LOCK_MINUTES * 60_000) }
+        : { failedAttempts: failed },
+    });
+    return { ok: false, reason: failed >= TEACHER_MAX_ATTEMPTS ? 'LOCKED' : 'BAD' };
+  }
+
+  /* A correct password on an account with no halaqa yet. Letting him in would
+     open a portal whose every screen is about a halaqa he does not have, and
+     each one would have to invent an empty state for a case that is really an
+     unfinished setup. He is told so plainly instead. */
+  if (!t.halaqa) return { ok: false, reason: 'NO_HALAQA' };
+
+  await db.teacher.update({
+    where: { id: t.id },
+    data: { failedAttempts: 0, lockedUntil: null, lastLoginAt: new Date() },
+  });
+
+  return {
+    ok: true,
+    teacher: { id: t.id, fullName: t.fullName, halaqaId: t.halaqa.id },
+    username: t.username,
+    mustChangePassword: t.mustChangePassword,
+  };
+}
+
+export const TEACHER_NO_HALAQA =
+  'حسابك لم يُربط بحلقة بعد. راجع مشرف الحلقات.';

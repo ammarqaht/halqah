@@ -327,6 +327,11 @@ function FollowUpScreen() {
                                   {r.daysHeld}
                                 </Num>
                                 {r.late && <span className="ms-1.5 align-middle"><Chip tone="warn">متأخر</Chip></span>}
+                                {r.student.examHold && (
+                                  <span className="ms-1.5 align-middle">
+                                    <Chip tone="risk">يحتاج مراجعة</Chip>
+                                  </span>
+                                )}
                               </td>
                             </>
                           ) : (

@@ -15,7 +15,7 @@ export type Option = { value: string; label: string; hint?: string };
 export function Combobox({
   value, onChange, options, placeholder = 'اختر…', searchPlaceholder = 'ابحث…',
   emptyText = 'لا نتائج', id, disabled, searchableFrom = 6,
-  creatable = false, createLabel = 'إضافة',
+  creatable = false, createLabel = 'إضافة', className,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -30,6 +30,8 @@ export function Combobox({
   /** let the supervisor type a value that isn't in the list yet */
   creatable?: boolean;
   createLabel?: string;
+  /** the trigger's own sizing, when a surface wants something other than h-11 */
+  className?: string;
 }) {
   const uid = useId();
   const listId = `${uid}-list`;
@@ -45,7 +47,11 @@ export function Combobox({
 
   useEffect(() => setMounted(true), []);
 
-  const selected = options.find((o) => o.value === value) ?? null;
+  /* A creatable value need not be in the list — and when it is not, the
+     trigger still has to SHOW it. Falling back to the placeholder would make a
+     name that was typed look like nothing was chosen at all. */
+  const selected = options.find((o) => o.value === value)
+    ?? (creatable && value ? { value, label: value } as Option : null);
   const searchable = creatable || options.length >= searchableFrom;
 
   const filtered = useMemo(() => {
@@ -114,6 +120,7 @@ export function Combobox({
           open
             ? 'border-brand-700 shadow-[0_0_0_3px_rgba(14,141,131,.13)]'
             : 'border-ink-200 hover:border-ink-300',
+          className,
         )}
       >
         <span className={cx('min-w-0 flex-1 truncate', selected ? 'text-ink-900' : 'text-ink-400')}>

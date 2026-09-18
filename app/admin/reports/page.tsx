@@ -30,10 +30,13 @@ function printHref(id: ReportId, halaqa: string, student: string, sections = '',
     }
     case 'ready':       return halaqa ? `/print/ready?halaqa=${halaqa}` : '/print/ready';
     case 'honour':      return halaqa ? `/print/honour?halaqa=${halaqa}` : '/print/honour';
+    case 'knights':     return halaqa ? `/print/knights?halaqa=${halaqa}` : '/print/knights';
+    case 'registration': return halaqa ? `/print/registration?halaqa=${halaqa}` : null;
     case 'period': {
       const q = [from && `from=${from}`, to && `to=${to}`].filter(Boolean).join('&');
       return `/print/period${q ? `?${q}` : ''}`;
     }
+    case 'progress':    return '/print/progress';
     case 'pick-list':   return '/print/pick-list';
     case 'bookings':    return '/print/bookings';
     default:            return null;

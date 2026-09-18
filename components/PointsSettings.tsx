@@ -11,7 +11,7 @@
 import { useEffect, useState } from 'react';
 import { Coins, Save, RotateCcw, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { Sheet, SheetHead } from '@/components/Sheet';
-import { Btn, INPUT, Chip } from '@/components/ui';
+import { Btn, INPUT_BARE, Chip } from '@/components/ui';
 import { Num } from '@/components/Num';
 import { EXAM_TYPE_AR } from '@/lib/points';
 import { TRACK_AR } from '@/lib/types';
@@ -89,7 +89,7 @@ export function PointsSettingsCard() {
                       <input inputMode="numeric" value={String(draft[track][type])}
                         aria-label={`نقاط ${EXAM_TYPE_AR[type]} — ${TRACK_AR[track]}`}
                         onChange={(e) => set(track, type, e.target.value)}
-                        className={cx(INPUT, 'h-9 w-28 px-2.5 tabular-nums',
+                        className={cx(INPUT_BARE, 'h-9 w-28 px-2.5 tabular-nums',
                           changed && 'border-brand-700 bg-brand-50')} />
                       {DEFAULT_POINTS[track][type] !== draft[track][type] && (
                         <span className="ms-2 text-micro text-ink-400">
