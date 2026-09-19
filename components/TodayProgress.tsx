@@ -91,9 +91,17 @@ export function TodayProgress() {
               <Num>{formatDate(d.day)}</Num> · <HijriText day={d.day} /> — عددًا لا متوسطًا
             </span>
           : 'ما سجّله المعلمون اليوم'}
-        action={<Link href="/admin/reports?r=progress"
-          className="flex items-center gap-1 text-xs2 text-brand-800 hover:underline">
-          إحصائيات الفترة <ArrowLeft size={14} strokeWidth={2} /></Link>} />
+        action={
+          /* اليوم هنا، والأسبوع في الكشف، والفترة في التقارير — ثلاثة مدَيات
+             وثلاثة أبواب، فلا يبحث المشرف عن الأمس في شاشة اليوم. */
+          <span className="flex items-center gap-4">
+            <Link href="/admin/follow-up?list=register"
+              className="flex items-center gap-1 text-xs2 text-brand-800 hover:underline">
+              كشف الأسبوع <ArrowLeft size={14} strokeWidth={2} /></Link>
+            <Link href="/admin/reports?r=progress"
+              className="flex items-center gap-1 text-xs2 text-brand-800 hover:underline">
+              إحصائيات الفترة <ArrowLeft size={14} strokeWidth={2} /></Link>
+          </span>} />
 
       {err ? (
         <p className="py-6 text-center text-panel text-ink-500">{err}</p>

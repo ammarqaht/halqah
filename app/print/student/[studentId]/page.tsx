@@ -210,7 +210,7 @@ export default function StudentReport({ params }: { params: Promise<{ studentId:
 
         {hasRatel && (
           <>
-            <PrintSec>لقطة رتل الأسبوعية</PrintSec>
+            <PrintSec>آخر لقطة أسبوعية</PrintSec>
             <table className="keep w-full border-collapse text-sm2">
               <tbody>
                 <tr>

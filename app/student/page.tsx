@@ -23,6 +23,7 @@ import { StudentCard } from '@/components/student/Card';
 import { ExamHold, NextExam } from '@/components/student/NextExam';
 import { Journey, ExamRail, RankTiles, Ledger, type ExamRow } from '@/components/student/Tiles';
 import { TodayAssignment, type StudentPlanPayload } from '@/components/student/Today';
+import { MyDay } from '@/components/student/MyDay';
 import {
   StudentAlertsBell, StudentAlertsBlock, StudentAlertsModal, useStudentAlerts,
 } from '@/components/student/Alerts';
@@ -95,6 +96,11 @@ export default function StudentHome() {
           when nobody has set his pointer: a boy must never be sent to an
           invented passage. */}
       {levelled && <TodayAssignment d={plan} />}
+
+      {/* حضوري وتسميعي — ما سجّله معلمه اليوم، وآخر أربعة أسابيع. Under
+          «ما عليّ اليوم» because that is what he is asked to do and this is
+          what he was recorded as doing. Shows nothing until a register exists. */}
+      <MyDay />
 
       {levelled && (
         <Journey level={me.currentLevel} ajza={me.ajza}

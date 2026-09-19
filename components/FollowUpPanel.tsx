@@ -53,6 +53,15 @@ export function FollowUpPanel({ onClose }: { onClose: () => void }) {
 
       {onFollowUp && rows.length > 0 && (
         <>
+          {/* ما سجّله المعلمون اليوم وهذا الأسبوع. First, because it is the
+              only thing on this screen that changed since he last looked. */}
+          <PanelGroup label="من بوابة المعلم">
+            <PanelItem active={list === 'register'} tone="ok"
+              onClick={() => set('list', 'register')} sub="حلقةً حلقة، أسبوعًا أسبوعًا">
+              الحضور والتسميع
+            </PanelItem>
+          </PanelGroup>
+
           <PanelGroup label="الكشوف الجاهزة">
             <PanelItem active={!list} onClick={() => set('list', null)} count={counts.scoped}>
               كل الطلاب

@@ -157,7 +157,7 @@ export default function StudentReport() {
 
             {s.ratelAttendedDays != null && (
               <p className="mt-1 text-[9.5px] text-ink-500">
-                ومن برنامج الجمعية (رتل) قبل البوابة:{' '}
+                وما سبق البوابة:{' '}
                 <Num>{toArabicDigits(s.ratelAttendedDays)}</Num> يومًا مجملًا بلا تواريخ —
                 لا يُجمع مع الشبكة أعلاه.
               </p>

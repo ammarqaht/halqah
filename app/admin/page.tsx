@@ -43,7 +43,7 @@ export default function OverviewPage() {
         <div className="mx-auto max-w-column px-6 py-8">
           <Sheet className="rise">
             <Empty icon={Inbox} title="لا توجد بيانات بعد"
-              body="الرفع كلّه من هنا. اسحب ملفاتك — رتل، قاعدة الحلقات، الاختبارات، منهج الحفظ — دفعة واحدة، ويقرأ النظام كل ورقة فيها بنفسه وينشرها على شاشات الموقع كلّها بعد أن تراجع المعاينة."
+              body="الرفع كلّه من هنا. اسحب ملفاتك — كشف الطلاب، قاعدة الحلقات، الاختبارات، منهج الحفظ — دفعة واحدة، ويقرأ النظام كل ورقة فيها بنفسه وينشرها على شاشات الموقع كلّها بعد أن تراجع المعاينة."
               action={<Link href="/admin/import">
                 <Btn variant="primary" size="lg" icon={UploadCloud}>رفع ملف</Btn></Link>} />
           </Sheet>

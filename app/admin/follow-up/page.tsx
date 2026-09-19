@@ -35,6 +35,7 @@ import { TRACK_AR, STATUS_AR } from '@/lib/types';
 import { foldArabic, shortName, teacherName } from '@/lib/normalise';
 import { formatDate, relativeDay } from '@/lib/dates';
 import { cx } from '@/lib/cx';
+import { Register } from '@/components/Register';
 
 const LIST_META: Record<ListKey, { title: string; hint: React.ReactNode }> = {
   ready: {
@@ -217,6 +218,12 @@ function FollowUpScreen() {
 
       <div className="mx-auto max-w-column px-6 py-8 pb-16">
 
+        {/* كشف الحضور والتسميع — شاشة قائمة بذاتها لا كشفًا بين الكشوف: ما
+            يسجّله المعلمون يوميًا ليس قائمة طلاب تُرشَّح، بل سجلّ أسبوع. */}
+        {listParam === 'register' ? (
+          <Register halaqaId={halaqaFilter} />
+        ) : (<>
+
         {/* كل بطاقة تفتح كشفها — والسهم أسفل يسارها يقول ذلك (قرار العميل ١ سبتمبر). */}
         <div className="rise mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
           <KPI label="طلاب يُتابَعون" value={inHalaqa.length} icon={Users} accent
@@ -393,7 +400,7 @@ function FollowUpScreen() {
                         <Num className="font-medium text-brand-800">{sel.balance}</Num> {pointWord(sel.balance)}
                       </Def>
                     )}
-                    <Def label="لقطة رتل الأسبوعية">
+                    <Def label="آخر لقطة أسبوعية">
                       {sel.student.attendedDays === undefined && sel.student.hifzPages === undefined
                         ? <span className="text-ink-400">لم يرد في آخر ملف</span>
                         : <>
@@ -533,6 +540,7 @@ function FollowUpScreen() {
             )}
           </div>
         )}
+        </>)}
       </div>
     </>
   );

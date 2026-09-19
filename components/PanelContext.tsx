@@ -67,7 +67,7 @@ export function PanelContext({ onClose }: { onClose: () => void }) {
         meta={d.sourceFile ? `آخر ملف: ${d.sourceFile}` : 'لم يُرفع ملف بعد'} onClose={onClose}>
         {d.isEmpty ? (
           <p className="px-1.5 py-2 text-panel leading-relaxed text-ink-500">
-            لا توجد تنبيهات لأن القاعدة فارغة. ابدأ برفع ملف رتل.
+            لا توجد تنبيهات لأن القاعدة فارغة. ابدأ برفع ملفاتك.
           </p>
         ) : (
           <PanelGroup label="تنبيهات">

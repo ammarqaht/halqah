@@ -47,7 +47,7 @@ export default function ProgressSheet() {
       <div className="sheet-a4 font-sans" dir="rtl">
         <PrintHead title="تقدّم الحلقات"
           sub={<span>
-            {db.sourceFile ? `من ملف: ${db.sourceFile}` : 'من آخر ملف رتل مرفوع'}
+            {db.sourceFile ? `من ملف: ${db.sourceFile}` : 'من آخر ملف مرفوع'}
             {db.importedAt && <> · <Num>{toArabicDigits(formatDate(db.importedAt.slice(0, 10)))}</Num></>}
           </span>} />
 
@@ -138,7 +138,7 @@ export default function ProgressSheet() {
         )}
 
         <PrintFoot>
-          الأرقام كما رفعها ملف رتل — «للطالب» متوسّطٌ على طلاب الحلقة، وما سواه مجموع.
+          الأرقام كما جاءت في الملف المرفوع — «للطالب» متوسّطٌ على طلاب الحلقة، وما سواه مجموع.
         </PrintFoot>
       </div>
     </>
