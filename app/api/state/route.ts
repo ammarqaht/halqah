@@ -4,6 +4,7 @@ import { issueMissingAccounts, type IssuedAccount } from '@/lib/credentials';
 import { readSession } from '@/lib/auth';
 import { toStudent, toHalaqa } from '@/lib/serialize';
 import type { Prisma } from '@prisma/client';
+import { createHash } from 'node:crypto';
 
 /* The whole working set, in one request and out in one.
    Eleven of the fourteen entities lived in localStorage: the points ledger,
@@ -143,6 +144,46 @@ export async function PUT(req: Request) {
      rather than a merge — and it happens inside ONE transaction, so a device
      that loses its connection half-way through leaves the previous state
      intact rather than half of two. */
+  /* The curriculum is REFERENCE data: three and a half thousand rows that
+     change on an import of «منهج الحفظ» and at no other time. Tearing them down
+     and building them back cost eight seconds of every save — a third of a
+     budget that had reached twenty-five of its thirty, and the save dies at
+     thirty. So it is rewritten only when it actually differs.
+
+     The comparison runs BEFORE the transaction opens, not inside it: reading
+     three and a half thousand rows is cheap, but spending the transaction's own
+     clock on a read is how a slow network turns a saving into a timeout. */
+  const curriculumChanged = await (async () => {
+    const sent = (s.curriculum ?? []) as Record<string, unknown>[];
+    const key = (r: Record<string, unknown>) =>
+      `${r.track}|${r.level}|${r.dayNo}|${r.kind}|${r.fromSurah ?? ''}|${r.fromAyah ?? ''}|${r.toSurah ?? ''}|${r.toAyah ?? ''}|${r.note ?? ''}`;
+
+    /* One row back, not three and a half thousand. Pulling the rows across to
+       compare them cost ten seconds on an ordinary day and sixty on a bad one —
+       more than the rebuild it was meant to avoid. Postgres folds them and
+       returns a single hash.
+
+       The fold is over each row's md5, not over the row text: the text is
+       Arabic, and Postgres orders Arabic by its collation while JavaScript
+       orders by code unit. Hex digests are ASCII, so both sides sort them the
+       same way and the comparison means what it says. */
+    const [row] = await db.$queryRaw<{ n: bigint; sig: string | null }[]>`
+      SELECT count(*) AS n,
+             md5(string_agg(h, '' ORDER BY h)) AS sig
+        FROM (SELECT md5(track || '|' || level || '|' || day_no || '|' || kind
+                         || '|' || from_surah || '|' || from_ayah || '|'
+                         || to_surah || '|' || to_ayah || '|' || note) AS h
+                FROM curriculum_days) q`;
+
+    if (Number(row?.n ?? 0) !== sent.length) return true;
+    if (sent.length === 0) return false;
+
+    const mine = createHash('md5').update(
+      sent.map((r) => createHash('md5').update(key(r)).digest('hex')).sort().join(''),
+    ).digest('hex');
+    return mine !== row?.sig;
+  })();
+
   let newAccounts: IssuedAccount[] = [];
   let accountsWithoutId: string[] = [];
 
@@ -299,7 +340,9 @@ export async function PUT(req: Request) {
       await tx.studentPlan.deleteMany();
       await tx.pointCodeBatch.deleteMany();
       await tx.gift.deleteMany();
-      await tx.curriculumDay.deleteMany();
+
+      if (curriculumChanged) await tx.curriculumDay.deleteMany();
+
       await tx.tajweedTopic.deleteMany();
 
       const d = (v: unknown) => (v ? new Date(String(v)) : null);
@@ -381,9 +424,19 @@ export async function PUT(req: Request) {
         }
       }
 
-      if (s.curriculum?.length) await tx.curriculumDay.createMany({ data: s.curriculum });
+      if (curriculumChanged && s.curriculum?.length) {
+        await tx.curriculumDay.createMany({ data: s.curriculum });
+      }
       if (s.tajweedTopics?.length) await tx.tajweedTopic.createMany({ data: s.tajweedTopics });
-    }, { timeout: 30_000 });
+    /* Thirty seconds was chosen when this save was small and the database was
+       near. It is neither: the working set is 3,572 curriculum rows, 412 exams,
+       168 plans and their ledger, and the database is a remote host where a
+       single read of the curriculum has been measured at ten seconds. A save
+       that overruns rolls the whole thing back and reports «تعذّر الحفظ»,
+       which is the worst of both — the supervisor's work is neither saved nor
+       explained. The transaction is the only writer, and last write wins here
+       anyway, so waiting is cheap and losing the save is not. */
+    }, { timeout: 120_000, maxWait: 20_000 });
   } catch (e) {
     return NextResponse.json(
       { error: 'تعذّر الحفظ على الخادم.', detail: e instanceof Error ? e.message : '' },
