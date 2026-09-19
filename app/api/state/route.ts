@@ -5,6 +5,7 @@ import { readSession } from '@/lib/auth';
 import { toStudent, toHalaqa } from '@/lib/serialize';
 import type { Prisma } from '@prisma/client';
 import { createHash } from 'node:crypto';
+import { json } from '@/lib/compress';
 
 /* The whole working set, in one request and out in one.
    Eleven of the fourteen entities lived in localStorage: the points ledger,
@@ -23,7 +24,7 @@ const iso = (d: Date | null | undefined) => (d ? d.toISOString() : null);
     written in `lib/day.ts` and read here, and the two must not drift. */
 const DAY_REF = 'day';
 
-export async function GET() {
+export async function GET(req: Request) {
   if (!await readSession()) return NextResponse.json({ error: 'غير مصرّح' }, { status: 401 });
 
   const holdRows = await db.studentProgress.findMany({
@@ -36,7 +37,7 @@ export async function GET() {
 
   const [students, halaqat,
          txns, batches, codes, gifts, orders, exams, questions, bookings,
-         curriculum, plans, topics] = await Promise.all([
+         plans, topics] = await Promise.all([
     db.student.findMany(),
     db.halaqa.findMany(),
     db.pointTxn.findMany({ orderBy: { createdAt: 'asc' } }),
@@ -47,7 +48,6 @@ export async function GET() {
     db.exam.findMany(),
     db.examQuestion.findMany(),
     db.examBooking.findMany(),
-    db.curriculumDay.findMany(),
     db.studentPlan.findMany(),
     db.tajweedTopic.findMany(),
   ]);
@@ -56,7 +56,7 @@ export async function GET() {
      empty itself rather than upload it back. */
   const resetAt = (await db.setting.findUnique({ where: { key: 'reset_at' } }))?.value ?? null;
 
-  return NextResponse.json({
+  return json({
     resetAt,
     /* The roster comes DOWN too. It only ever went up — through /api/import —
        so every browser showed its own copy of the students and disagreed with
@@ -82,10 +82,14 @@ export async function GET() {
     exams: exams.map((e) => ({ ...e, createdAt: e.createdAt.toISOString() })),
     examQuestions: questions,
     bookings: bookings.map((b) => ({ ...b, createdAt: b.createdAt.toISOString() })),
-    curriculum,
+    /* المنهج ليس هنا. It was — 3,572 rows, 520 KB, seventy-three seconds
+       against the live database, two thirds of this payload and almost all of
+       its wait, on every page load, for a table only the plans and exam
+       screens read. It has its own cached endpoint now: `GET /api/curriculum`,
+       which answers 304 to a browser that already holds this term's. */
     plans: plans.map((p) => ({ ...p, createdAt: p.createdAt.toISOString() })),
     tajweedTopics: topics,
-  });
+  }, req);
 }
 
 /** Is this row already what we are about to write?
@@ -120,7 +124,9 @@ export async function PUT(req: Request) {
      So a payload that is empty where the database is not is refused. Wiping is
      a deliberate act with its own endpoint and its own confirmation phrase;
      it is not something a save should ever do by omission. */
-  const HELD = ['exams', 'plans', 'txns', 'orders', 'curriculum'] as const;
+  /* المنهج خرج من هذه القائمة مع خروجه من الحمل: المتصفّح لا يرسله إلا حين
+     يغيّره، فغيابه ليس فقدانًا يُحرس منه. */
+  const HELD = ['exams', 'plans', 'txns', 'orders'] as const;
   const sending = Object.fromEntries(
     HELD.map((k) => [k, Array.isArray(s[k]) ? (s[k] as unknown[]).length : 0]));
   if (HELD.some((k) => sending[k] === 0)) {
@@ -129,7 +135,6 @@ export async function PUT(req: Request) {
       plans: await db.studentPlan.count(),
       txns: await db.pointTxn.count(),
       orders: await db.order.count(),
-      curriculum: await db.curriculumDay.count(),
     };
     const wouldLose = HELD.filter((k) => sending[k] === 0 && held[k] > 0);
     if (wouldLose.length) {
@@ -153,7 +158,11 @@ export async function PUT(req: Request) {
      The comparison runs BEFORE the transaction opens, not inside it: reading
      three and a half thousand rows is cheap, but spending the transaction's own
      clock on a read is how a slow network turns a saving into a timeout. */
-  const curriculumChanged = await (async () => {
+  /* Absent means «I did not touch it», not «delete it». A browser only sends
+     the curriculum when it imported one or edited a level; every other save
+     leaves the table exactly as it stands. */
+  const sentCurriculum = Array.isArray(s.curriculum);
+  const curriculumChanged = sentCurriculum && await (async () => {
     const sent = (s.curriculum ?? []) as Record<string, unknown>[];
     const key = (r: Record<string, unknown>) =>
       `${r.track}|${r.level}|${r.dayNo}|${r.kind}|${r.fromSurah ?? ''}|${r.fromAyah ?? ''}|${r.toSurah ?? ''}|${r.toAyah ?? ''}|${r.note ?? ''}`;
@@ -341,7 +350,7 @@ export async function PUT(req: Request) {
       await tx.pointCodeBatch.deleteMany();
       await tx.gift.deleteMany();
 
-      if (curriculumChanged) await tx.curriculumDay.deleteMany();
+      if (sentCurriculum && curriculumChanged) await tx.curriculumDay.deleteMany();
 
       await tx.tajweedTopic.deleteMany();
 
@@ -424,7 +433,7 @@ export async function PUT(req: Request) {
         }
       }
 
-      if (curriculumChanged && s.curriculum?.length) {
+      if (sentCurriculum && curriculumChanged && s.curriculum?.length) {
         await tx.curriculumDay.createMany({ data: s.curriculum });
       }
       if (s.tajweedTopics?.length) await tx.tajweedTopic.createMany({ data: s.tajweedTopics });

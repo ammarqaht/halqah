@@ -9,7 +9,7 @@
 
    The parser is loud on purpose (§5.4: «assert 24 days for every level, or fail
    loudly»). This file becomes the content of every sheet a child is handed. */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { UploadCloud, FileSpreadsheet, AlertTriangle, Check, BookOpen } from 'lucide-react';
 import { TopBar } from '@/components/TopBar';
@@ -17,7 +17,7 @@ import { Sheet, SheetHead } from '@/components/Sheet';
 import { Btn, Empty, Chip } from '@/components/ui';
 import { Num } from '@/components/Num';
 import { usePanel } from '@/components/PanelState';
-import { store, useDB } from '@/lib/store';
+import { store, useDB, ensureCurriculum } from '@/lib/store';
 import { coverage } from '@/lib/curriculum';
 import { parseCurriculumWorkbook, type CurriculumParse } from '@/lib/importers/curriculum';
 import { TRACK_AR } from '@/lib/types';
@@ -26,6 +26,8 @@ import { cx } from '@/lib/cx';
 export default function CurriculumImport() {
   const { panelOpen, setPanelOpen } = usePanel();
   const db = useDB();
+  /* المنهج يُطلب عند الحاجة لا مع كل صفحة — راجع lib/store.ts */
+  useEffect(() => { void ensureCurriculum(); }, []);
   const [parsed, setParsed] = useState<CurriculumParse[] | null>(null);
   const [fileName, setFileName] = useState('');
   const [busy, setBusy] = useState(false);

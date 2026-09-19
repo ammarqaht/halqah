@@ -24,7 +24,7 @@ import { Combobox } from '@/components/Combobox';
 import { TrackPicker } from '@/components/TrackPicker';
 import { Num, juzPhrase } from '@/components/Num';
 import { usePanel } from '@/components/PanelState';
-import { store, useDB } from '@/lib/store';
+import { store, useDB, ensureCurriculum } from '@/lib/store';
 import { resolvePlan, levelAvailable, dailyAmountFor, draftPlan, dayCountFor } from '@/lib/curriculum';
 import { nextLevel, ajzaForLevel } from '@/lib/exams';
 import { PLAN_KIND_AR, TRACK_AR, type Track } from '@/lib/types';
@@ -38,6 +38,8 @@ const BADGE_AR = { BADGE_GOLDEN: 'الوسام الذهبي', BADGE_DIAMOND: 'ا
 function PlansScreen() {
   const { panelOpen, setPanelOpen } = usePanel();
   const db = useDB();
+  /* المنهج يُطلب عند الحاجة لا مع كل صفحة — راجع lib/store.ts */
+  useEffect(() => { void ensureCurriculum(); }, []);
   const myName = useMyName();
   const sp = useSearchParams();
   const router = useRouter();

@@ -23,7 +23,7 @@ import { Combobox } from '@/components/Combobox';
 import { Grid, GridCell } from '@/components/Grid';
 import { Num, juzPhrase } from '@/components/Num';
 import { usePanel } from '@/components/PanelState';
-import { store, useDB } from '@/lib/store';
+import { store, useDB, ensureCurriculum } from '@/lib/store';
 import { incompleteDays, DEFAULT_DAY_COUNT, coverage } from '@/lib/curriculum';
 import { ajzaExact } from '@/lib/exams';
 import { ASSOCIATION_NOTE } from '@/lib/importers/curriculum';
@@ -40,6 +40,8 @@ const HEADS = ['اليوم', 'المقرَّر', 'من سورة', 'من آية',
 function PlanEditorScreen() {
   const { panelOpen, setPanelOpen } = usePanel();
   const db = useDB();
+  /* المنهج يُطلب عند الحاجة لا مع كل صفحة — راجع lib/store.ts */
+  useEffect(() => { void ensureCurriculum(); }, []);
 
   const [toast, setToast] = useState<string | null>(null);
   useEffect(() => {

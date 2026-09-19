@@ -18,6 +18,7 @@ import { useDB } from '@/lib/store';
 import { EXAM_TYPE_AR, type ExamType } from '@/lib/points';
 import { halaqaLabel, shortName } from '@/lib/normalise';
 import { formatDate } from '@/lib/dates';
+import { useAttendance } from '@/components/useAttendance';
 
 const EXAM_ORDER: ExamType[] = ['BADGE_GOLDEN', 'BADGE_DIAMOND', 'ASSOCIATION', 'TAJWEED', 'MOCK'];
 
@@ -26,6 +27,7 @@ function PeriodSheet() {
   const sp = useSearchParams();
   const from = sp.get('from') || '';
   const to = sp.get('to') || '';
+  const att = useAttendance({ from: from || null, to: to || null });
 
   /* An ISO date compares correctly as a string, and both bounds are inclusive
      — «من ١/٩ إلى ٣٠/٩» must contain the thirtieth. */
@@ -137,6 +139,41 @@ function PeriodSheet() {
                 ))}
               </tbody>
             </table>
+
+            {/* الحضور والتسميع في الفترة — من سجلّ المعلمين. A period report
+                that counted exams and points but not a single afternoon was
+                missing the thing the period is actually made of. */}
+            {att && att.total.recorded > 0 && (
+              <>
+                <PrintSec>الحضور والتسميع في الفترة</PrintSec>
+                <table className="keep w-full border-collapse text-[11px]">
+                  <tbody>
+                    <tr>
+                      <th className={`${PCELL} bg-page/60 font-medium`}>تسجيلات</th>
+                      <td className={PCELL}><Num>{toArabicDigits(att.total.recorded)}</Num></td>
+                      <th className={`${PCELL} bg-page/60 font-medium`}>حضور</th>
+                      <td className={PCELL}>
+                        <Num>{toArabicDigits(att.total.attended)}</Num>
+                        {att.total.rate !== null && <> · <Num>{toArabicDigits(att.total.rate)}</Num>٪</>}
+                      </td>
+                      <th className={`${PCELL} bg-page/60 font-medium`}>غياب</th>
+                      <td className={PCELL}><Num>{toArabicDigits(att.total.absent)}</Num></td>
+                    </tr>
+                    <tr>
+                      <th className={`${PCELL} bg-page/60 font-medium`}>متأخر</th>
+                      <td className={PCELL}><Num>{toArabicDigits(att.total.late)}</Num></td>
+                      <th className={`${PCELL} bg-page/60 font-medium`}>أسطر سُمّعت</th>
+                      <td className={PCELL}><Num>{toArabicDigits(att.total.lines)}</Num></td>
+                      <th className={`${PCELL} bg-page/60 font-medium`}>أخطاء</th>
+                      <td className={PCELL}><Num>{toArabicDigits(att.total.errors)}</Num></td>
+                    </tr>
+                  </tbody>
+                </table>
+                <p className="mb-3 text-[10px] text-ink-600">
+                  من سجلّ المعلمين في بوابتهم. واليوم الذي لم يُسجَّل لا يُحسب حضورًا ولا غيابًا.
+                </p>
+              </>
+            )}
 
             <PrintSec>النقاط في الفترة</PrintSec>
             <table className="keep w-full border-collapse text-[11px]">

@@ -95,9 +95,15 @@ function load(): DB {
    somewhere every device reads from. */
 
 /** The lists the server owns. Students and halaqat already had their own API. */
+/* المنهج ليس منها — وهو أثقل ما كان فيها.
+   3,572 rows, 520 KB and seventy-three seconds against the live database, on
+   every page load, for a table only the plans and exam screens read. It is
+   server-owned now: `GET /api/curriculum` serves it with an ETag, the screens
+   that need it ask `ensureCurriculum()`, and the two paths that WRITE it — an
+   import, and an edit to one level — say so explicitly. */
 const SYNCED = [
   'txns', 'batches', 'codes', 'gifts', 'orders', 'exams', 'examQuestions',
-  'bookings', 'curriculum', 'plans', 'tajweedTopics',
+  'bookings', 'plans', 'tajweedTopics',
 ] as const;
 
 type SyncState = 'idle' | 'saving' | 'saved' | 'offline' | 'unauthorized';
@@ -125,9 +131,41 @@ const slice = (d: DB) => ({
      written back, so adding a halaqa, renaming one, or deleting one changed
      nothing beyond the browser it was done in. */
   halaqat: d.halaqat,
+  /* Only when this browser changed it. Sending an empty list from a device
+     that never loaded it is how a save would ask the server to delete the
+     curriculum — which the 409 guard would refuse, blocking every save. */
+  ...(curriculumDirty ? { curriculum: d.curriculum } : {}),
 });
 
 function setSync(s: SyncState) { syncState = s; subs.forEach((f) => f()); }
+
+/** Set when this browser has CHANGED the curriculum and the change must go up.
+    Otherwise the save says nothing about it and the server leaves it alone —
+    which is what every ordinary save does. */
+let curriculumDirty = false;
+
+/** Fetched once per session, and re-fetched for free after that: the endpoint
+    answers 304 to a browser holding this term's. */
+let curriculumLoaded = false;
+let curriculumInFlight: Promise<void> | null = null;
+
+/** Screens that read `db.curriculum` call this first. */
+export function ensureCurriculum(): Promise<void> {
+  if (curriculumLoaded) return Promise.resolve();
+  if (curriculumInFlight) return curriculumInFlight;
+  curriculumInFlight = fetch('/api/curriculum')
+    .then((r) => (r.ok ? r.json() : null))
+    .then((j) => {
+      if (j?.curriculum) {
+        const cur = load();
+        commit({ ...cur, curriculum: j.curriculum });
+        curriculumLoaded = true;
+      }
+    })
+    .catch(() => { /* the screen shows its empty state */ })
+    .finally(() => { curriculumInFlight = null; });
+  return curriculumInFlight;
+}
 
 /* WHO is doing this.
    Every row that records a person — a plan issued, points granted, a code
@@ -907,6 +945,7 @@ export const store = {
   },
 
   replaceCurriculum(track: Student['track'], days: CurriculumDay[], sourceFile: string) {
+    curriculumDirty = true;
     const cur = load();
     commit({
       ...cur,
@@ -919,6 +958,7 @@ export const store = {
       «لكل من يأخذ هذا المستوى» in §9: it touches everyone on that level, which
       is why the screen asks twice before calling this. */
   setCurriculumLevel(track: Exclude<Student['track'], null>, level: number, days: CurriculumDay[]) {
+    curriculumDirty = true;
     const cur = load();
     commit({
       ...cur,

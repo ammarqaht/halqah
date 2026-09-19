@@ -5,7 +5,7 @@
    never has to work out which screen a file belongs to.
    parse → classify → PREVIEW → commit. Nothing is written before he confirms,
    and an import never deletes. */
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import * as XLSX from 'xlsx';
 import {
@@ -21,7 +21,7 @@ import { usePanel } from '@/components/PanelState';
 import { KIND_AR } from '@/lib/importers/detect';
 import { readWorkbook, type WorkbookRead, type SheetOutcome } from '@/lib/importers/workbook';
 import { ISSUE_AR } from '@/lib/importers/roster';
-import { useDB, store, flushToServer } from '@/lib/store';
+import { useDB, store, flushToServer, ensureCurriculum } from '@/lib/store';
 import { shortName } from '@/lib/normalise';
 import { TRACK_AR } from '@/lib/types';
 import { cx } from '@/lib/cx';
@@ -47,6 +47,8 @@ export default function ImportPage() {
   const { panelOpen, setPanelOpen } = usePanel();
   const router = useRouter();
   const db = useDB();
+  /* المنهج يُطلب عند الحاجة لا مع كل صفحة — راجع lib/store.ts */
+  useEffect(() => { void ensureCurriculum(); }, []);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [jobs, setJobs] = useState<Job[]>([]);

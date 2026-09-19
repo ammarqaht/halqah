@@ -33,7 +33,7 @@ import { Printer } from 'lucide-react';
 import { LogoMark, LogoJamiyah } from '@/components/Logo';
 import { Num } from '@/components/Num';
 import { Btn } from '@/components/ui';
-import { store, useDB } from '@/lib/store';
+import { store, useDB, ensureCurriculum } from '@/lib/store';
 import {
   resolvePlan, dailyAmountFor, DEFAULT_DAY_COUNT, DEFAULT_EXAM_DAYS,
   TAJWEED_FOOTER, type PlanRow,
@@ -78,6 +78,8 @@ function Range({ r }: { r: PlanRow | undefined }) {
 function PlanSheetInner({ params }: { params: Promise<{ planId: string }> }) {
   const { planId } = use(params);
   const db = useDB();
+  /* المنهج يُطلب عند الحاجة لا مع كل صفحة — راجع lib/store.ts */
+  useEffect(() => { void ensureCurriculum(); }, []);
 
   /* A BLANK sheet: `/print/plan/blank?track=SILVER&level=40`.
      The supervisor keeps a stack of a level's sheets on the desk and writes a

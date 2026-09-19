@@ -27,7 +27,7 @@ import { DateField } from '@/components/DateField';
 import { TrackPicker } from '@/components/TrackPicker';
 import { Num, pointWord } from '@/components/Num';
 import { usePanel } from '@/components/PanelState';
-import { store, useDB } from '@/lib/store';
+import { store, useDB, ensureCurriculum } from '@/lib/store';
 import { earnsPoints, examPoints, EXAM_TYPE_AR, type ExamType } from '@/lib/points';
 import { DEFAULT_POINTS, POINTS_KEY, readPoints } from '@/lib/settings';
 import {
@@ -102,6 +102,8 @@ type Saved = { exam: Exam; studentName: string; nextLevel: number | null };
 function RecordExam() {
   const { panelOpen, setPanelOpen } = usePanel();
   const db = useDB();
+  /* المنهج يُطلب عند الحاجة لا مع كل صفحة — راجع lib/store.ts */
+  useEffect(() => { void ensureCurriculum(); }, []);
   const router = useRouter();
   const sp = useSearchParams();
 

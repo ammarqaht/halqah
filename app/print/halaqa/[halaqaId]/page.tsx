@@ -15,10 +15,12 @@ import { EXAM_TYPE_SHORT_AR, type ExamType } from '@/lib/points';
 import { TRACK_AR } from '@/lib/types';
 import { formatDate } from '@/lib/dates';
 import { cx } from '@/lib/cx';
+import { useAttendance } from '@/components/useAttendance';
 
 export default function HalaqaReport({ params }: { params: Promise<{ halaqaId: string }> }) {
   const { halaqaId } = use(params);
   const db = useDB();
+  const att = useAttendance({ halaqa: halaqaId });
 
   const halaqa = db.halaqat.find((h) => h.id === halaqaId) ?? null;
   const rows = useMemo(() => followedRows(followUpRows(db))
@@ -26,14 +28,11 @@ export default function HalaqaReport({ params }: { params: Promise<{ halaqaId: s
     .sort((a, b) => a.student.fullName.localeCompare(b.student.fullName, 'ar')),
   [db, halaqaId]);
 
-  /* The halaqa's own attendance, averaged over the boys رتل actually reported
-     on — a student the file did not mention must not drag the figure down. */
-  const attTotal = (() => {
-    const marked = rows.filter((r) => r.student.attendedDays !== undefined);
-    if (!marked.length) return null;
-    const n = marked.reduce((a, r) => a + (r.student.attendedDays ?? 0), 0) / marked.length;
-    return Math.round(n * 10) / 10;
-  })();
+  /* The halaqa's attendance rate, over every afternoon actually RECORDED —
+     not an average of per-boy averages, so a student with three records does
+     not weigh the same as one with thirty. Null before the first save: a
+     percentage with no register behind it is an invention. */
+  const attRate = att && att.total.recorded > 0 ? att.total.rate : null;
 
   if (!halaqa) {
     return (
@@ -55,7 +54,7 @@ export default function HalaqaReport({ params }: { params: Promise<{ halaqaId: s
       <div className="sheet-a4 font-sans" dir="rtl">
         <PrintHead title={`تقرير حلقة ${halaqa.teacher}`}
           sub={`جامع محمد العبدالكريم — ${toArabicDigits(plural(rows.length, 'طالب واحد', 'طالبان', 'طلاب', 'طالبًا'))}`
-            + (attTotal !== null ? ` · متوسّط الحضور ${toArabicDigits(attTotal)} ${attTotal === 1 ? 'يوم' : 'أيام'}` : '')} />
+            + (attRate !== null ? ` · الحضور ${toArabicDigits(attRate)}٪ من ${toArabicDigits(att!.total.recorded)} تسجيلًا` : '')} />
 
         {rows.length === 0 ? (
           <p className="py-12 text-center text-lg2 text-ink-500">لا طلاب نشطين في هذه الحلقة.</p>
@@ -63,9 +62,12 @@ export default function HalaqaReport({ params }: { params: Promise<{ halaqaId: s
           <table className="w-full border-collapse text-[11px]">
             <thead>
               <tr className="bg-page/60 text-[10px] text-ink-700">
-                {/* «أيام الحضور» comes straight from رتل's «الحضور» column in
-                    قاعدة بيانات الحلقات — the count the file already carries. */}
-                {['#', 'الطالب', 'الصف', 'المسار', 'المستوى', 'الحضور', 'آخر اختبار', 'جمعية', 'النقاط'].map((h) => (
+                {/* «الحضور» is now the REGISTER's — what his teacher marked,
+                    afternoon by afternoon — and «سمّع» beside it is the days he
+                    recited something. Both were the uploaded file's term totals
+                    before, which could not name a day and went stale the moment
+                    the teacher's portal recorded one. */}
+                {['#', 'الطالب', 'الصف', 'المسار', 'المستوى', 'الحضور', 'سمّع', 'آخر اختبار', 'جمعية', 'النقاط'].map((h) => (
                   <th key={h} className={PCELL}>{h}</th>))}
               </tr>
             </thead>
@@ -87,8 +89,21 @@ export default function HalaqaReport({ params }: { params: Promise<{ halaqaId: s
                         : s.currentLevel != null ? <Num>{toArabicDigits(s.currentLevel)}</Num> : '—'}
                     </td>
                     <td className={PCELL}>
-                      {s.attendedDays === undefined ? '—'
-                        : <Num>{toArabicDigits(s.attendedDays)}</Num>}
+                      {(() => {
+                        const a = att?.students[s.id];
+                        if (!a || a.recorded === 0) return '—';
+                        return (<>
+                          <Num>{toArabicDigits(a.attended)}</Num>
+                          <span className="text-ink-500">/<Num>{toArabicDigits(a.recorded)}</Num></span>
+                        </>);
+                      })()}
+                    </td>
+                    <td className={PCELL}>
+                      {(() => {
+                        const a = att?.students[s.id];
+                        if (!a || a.recorded === 0) return '—';
+                        return <Num>{toArabicDigits(a.recitedDays)}</Num>;
+                      })()}
                     </td>
                     <td className={`${PCELL} text-start`}>
                       {last

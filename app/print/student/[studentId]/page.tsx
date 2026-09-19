@@ -16,6 +16,7 @@ import { EXAM_TYPE_AR, type ExamType } from '@/lib/points';
 import { TRACK_AR, STATUS_AR, TXN_KIND_AR } from '@/lib/types';
 import { halaqaLabel, shortName  } from '@/lib/normalise';
 import { formatDate } from '@/lib/dates';
+import { useAttendance } from '@/components/useAttendance';
 
 // Seventeen is the most any one boy has sat; at the tighter row height they all
 // fit, so nobody's report is truncated at all.
@@ -25,6 +26,8 @@ const MAX_TXN_ROWS = 5;
 export default function StudentReport({ params }: { params: Promise<{ studentId: string }> }) {
   const { studentId } = use(params);
   const db = useDB();
+  const att = useAttendance({ student: studentId });
+  const me = att?.students[studentId] ?? null;
 
   const row = useMemo(
     () => followUpRows(db).find((r) => r.student.id === studentId) ?? null, [db, studentId]);
@@ -204,6 +207,49 @@ export default function StudentReport({ params }: { params: Promise<{ studentId:
                   ))}
                 </tbody>
               </table>
+            )}
+          </>
+        )}
+
+        {/* حضوره وتسميعه — من سجلّ معلمه، لا من ملف مرفوع.
+            The line above it is the last upload's term totals, which cannot
+            name a day and go stale the moment a teacher records one. This is
+            every afternoon his own teacher marked. */}
+        {me && me.recorded > 0 && (
+          <>
+            <PrintSec>الحضور والتسميع</PrintSec>
+            <table className="keep w-full border-collapse text-sm2">
+              <tbody>
+                <tr>
+                  <th className={`${PCELL} bg-page/60 font-medium`}>الحضور</th>
+                  <td className={PCELL}>
+                    <Num>{toArabicDigits(me.attended)}</Num> من{' '}
+                    <Num>{toArabicDigits(me.recorded)}</Num>
+                    {me.rate !== null && <> · <Num>{toArabicDigits(me.rate)}</Num>٪</>}
+                  </td>
+                  <th className={`${PCELL} bg-page/60 font-medium`}>متأخر</th>
+                  <td className={PCELL}><Num>{toArabicDigits(me.late)}</Num></td>
+                  <th className={`${PCELL} bg-page/60 font-medium`}>غائب</th>
+                  <td className={PCELL}><Num>{toArabicDigits(me.absent)}</Num></td>
+                </tr>
+                <tr>
+                  <th className={`${PCELL} bg-page/60 font-medium`}>أيام سمّع فيها</th>
+                  <td className={PCELL}><Num>{toArabicDigits(me.recitedDays)}</Num></td>
+                  <th className={`${PCELL} bg-page/60 font-medium`}>أسطر · أخطاء</th>
+                  <td className={PCELL}>
+                    <Num>{toArabicDigits(me.lines)}</Num> · <Num>{toArabicDigits(me.errors)}</Num>
+                  </td>
+                  <th className={`${PCELL} bg-page/60 font-medium`}>آخر حضور</th>
+                  <td className={PCELL}>
+                    {me.lastAttended ? <Num>{toArabicDigits(formatDate(me.lastAttended))}</Num> : '—'}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            {me.absentStreak >= 2 && (
+              <p className="mb-3 text-[10px] text-ink-600">
+                غاب <Num>{toArabicDigits(me.absentStreak)}</Num> أيام متتالية في آخر ما سُجِّل له.
+              </p>
             )}
           </>
         )}
