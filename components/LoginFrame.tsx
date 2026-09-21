@@ -24,6 +24,7 @@ import { Curtain } from '@/components/Curtain';
 import { Lattice } from '@/components/Lattice';
 import { INTRO, prefersReducedMotion } from '@/lib/motion';
 import { cx } from '@/lib/cx';
+import { MedadFoot } from '@/components/MedadFoot';
 
 /* ── الستارة ─────────────────────────────────────────────────────────────────
    Plays on every visit, reloads included. The page underneath is fully rendered
@@ -76,6 +77,10 @@ export function LoginFrame({ children, foot, curtain }: {
           <div className="mx-auto w-full max-w-[24rem]">
             <div className="mb-8 lg:hidden"><LogoFull height={44} /></div>
             {children}
+            {/* الأبواب الثلاثة تشترك في هذا الإطار، فموضع واحد يكفيها.
+                وفي لوح الفاتح لا الأخضر: الأخضر يحمل شعارَي الجامع والجمعية،
+                وهذه الصفحة لهما. */}
+            <MedadFoot className="!pb-0 pt-10" />
           </div>
         </main>
 

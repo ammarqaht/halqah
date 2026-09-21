@@ -6,6 +6,7 @@ import { IdleGuard } from '@/components/IdleGuard';
 import { SyncGuard } from '@/components/SyncGuard';
 import { PanelContext } from '@/components/PanelContext';
 import { PanelState } from '@/components/PanelState';
+import { MedadFoot } from '@/components/MedadFoot';
 
 const panelSkeleton = <div className="flex-1 p-4"><div className="skel h-5 w-32" /></div>;
 
@@ -53,6 +54,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {/* tier 3 — work area */}
         <main className="thin-scroll flex-1 overflow-y-auto">
           <RouteVeil>{children}</RouteVeil>
+          {/* داخل المنطقة التي تمرّ، لا مثبّتًا فوقها: `main` هنا هو الشيء
+              الوحيد الذي يمرّر، وتثبيته يعني تغطية مساحة العمل. */}
+          <MedadFoot />
           <IdleGuard />
           <SyncGuard />
         </main>

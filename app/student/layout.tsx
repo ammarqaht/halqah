@@ -8,6 +8,7 @@ import { MeProvider, useMe } from '@/components/student/Me';
 import { StudentNav } from '@/components/student/Nav';
 import { LoadingMark } from '@/components/LoadingMark';
 import { ScrollProgress } from '@/components/ScrollProgress';
+import { MedadFoot } from '@/components/MedadFoot';
 
 function Shell({ children }: { children: React.ReactNode }) {
   const { me } = useMe();
@@ -21,6 +22,8 @@ function Shell({ children }: { children: React.ReactNode }) {
       <StudentNav />
       <main className="mx-auto max-w-column px-5 pb-28 pt-4 md:px-6 md:pb-16 md:pt-8">
         {children}
+        {/* داخل `main` فيقع فوق شريط الجوال السفلي لا تحته. */}
+        <MedadFoot />
       </main>
     </div>
   );
