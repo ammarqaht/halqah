@@ -53,15 +53,6 @@ export function FollowUpPanel({ onClose }: { onClose: () => void }) {
 
       {onFollowUp && rows.length > 0 && (
         <>
-          {/* ما سجّله المعلمون اليوم وهذا الأسبوع. First, because it is the
-              only thing on this screen that changed since he last looked. */}
-          <PanelGroup label="من بوابة المعلم">
-            <PanelItem active={list === 'register'} tone="ok"
-              onClick={() => set('list', 'register')} sub="حلقةً حلقة، أسبوعًا أسبوعًا">
-              الحضور والتسميع
-            </PanelItem>
-          </PanelGroup>
-
           <PanelGroup label="الكشوف الجاهزة">
             <PanelItem active={!list} onClick={() => set('list', null)} count={counts.scoped}>
               كل الطلاب
@@ -76,8 +67,10 @@ export function FollowUpPanel({ onClose }: { onClose: () => void }) {
               onClick={() => set('list', 'top')}>المتفوقون</PanelItem>
           </PanelGroup>
 
+          {/* ضغط الحلقة يفتح متابعتها الأسبوعية — حضورها وتسميعها. وقائمة
+              طلابها مكانها «الطلاب والحلقات»، حيث تُفتح ملفاتهم وتُعدَّل. */}
           {counts.byHalaqa.size > 0 && (
-            <PanelGroup label="الحلقات">
+            <PanelGroup label="الحلقات — حضورها وتسميعها">
               <PanelItem active={!halaqa} onClick={() => set('halaqa', null)}>كل الحلقات</PanelItem>
               {db.halaqat.map((h) => {
                 const n = counts.byHalaqa.get(h.id) ?? 0;

@@ -20,6 +20,7 @@ import { useDB } from '@/lib/store';
 import { TRACK_AR, STATUS_AR, type Student } from '@/lib/types';
 import { foldArabic, shortName } from '@/lib/normalise';
 import { cx } from '@/lib/cx';
+import { StudentProfile } from '@/components/StudentProfile';
 
 const TRACK_TONE = { GOLDEN: 'warn', SILVER: 'ink', TALQEEN: 'info' } as const;
 
@@ -33,6 +34,9 @@ function StudentsScreen() {
   const [editStudent, setEditStudent] = useState<Student | 'new' | null>(null);
   const [editHalaqa, setEditHalaqa] = useState(false);
   const [moving, setMoving] = useState(false);
+  /* بالمعرّف لا بالكائن: الطالب يُعدَّل من داخل ملفه، والكائن المحفوظ في الحالة
+     يصير نسخةً قديمة في اللحظة التي يُحفظ فيها أوّل سطر. */
+  const [profile, setProfile] = useState<string | null>(null);
   const halaqaFilter = sp.get('halaqa');
 
   /* Filtering replaces the query string without unmounting this screen, so an
@@ -40,6 +44,7 @@ function StudentsScreen() {
   const filterKey = sp.toString();
   useEffect(() => {
     setEditStudent(null); setEditHalaqa(false); setMoving(false); setSel(new Set());
+    setProfile(null);
   }, [filterKey]);
   const halaqa = halaqaFilter && halaqaFilter !== 'none'
     ? db.halaqat.find((h) => h.id === halaqaFilter) ?? null : null;
@@ -123,6 +128,27 @@ function StudentsScreen() {
                 <Btn variant="primary" size="lg" icon={Home}>الصفحة الرئيسية</Btn></Link>} />
           </Sheet>
         </div>
+      </>
+    );
+  }
+
+  /* من الحالة لا من الصفّ: الطالب يُعدَّل من داخل ملفه، فالكائن يُقرأ من المخزن
+     في كل رسم ليعكس ما حُفظ للتوّ. */
+  const opened = profile ? db.students.find((x) => x.id === profile) ?? null : null;
+
+  if (opened) {
+    return (
+      <>
+        <TopBar title="الطلاب والحلقات" crumbs={[opened.fullName]}
+          panelOpen={panelOpen} onOpenPanel={() => setPanelOpen(true)} />
+        <div className="mx-auto max-w-column px-6 py-8 pb-16">
+          <StudentProfile student={opened} onClose={() => setProfile(null)}
+            onFullEdit={() => setEditStudent(opened)} />
+        </div>
+        {editStudent && (
+          <StudentDialog open student={editStudent === 'new' ? null : editStudent}
+            defaultHalaqa={halaqa?.id ?? null} onClose={() => setEditStudent(null)} />
+        )}
       </>
     );
   }
@@ -254,7 +280,12 @@ function StudentsScreen() {
                           className="h-4 w-4 rounded-sm border-ink-300 accent-brand-800" />
                       </td>
                       <td className="px-3 py-3">
-                        <span className="font-medium text-ink-900">{s.fullName}</span>
+                        {/* اسمه يفتح ملفه — كل ما عنه وتعديله من مكانه.
+                            كان يفتح نموذجًا فيه أحد عشر حقلًا ولا حقيقة واحدة. */}
+                        <button onClick={() => setProfile(s.id)}
+                          className="text-start font-medium text-ink-900 transition hover:text-brand-800 hover:underline">
+                          {s.fullName}
+                        </button>
                         {/* a column identical on every row carries nothing; the exception does */}
                         {s.status !== 'ACTIVE' && (
                           <Chip tone={s.status === 'INACTIVE' ? 'risk' : 'brand'}>{STATUS_AR[s.status]}</Chip>
