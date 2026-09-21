@@ -36,6 +36,7 @@ import { foldArabic, shortName, teacherName } from '@/lib/normalise';
 import { formatDate, relativeDay } from '@/lib/dates';
 import { cx } from '@/lib/cx';
 import { Register } from '@/components/Register';
+import { StudentWeek } from '@/components/StudentWeek';
 
 const LIST_META: Record<ListKey, { title: string; hint: React.ReactNode }> = {
   ready: {
@@ -413,6 +414,10 @@ function FollowUpScreen() {
                           </>}
                     </Def>
                   </Sheet>
+
+                  {/* حضوره وتسميعه — فوق الخطة، لأن «هل حضر هذا الأسبوع؟»
+                      يسبق «أين وصل» في كل سؤال يُسأل عن طالب. */}
+                  <StudentWeek studentId={sel.student.id} />
 
                   <Sheet>
                     <SheetHead title="المستوى والخطة" />
