@@ -6,7 +6,7 @@ import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  UserPlus, Search, Pencil, ArrowLeftRight, Inbox, X,
+  UserPlus, Search, Pencil, Inbox, X,
   AlertTriangle, Users2, Home } from 'lucide-react';
 import { TopBar } from '@/components/TopBar';
 import { Sheet, SheetHead } from '@/components/Sheet';
@@ -14,7 +14,6 @@ import { Btn, Empty, Chip, INPUT } from '@/components/ui';
 import { Num } from '@/components/Num';
 import { usePanel } from '@/components/PanelState';
 import { StudentDialog } from '@/components/StudentDialog';
-import { MoveDialog } from '@/components/MoveDialog';
 import { HalaqaDialog } from '@/components/HalaqaDialog';
 import { useDB } from '@/lib/store';
 import { TRACK_AR, STATUS_AR, type Student } from '@/lib/types';
@@ -30,22 +29,30 @@ function StudentsScreen() {
   const sp = useSearchParams();
   const router = useRouter();
   const [q, setQ] = useState('');
-  const [sel, setSel] = useState<Set<string>>(new Set());
   const [editStudent, setEditStudent] = useState<Student | 'new' | null>(null);
   const [editHalaqa, setEditHalaqa] = useState(false);
-  const [moving, setMoving] = useState(false);
   /* بالمعرّف لا بالكائن: الطالب يُعدَّل من داخل ملفه، والكائن المحفوظ في الحالة
      يصير نسخةً قديمة في اللحظة التي يُحفظ فيها أوّل سطر. */
   const [profile, setProfile] = useState<string | null>(null);
   const halaqaFilter = sp.get('halaqa');
+  /* `?student=` يفتح ملفه مباشرة — تأتي كشوف المتابعة بهذا الرابط، فصفّ
+     «جاهزون للجمعية» يفتح الطالب حيث تُعدَّل بياناته لا حيث تُقرأ فقط. */
+  const askedStudent = sp.get('student');
 
   /* Filtering replaces the query string without unmounting this screen, so an
      open dialog would linger over the new view. Close everything on any change. */
-  const filterKey = sp.toString();
+  /* `student` مستثنى: تغيّره يفتح ملفًّا، وإقفال الملف فور فتحه يجعل
+     الرابط القادم من كشوف المتابعة لا يصل. */
+  const filterKey = (() => {
+    const q = new URLSearchParams(sp.toString());
+    q.delete('student');
+    return q.toString();
+  })();
   useEffect(() => {
-    setEditStudent(null); setEditHalaqa(false); setMoving(false); setSel(new Set());
+    setEditStudent(null); setEditHalaqa(false);
     setProfile(null);
   }, [filterKey]);
+  useEffect(() => { if (askedStudent) setProfile(askedStudent); }, [askedStudent]);
   const halaqa = halaqaFilter && halaqaFilter !== 'none'
     ? db.halaqat.find((h) => h.id === halaqaFilter) ?? null : null;
 
@@ -112,9 +119,6 @@ function StudentsScreen() {
     const t = id ? db.halaqat.find((h) => h.id === id)?.teacher : null;
     return t ? shortName(t) : '—';
   };
-
-  const toggle = (id: string) =>
-    setSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   if (!db.students.length) {
     return (
@@ -228,13 +232,6 @@ function StudentsScreen() {
               <X size={13} className="opacity-60 transition-opacity group-hover:opacity-100" />
             </button>
           ))}
-          {sel.size > 0 && (
-            <div className="fade flex items-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5">
-              <span className="text-panel text-brand-800">حُدِّد <Num>{sel.size}</Num></span>
-              <Btn size="sm" icon={ArrowLeftRight} onClick={() => setMoving(true)}>نقل إلى حلقة</Btn>
-              <button onClick={() => setSel(new Set())} className="rounded p-1 text-ink-400 hover:text-ink-800"><X size={14} /></button>
-            </div>
-          )}
         </div>
 
         {/* ── roster ─────────────────────────────────────────────────────── */}
@@ -257,35 +254,23 @@ function StudentsScreen() {
               <table className={cx('w-full border-collapse text-body', halaqa ? 'min-w-[48rem]' : 'min-w-[56rem]')}>
                 <thead>
                   <tr className="border-b border-ink-200 bg-page/50 text-cap text-ink-500">
-                    <th className="w-10 px-3 py-3">
-                      <input type="checkbox" aria-label="تحديد الكل"
-                        checked={sel.size === rows.length && rows.length > 0}
-                        onChange={(e) => setSel(e.target.checked ? new Set(rows.map((r) => r.id)) : new Set())}
-                        className="h-4 w-4 rounded-sm border-ink-300 accent-brand-800" />
-                    </th>
+                    {/* لا مربّع تحديد ولا عمود قلم: الصفّ كلّه يفتح ملف الطالب،
+                        وفيه يُعدَّل كل شيء — ومنه نقله إلى حلقة أخرى. */}
                     {['الطالب', 'رقم الهوية', 'المسار',
                       ...(halaqa ? [] : ['الحلقة']),
-                      'المستوى', 'الصف', 'الجنسية', 'جوال ولي الأمر', ''].map((h) => (
+                      'المستوى', 'الصف', 'الجنسية', 'جوال ولي الأمر'].map((h) => (
                       <th key={h} className="px-3 py-3 text-start font-medium">{h}</th>))}
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((s) => (
-                    <tr key={s.id}
-                      className={cx('border-b border-ink-150 transition-colors last:border-0 hover:bg-brand-50',
-                        sel.has(s.id) && 'bg-brand-50')}>
+                    <tr key={s.id} onClick={() => setProfile(s.id)}
+                      tabIndex={0} role="button"
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setProfile(s.id); } }}
+                      aria-label={`ملف ${s.fullName}`}
+                      className="cursor-pointer border-b border-ink-150 transition-colors last:border-0 hover:bg-brand-50 focus:bg-brand-50 focus:outline-none">
                       <td className="px-3 py-3">
-                        <input type="checkbox" checked={sel.has(s.id)} onChange={() => toggle(s.id)}
-                          aria-label={`تحديد ${s.fullName}`}
-                          className="h-4 w-4 rounded-sm border-ink-300 accent-brand-800" />
-                      </td>
-                      <td className="px-3 py-3">
-                        {/* اسمه يفتح ملفه — كل ما عنه وتعديله من مكانه.
-                            كان يفتح نموذجًا فيه أحد عشر حقلًا ولا حقيقة واحدة. */}
-                        <button onClick={() => setProfile(s.id)}
-                          className="text-start font-medium text-ink-900 transition hover:text-brand-800 hover:underline">
-                          {s.fullName}
-                        </button>
+                        <span className="font-medium text-ink-900">{s.fullName}</span>
                         {/* a column identical on every row carries nothing; the exception does */}
                         {s.status !== 'ACTIVE' && (
                           <Chip tone={s.status === 'INACTIVE' ? 'risk' : 'brand'}>{STATUS_AR[s.status]}</Chip>
@@ -315,12 +300,6 @@ function StudentsScreen() {
                       <td className="px-3 py-3 text-panel text-ink-600">{s.grade || '—'}</td>
                       <td className="px-3 py-3 text-panel text-ink-600">{s.nationality || '—'}</td>
                       <td className="px-3 py-3"><Num className="text-panel text-ink-700">{s.guardianPhone || '—'}</Num></td>
-                      <td className="px-3 py-3 text-end">
-                        <button onClick={() => setEditStudent(s)} aria-label={`تعديل ${s.fullName}`}
-                          className="rounded p-1.5 text-ink-400 transition-colors hover:bg-ink-100 hover:text-ink-900">
-                          <Pencil size={14} strokeWidth={1.9} />
-                        </button>
-                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -333,7 +312,6 @@ function StudentsScreen() {
       <StudentDialog open={editStudent !== null} student={editStudent === 'new' ? null : editStudent}
         defaultHalaqa={halaqa?.id ?? null} onClose={() => setEditStudent(null)} />
       <HalaqaDialog open={editHalaqa} halaqa={halaqa} onClose={() => setEditHalaqa(false)} />
-      <MoveDialog open={moving} ids={[...sel]} onClose={() => { setMoving(false); setSel(new Set()); }} />
     </>
   );
 }

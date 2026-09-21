@@ -1,27 +1,32 @@
 'use client';
 /* المتابعة — SPEC.md §6.10, approved PDF §9 (إد-٥-د).
 
-   Two ways of looking at the same rows, switched in place rather than split
-   into destinations:
-   - «بالحلقة» replaces the client's «البحث بالحلقة» sheet: one row per student
-     with his plan, his last association exam and his last internal one. A
-     student with no plan reads «لا توجد خطة» — never blanks.
-   - «بالطالب» replaces «البحث باسم الطالب»: search a name, get the whole
-     follow-up card — plan, readiness, exams, the Ratel snapshot, the balance.
+   Two questions, and nothing else:
 
-   The four ready-made lists live in the contextual panel (DESIGN.md §4) and
-   filter this same table; nothing is a separate report page. Every figure is
-   computed by `lib/followup.ts` in one pass — the screen only sorts and shows. */
+   - «من يحتاج نظرك؟» — four ready-made lists in the contextual panel: الجاهزون
+     للجمعية · المتأخرون في مستواهم · من لم يُختبروا مؤخرًا · المتفوقون. One row
+     per student, with his plan, his last association exam and his last internal
+     one. A student with no plan reads «لا توجد خطة» — never blanks.
+   - «كيف كانت حلقة فلان هذا الأسبوع؟» — the halaqa's name opens its register:
+     who was present, who recited what, الأحد إلى الخميس.
+
+   WHAT LEFT, 22 Sep 2026. A table of every followed student, and a card holding
+   one boy's whole file, both used to live here. The roster belongs on «الطلاب
+   والحلقات» — that screen lists them and now opens each one's file, where every
+   field is editable in place. This screen follows their PROGRESS; it does not
+   hold their records. Clicking a row in any list opens him over there.
+
+   Every figure is computed by `lib/followup.ts` in one pass — the screen only
+   sorts and shows. */
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Users, Award, Hourglass, CalendarClock, Search, Inbox, Printer, FileText,
 } from 'lucide-react';
-import { LevelEditor } from '@/components/LevelEditor';
 import { TopBar } from '@/components/TopBar';
 import { Sheet, SheetHead } from '@/components/Sheet';
-import { Btn, Empty, Chip, Segmented, INPUT } from '@/components/ui';
+import { Btn, Empty, Chip, INPUT } from '@/components/ui';
 import { KPI } from '@/components/Stat';
 import { Tooltip } from '@/components/Tooltip';
 import { Combobox } from '@/components/Combobox';
@@ -127,7 +132,6 @@ function FollowUpScreen() {
   const sp = useSearchParams();
   const router = useRouter();
 
-  const [view, setView] = useState<'sheet' | 'student'>('sheet');
   const [studentId, setStudentId] = useState('');
   const [q, setQ] = useState('');
 
@@ -136,13 +140,11 @@ function FollowUpScreen() {
   const list: ListKey | null = listParam && listParam in LIST_META ? (listParam as ListKey) : null;
 
   /* A panel click means «show me that list» — it always lands on the sheet. */
-  useEffect(() => { setView('sheet'); }, [listParam, halaqaFilter]);
 
   /* The KPI cards navigate: same URL contract as the panel, so the two agree. */
   const openList = (key: string | null) => {
     const next = new URLSearchParams(sp.toString());
     if (key === null) next.delete('list'); else next.set('list', key);
-    setView('sheet');
     router.replace(`/admin/follow-up${next.toString() ? `?${next}` : ''}`, { scroll: false });
   };
 
@@ -198,7 +200,7 @@ function FollowUpScreen() {
         <div className="mx-auto max-w-column px-6 py-8">
           <Sheet className="rise">
             <Empty icon={Inbox} title="لا طلاب بعد"
-              body="شاشة المتابعة تبحث بالحلقة وبالطالب، وتعدّ لك أربعة كشوف جاهزة: الجاهزين للجمعية، والمتأخرين في مستواهم، ومن لم يُختبروا مؤخرًا، والمتفوقين. ابدأ برفع ملفاتك من الصفحة الرئيسية."
+              body="شاشة المتابعة تعدّ لك أربعة كشوف جاهزة — الجاهزين للجمعية، والمتأخرين في مستواهم، ومن لم يُختبروا مؤخرًا، والمتفوقين — وتفتح لك حضور كل حلقة وتسميعها أسبوعًا أسبوعًا. ابدأ برفع ملفاتك من الصفحة الرئيسية."
               action={<Link href="/admin">
                 <Btn variant="primary" size="lg">الصفحة الرئيسية</Btn></Link>} />
           </Sheet>
@@ -228,11 +230,10 @@ function FollowUpScreen() {
         ) : (<>
 
         {/* كل بطاقة تفتح كشفها — والسهم أسفل يسارها يقول ذلك (قرار العميل ١ سبتمبر). */}
-        <div className="rise mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <KPI label="طلاب يُتابَعون" value={inHalaqa.length} icon={Users} accent
-            sub={halaqa ? `في حلقة ${shortName(halaqa.teacher)}` : 'النشطون في كل الحلقات'}
-            onClick={() => openList(null)} />
-          <KPI label="جاهزون للجمعية" value={counts.ready} icon={Award} delay={60}
+        {/* ثلاث بطاقات لا أربع: «طلاب يُتابَعون» كانت تفتح كشف كل الطلاب، وقد
+            انتقل إلى «الطلاب والحلقات» حيث تُفتح ملفاتهم وتُعدَّل. */}
+        <div className="rise mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <KPI label="جاهزون للجمعية" value={counts.ready} icon={Award} accent
             sub="أتمّوا الجزء واجتازوا الماسي"
             onClick={() => openList('ready')} />
           <KPI label="متأخرون في مستواهم" value={counts.late} icon={Hourglass} delay={120}
@@ -243,25 +244,7 @@ function FollowUpScreen() {
             onClick={() => openList('unexamined')} />
         </div>
 
-        <div className="rise mb-4 flex flex-wrap items-center gap-3">
-          <Segmented value={view} onChange={setView}
-            options={[{ value: 'sheet', label: 'بالحلقة' }, { value: 'student', label: 'بالطالب' }]} />
-          {view === 'sheet' && (
-            <>
-              <div className="relative min-w-[14rem] flex-1">
-                <Search size={16} className="pointer-events-none absolute inset-y-0 end-3 my-auto text-ink-400" />
-                <input value={q} onChange={(e) => setQ(e.target.value)}
-                  placeholder="ابحث باسم الطالب…" className={cx(INPUT, 'pe-10')} />
-              </div>
-              <span className="text-panel text-ink-500">
-                <Num className="font-medium text-ink-900">{rows.length}</Num> من <Num>{inHalaqa.length}</Num>
-              </span>
-            </>
-          )}
-        </div>
-
-        {view === 'sheet' ? (
-          <>
+        <>
             {list && (
               <div className="rise mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-ink-150 bg-paper px-4 py-3">
                 <p className="min-w-0 flex-1">
@@ -276,15 +259,24 @@ function FollowUpScreen() {
               </div>
             )}
 
+            {/* بلا كشف ولا حلقة: لا يُعرض جدول بكل الطلاب — ذاك انتقل إلى
+                «الطلاب والحلقات». هذه الشاشة للكشوف الأربعة ولأسابيع الحلقات. */}
+            {!list ? (
+              <Sheet className="rise">
+                <Empty icon={Users} title="اختر كشفًا أو حلقة"
+                  body="الكشوف الأربعة على اليمين تُجيب «من يحتاج نظرك»: الجاهزون للجمعية، والمتأخرون في مستواهم، ومن لم يُختبروا مؤخرًا، والمتفوقون. وضغط اسم حلقة يفتح حضورها وتسميعها هذا الأسبوع. وبيانات أيّ طالب وتعديلها في «الطلاب والحلقات»."
+                  action={<Link href="/admin/students">
+                    <Btn variant="primary">الطلاب والحلقات</Btn></Link>} />
+              </Sheet>
+            ) : (
             <Sheet className="rise" pad={false}>
               {rows.length === 0 ? (
                 <Empty icon={Users}
-                  title={list ? 'الكشف فارغ' : 'لا نتائج'}
+                  title="الكشف فارغ"
                   body={list === 'ready' ? 'لا طالب استوفى الشرطين الآن — يظهر هنا فور اجتيازه الوسام الماسي على جزء أتمّه.'
                     : list === 'late' ? 'لا أحد أمضى على ورقته أكثر من المدة. هذا هو المطلوب.'
                     : list === 'unexamined' ? 'كل الطلاب اختُبروا خلال المدة.'
-                    : list === 'top' ? 'لا أرصدة نقاط بعد.'
-                    : 'جرّب توسيع التصفية أو مسح البحث.'} />
+                    : 'لا أرصدة نقاط بعد.'} />
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[64rem] border-collapse text-body">
@@ -307,8 +299,8 @@ function FollowUpScreen() {
                     <tbody>
                       {rows.map((r, i) => (
                         <tr key={r.student.id}
-                          onClick={() => { setStudentId(r.student.id); setView('student'); }}
-                          title="افتح بطاقة المتابعة"
+                          onClick={() => router.push(`/admin/students?student=${r.student.id}`)}
+                          title="افتح ملفه في الطلاب والحلقات"
                           className="cursor-pointer border-b border-ink-150 transition-colors last:border-0 hover:bg-brand-50">
                           <td className="px-3 py-3 text-ink-900">
                             {list === 'top' && (
@@ -369,184 +361,8 @@ function FollowUpScreen() {
                 </div>
               )}
             </Sheet>
-          </>
-        ) : (
-          <div className="rise">
-            <Sheet className="mb-4">
-              <SheetHead title="البحث باسم الطالب"
-                meta="بديل كشف «البحث باسم الطالب» — الخطة والجاهزية والاختبارات والرصيد في بطاقة واحدة" />
-              <div className="max-w-md">
-                <Combobox value={studentId} onChange={setStudentId} options={studentOptions}
-                  placeholder="اختر طالبًا…" searchPlaceholder="ابحث بالاسم…" />
-              </div>
-            </Sheet>
-
-            {sel && (
-              <>
-                <div className="mb-4 grid gap-4 lg:grid-cols-2">
-                  <Sheet>
-                    <SheetHead title={sel.student.fullName}
-                      meta={[teacherOf(sel.student.halaqaId) === '—' ? 'بلا حلقة' : `حلقة ${teacherOf(sel.student.halaqaId)}`,
-                             STATUS_AR[sel.student.status]].join(' · ')} />
-                    <Def label="المسار">
-                      {sel.student.track
-                        ? <Chip tone={sel.student.track === 'TALQEEN' ? 'ink' : 'brand'}>{TRACK_AR[sel.student.track]}</Chip>
-                        : <span className="text-ink-400">—</span>}
-                    </Def>
-                    <Def label="الصف">{sel.student.grade || '—'}</Def>
-                    <Def label="الجنسية">{sel.student.nationality || '—'}</Def>
-                    <Def label="رقم الهوية">
-                      {sel.student.nationalId ? <Num>{sel.student.nationalId}</Num> : '—'}
-                    </Def>
-                    {earnsPoints(sel.student) && (
-                      <Def label="رصيد النقاط">
-                        <Num className="font-medium text-brand-800">{sel.balance}</Num> {pointWord(sel.balance)}
-                      </Def>
-                    )}
-                    <Def label="آخر لقطة أسبوعية">
-                      {sel.student.attendedDays === undefined && sel.student.hifzPages === undefined
-                        ? <span className="text-ink-400">لم يرد في آخر ملف</span>
-                        : <>
-                            {sel.student.attendedDays !== undefined && (
-                              <Chip tone={sel.student.attendedDays > 0 ? 'ok' : 'risk'}>
-                                <Num>{sel.student.attendedDays}</Num> {sel.student.attendedDays === 1 ? 'يوم' : 'أيام'}
-                              </Chip>)}
-                            {' '}حفظ <Num>{sel.student.hifzPages ?? '—'}</Num> ·
-                            {' '}مراجعة <Num>{sel.student.reviewPages ?? '—'}</Num>
-                          </>}
-                    </Def>
-                  </Sheet>
-
-                  {/* حضوره وتسميعه — فوق الخطة، لأن «هل حضر هذا الأسبوع؟»
-                      يسبق «أين وصل» في كل سؤال يُسأل عن طالب. */}
-                  <StudentWeek studentId={sel.student.id} />
-
-                  <Sheet>
-                    <SheetHead title="المستوى والخطة" />
-                    {sel.student.track === 'TALQEEN' ? (
-                      <p className="text-base2 text-ink-600">
-                        مسار التلقين بلا مستوى وبلا خطة وبلا نقاط — §13.1. تُتابَع اختباراته وحضوره فقط.
-                      </p>
-                    ) : sel.plan ? (
-                      <>
-                        <Def label="المستوى الحالي">
-                          <LevelEditor studentId={sel.student.id} track={sel.student.track}
-                            level={sel.student.currentLevel ?? sel.plan.level} />
-                        </Def>
-                        <Def label="ورقة المستوى">
-                          <Num>{sel.plan.level}</Num> — {TRACK_AR[sel.plan.track]}
-                        </Def>
-                        <Def label="تاريخ الإصدار">
-                          <Num>{formatDate(sel.plan.issuedAt)}</Num>
-                          <span className="ms-1.5 text-micro text-ink-500">{relativeDay(sel.plan.issuedAt)}</span>
-                        </Def>
-                        <Def label="الأيام منذ الإصدار">
-                          <Num className={cx('font-medium', sel.late && 'text-warn-700')}>{sel.daysHeld}</Num>
-                          {sel.late && <span className="ms-1.5"><Chip tone="warn">متأخر في مستواه</Chip></span>}
-                        </Def>
-                        <Def label="المقدار اليومي">{sel.plan.dailyAmount}</Def>
-                        <Def label="الطباعة">
-                          {sel.plan.printedCount > 0
-                            ? <>طُبعت <Count n={sel.plan.printedCount} one="مرة" two="مرتين" few="مرات" many="مرة" /></>
-                            : 'لم تُطبع بعد'}
-                        </Def>
-                        <div className="mt-4">
-                          <Link href={`/print/plan/${sel.plan.id}`}>
-                            <Btn size="sm" icon={FileText}>ورقة المستوى</Btn>
-                          </Link>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <Def label="المستوى الحالي">
-                          <LevelEditor studentId={sel.student.id} track={sel.student.track}
-                            level={sel.student.currentLevel} />
-                        </Def>
-                        <p className="mt-3 text-base2 text-ink-600">لا توجد خطة مُصدرة لهذا الطالب.</p>
-                        <div className="mt-4">
-                          <Link href={`/admin/plans?student=${sel.student.id}`}>
-                            <Btn size="sm" variant="primary" icon={FileText}>إصدار خطة</Btn>
-                          </Link>
-                        </div>
-                      </>
-                    )}
-
-                    <div className="mt-5 border-t border-ink-150 pt-4">
-                      <p className="mb-2 text-2xs font-medium uppercase tracking-[.12em] text-ink-500">
-                        الجاهزية لاختبار الجمعية
-                      </p>
-                      {sel.ready.ready ? (
-                        <p className="text-base2 text-ink-800">
-                          <Chip tone="ok">جاهز</Chip>
-                          <span className="ms-2">أتمّ جزء <Num>{sel.ready.ajza}</Num> واجتاز وسامه الماسي —
-                            يظهر في كشف الجاهزين.</span>
-                        </p>
-                      ) : (
-                        <p className="text-base2 text-ink-600">{sel.ready.reason}</p>
-                      )}
-                    </div>
-                  </Sheet>
-                </div>
-
-                <Sheet pad={false}>
-                  <div className="px-6 pt-5">
-                    <SheetHead title="اختباراته"
-                      meta={selExams.length
-                        ? plural(selExams.length, 'اختبار واحد مسجَّل', 'اختباران مسجَّلان', 'اختبارات مسجَّلة', 'اختبارًا مسجَّلًا')
-                        : undefined} />
-                  </div>
-                  {selExams.length === 0 ? (
-                    <p className="px-6 pb-6 text-base2 text-ink-500">لم يُختبر بعد.</p>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full min-w-[36rem] border-collapse text-body">
-                        <thead>
-                          <tr className="border-b border-ink-200 bg-page/50 text-cap text-ink-500">
-                            {['التاريخ', 'النوع', 'المستوى', 'الأجزاء', 'الدرجة', 'النتيجة', 'ملاحظة'].map((h) => (
-                              <th key={h} className="px-3 py-2.5 text-start font-medium">{h}</th>))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {selExams.slice(0, 8).map((e) => (
-                            <tr key={e.id} className="border-b border-ink-150 last:border-0">
-                              <td className="whitespace-nowrap px-3 py-2.5">
-                                <Num className="text-panel text-ink-600">{formatDate(e.takenOn)}</Num>
-                              </td>
-                              <td className="px-3 py-2.5">
-                                <Chip tone={e.type === 'ASSOCIATION' ? 'assoc' : 'ink'}>
-                                  {EXAM_TYPE_AR[e.type as ExamType] ?? e.type}
-                                </Chip>
-                              </td>
-                              <td className="px-3 py-2.5"><Num className="text-panel text-ink-700">{e.level ?? '—'}</Num></td>
-                              <td className="px-3 py-2.5"><Num className="text-panel text-ink-700">{e.ajza ?? '—'}</Num></td>
-                              <td className="px-3 py-2.5"><Num className="text-panel text-ink-700">{e.score ?? '—'}</Num></td>
-                              <td className="px-3 py-2.5">
-                                {e.passed === null ? <span className="text-ink-400">—</span>
-                                  : e.passed ? <Chip tone="ok">اجتاز</Chip> : <Chip tone="risk">لم يجتز</Chip>}
-                              </td>
-                              <td className="max-w-[12rem] px-3 py-2.5 text-panel text-ink-600">
-                                {e.note
-                                  ? <Tooltip content={<span className="leading-relaxed">{e.note}</span>}>
-                                      <span className="block max-w-[11rem] truncate">{e.note}</span>
-                                    </Tooltip>
-                                  : '—'}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                      {selExams.length > 8 && (
-                        <p className="border-t border-ink-150 px-6 py-3 text-micro text-ink-500">
-                          يُعرض آخر <Num>8</Num> اختبارات — البقية في <Link className="text-brand-800 underline" href="/admin/exams">سجلّ الاختبارات</Link>.
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </Sheet>
-              </>
             )}
-          </div>
-        )}
+          </>
         </>)}
       </div>
     </>

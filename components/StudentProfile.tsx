@@ -20,7 +20,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   X, Pencil, Check, Trophy, ClipboardCheck, Coins, CalendarCheck,
-  ArrowLeft, AlertTriangle,
+  ArrowLeft, AlertTriangle, FileText,
 } from 'lucide-react';
 import { Sheet, SheetHead } from '@/components/Sheet';
 import { Num, pointWord } from '@/components/Num';
@@ -34,6 +34,7 @@ import {
 } from '@/lib/types';
 import { halaqaLabel, shortName, normaliseNationalId, normalisePhone } from '@/lib/normalise';
 import { formatDate } from '@/lib/dates';
+import { ajzaForLevel, daysSince, isLate, readyForAssociation } from '@/lib/exams';
 import { cx } from '@/lib/cx';
 
 /** سطر: عنوانه، وقيمته، وتعديله في مكانه. */
@@ -111,6 +112,15 @@ export function StudentProfile({
     .sort((a, b) => (a.issuedAt < b.issuedAt ? 1 : -1))[0] ?? null, [db.plans, d.id]);
 
   const talqeen = d.track === 'TALQEEN';
+  const level = d.currentLevel ?? plan?.level ?? null;
+  const ajza = ajzaForLevel(d.track, level);
+  const daysHeld = daysSince(plan?.issuedAt, new Date());
+  const late = isLate(plan ?? null);
+  /* حكم §٤٫٨ نفسه الذي يبني كشف الجاهزين — لا نسخة ثانية منه هنا. */
+  const ready = readyForAssociation({
+    track: d.track, level,
+    exams: db.exams.filter((e) => e.studentId === d.id),
+  });
 
   return (
     <div className="space-y-4">
@@ -243,30 +253,90 @@ export function StudentProfile({
         {/* ── خطته ونقاطه ──────────────────────────────────────────────────── */}
         <div className="space-y-4">
           <Sheet>
-            <SheetHead title="خطته" />
+            <SheetHead title="مستواه وخطته" />
             {talqeen ? (
               <p className="text-base2 text-ink-600">
-                مسار التلقين بلا مستوى وبلا خطة — يُتابَع حضوره وتسميعه فقط.
+                مسار التلقين بلا مستوى وبلا خطة وبلا نقاط — §١٣٫١. يُتابَع حضوره وتسميعه واختباراته فقط.
               </p>
-            ) : plan ? (
-              <dl>
-                <Row label="آخر ورقة">
-                  المستوى <Num className="font-medium">{plan.level}</Num>
-                  <span className="text-ink-500"> · سُلِّمت <Num>{formatDate(plan.issuedAt)}</Num></span>
-                </Row>
-                <Row label="طُبعت">
-                  <Num>{plan.printedCount}</Num> {plan.printedCount === 1 ? 'مرة' : 'مرات'}
-                </Row>
-              </dl>
             ) : (
-              <p className="text-base2 text-ink-500">لم تُصدَر له خطة بعد.</p>
+              <dl>
+                <Row label="المستوى"
+                  edit={() => (
+                    <select className={cx(INPUT, 'h-9 py-0')} value={d.currentLevel ?? ''}
+                      onChange={(e) => put({ currentLevel: e.target.value ? Number(e.target.value) : null })}>
+                      <option value="">—</option>
+                      {levelsFor(d.track).map((l) => (
+                        <option key={l} value={l}>{l}</option>
+                      ))}
+                    </select>
+                  )}>
+                  {d.currentLevel != null
+                    ? <span className="flex items-baseline gap-2">
+                        <Num className="font-medium">{d.currentLevel}</Num>
+                        {ajza != null && (
+                          <span className="text-panel text-ink-500"><Num>{ajza}</Num> أجزاء</span>
+                        )}
+                      </span>
+                    : <span className="text-ink-400">لم يُحدَّد</span>}
+                </Row>
+
+                {plan ? (
+                  <>
+                    <Row label="ورقته">
+                      المستوى <Num>{plan.level}</Num> — {TRACK_AR[plan.track as Track]}
+                    </Row>
+                    <Row label="سُلِّمت">
+                      <Num>{formatDate(plan.issuedAt)}</Num>
+                      {daysHeld != null && (
+                        <span className={cx('ms-2 text-panel', late ? 'text-warn-700' : 'text-ink-500')}>
+                          قبل <Num>{daysHeld}</Num> يومًا{late && ' — متأخر في مستواه'}
+                        </span>
+                      )}
+                    </Row>
+                    <Row label="المقدار اليومي">{plan.dailyAmount || '—'}</Row>
+                    <Row label="الطباعة">
+                      {plan.printedCount > 0
+                        ? <>طُبعت <Num>{plan.printedCount}</Num> {plan.printedCount === 1 ? 'مرة' : 'مرات'}</>
+                        : <span className="text-ink-400">لم تُطبع بعد</span>}
+                    </Row>
+                  </>
+                ) : (
+                  <Row label="ورقته"><span className="text-ink-400">لم تُصدَر له خطة بعد</span></Row>
+                )}
+              </dl>
             )}
+
             {!talqeen && (
-              <Link href={`/admin/plans?student=${d.id}`}
-                className="mt-3 inline-flex items-center gap-1 text-panel text-brand-800 hover:underline">
-                الخطط وطباعتها <ArrowLeft size={13} />
-              </Link>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {plan && (
+                  <Link href={`/print/plan/${plan.id}`}>
+                    <Btn size="sm" icon={FileText}>ورقة المستوى</Btn>
+                  </Link>
+                )}
+                <Link href={`/admin/plans?student=${d.id}`}>
+                  <Btn size="sm" variant={plan ? undefined : 'primary'} icon={FileText}>
+                    {plan ? 'الخطط وطباعتها' : 'إصدار خطة'}
+                  </Btn>
+                </Link>
+              </div>
             )}
+
+            {/* الجاهزية لاختبار الجمعية — §٤٫٨، وهي حكم النظام لا رأي الشاشة. */}
+            <div className="mt-5 border-t border-ink-150 pt-4">
+              <p className="mb-2 text-2xs font-medium uppercase tracking-[.12em] text-ink-500">
+                الجاهزية لاختبار الجمعية
+              </p>
+              {ready.ready ? (
+                <p className="text-base2 text-ink-800">
+                  <Chip tone="ok">جاهز</Chip>
+                  <span className="ms-2">
+                    أتمّ جزء <Num>{ready.ajza}</Num> واجتاز وسامه الماسي — يظهر في كشف الجاهزين.
+                  </span>
+                </p>
+              ) : (
+                <p className="text-base2 text-ink-600">{ready.reason}</p>
+              )}
+            </div>
           </Sheet>
 
           {earnsPoints(d) && (

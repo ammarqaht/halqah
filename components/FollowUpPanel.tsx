@@ -54,9 +54,6 @@ export function FollowUpPanel({ onClose }: { onClose: () => void }) {
       {onFollowUp && rows.length > 0 && (
         <>
           <PanelGroup label="الكشوف الجاهزة">
-            <PanelItem active={!list} onClick={() => set('list', null)} count={counts.scoped}>
-              كل الطلاب
-            </PanelItem>
             <PanelItem active={list === 'ready'} tone="ok" count={counts.ready}
               onClick={() => set('list', 'ready')}>جاهزون للجمعية</PanelItem>
             <PanelItem active={list === 'late'} tone="warn" count={counts.late}
