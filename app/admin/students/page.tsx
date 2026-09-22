@@ -53,13 +53,23 @@ function StudentsScreen() {
     setProfile(null);
   }, [filterKey]);
   useEffect(() => { if (askedStudent) setProfile(askedStudent); }, [askedStudent]);
-  const halaqa = halaqaFilter && halaqaFilter !== 'none'
+  const halaqa = halaqaFilter && halaqaFilter !== 'none' && halaqaFilter !== 'inactive'
     ? db.halaqat.find((h) => h.id === halaqaFilter) ?? null : null;
+  const viewingInactive = halaqaFilter === 'inactive';
 
   const rows = useMemo(() => {
     const needle = foldArabic(q);
     return db.students.filter((s) => {
-      if (halaqaFilter === 'none' ? s.halaqaId : halaqaFilter ? s.halaqaId !== halaqaFilter : false) return false;
+      /* المنقطع في خانته وحدها. لا يظهر في حلقته ولا في «كل الطلاب» ولا في
+         «بلا حلقة» — «ينزال من كل شي» — وهو محفوظ كما هو، ومن خانته يُسند
+         إلى حلقة إن عاد. */
+      if (halaqaFilter === 'inactive') {
+        if (s.status === 'ACTIVE') return false;
+      } else if (s.status !== 'ACTIVE') {
+        return false;
+      } else if (halaqaFilter === 'none' ? s.halaqaId : halaqaFilter ? s.halaqaId !== halaqaFilter : false) {
+        return false;
+      }
       const track = sp.get('track'); if (track && s.track !== track) return false;
       const stage = sp.get('stage'); if (stage && s.stage !== stage) return false;
       const status = sp.get('status'); if (status && s.status !== status) return false;
@@ -87,8 +97,11 @@ function StudentsScreen() {
      left after the other filters. It read `rows.length` before, so a narrowing
      filter made a halaqa of thirteen announce «٠ طالبًا» beside a chip saying
      thirteen — two numbers for one fact, and the wrong one in the larger type. */
+  /* عدد الحلقة = نشطوها. حلقة فيها منقطعان كانت تقول «١٢» وفيها عشرة يحضرون. */
   const halaqaTotal = useMemo(
-    () => (halaqa ? db.students.filter((s) => s.halaqaId === halaqa.id).length : 0),
+    () => (halaqa
+      ? db.students.filter((s) => s.halaqaId === halaqa.id && s.status === 'ACTIVE').length
+      : 0),
     [halaqa, db.students]);
 
   /* Every filter that is on, named. The roster is filtered by the query string,
@@ -160,7 +173,7 @@ function StudentsScreen() {
   return (
     <>
       <TopBar title="الطلاب والحلقات"
-        crumbs={halaqa ? [`حلقة ${halaqa.teacher}`] : undefined}
+        crumbs={halaqa ? [`حلقة ${halaqa.teacher}`] : viewingInactive ? ['المنقطعون'] : undefined}
         panelOpen={panelOpen} onOpenPanel={() => setPanelOpen(true)}
         action={
           <div className="flex items-center gap-2">
@@ -170,6 +183,19 @@ function StudentsScreen() {
       <div className="mx-auto max-w-column px-6 py-8 pb-16">
 
         {/* ── halaqa file header — the page becomes that halaqa's record ──── */}
+        {/* المنقطعون — ما هم، وكيف يعودون. */}
+        {viewingInactive && (
+          <Sheet className="rise mb-4 border-warn-200 bg-warn-100/30">
+            <SheetHead title="الطلاب المنقطعون"
+              meta="خارج الحلقات وخارج كل عدّ — وبياناتهم كاملة كما هي" />
+            <p className="text-base2 text-ink-700">
+              لا يظهر المنقطع في حلقته ولا في الكشوف ولا في الإحصاءات، ولا يُحذف أبدًا:
+              اختباراته وخططه ونقاطه وسجلّ حضوره كلّها محفوظة. وإن عاد، افتح ملفه
+              واجعل حالته «نشط» ثم أسنده إلى حلقة — فيعود بكل تاريخه.
+            </p>
+          </Sheet>
+        )}
+
         {halaqa && (
           <Sheet className="rise mb-4 border-brand-200 bg-brand-50/50">
             <div className="flex flex-wrap items-start justify-between gap-4">

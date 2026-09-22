@@ -71,8 +71,11 @@ export default function OverviewPage() {
         </header>
 
         <div className="mb-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {/* العدد الحقيقي — من في الحلقات. والمنقطعون في خانتهم لا سطرًا
+              تحت الرقم يُقرأ نقصًا فيه. */}
           <KPI label="الطلاب" value={d.students} unit="طالبًا" icon={Users} accent
-            sub={`نشط ${d.activeStudents}`} />
+            sub={d.inactiveStudents > 0
+              ? `وَ${d.inactiveStudents} منقطع خارج الحلقات` : 'في الحلقات'} />
           <KPI label="الحلقات" value={d.halaqat} unit="حلقات" icon={CircleDot} delay={60}
             sub={d.byHalaqa[0] ? `أكبرها: ${d.byHalaqa[0].teacher}` : undefined} />
           <KPI label="بلا حلقة" value={d.orphans} unit="طالبًا" icon={AlertTriangle} delay={120}

@@ -120,8 +120,11 @@ function AssociationSheet() {
         ) : (
           <>
             <div className="keep grid grid-cols-4 gap-2">
-              {stat('طالبًا مقيّدًا', d.students)}
-              {stat('نشطون', d.activeStudents)}
+              {/* «مقيّد» و«نشط» صارا رقمًا واحدًا: الإحصاء للجمعية يصف من في
+                  الحلقات، والمنقطع خارجه — فعمود يقول العدد نفسه مرتين أهدر
+                  خانة من أربع. */}
+              {stat('طالبًا', d.students)}
+              {stat('منقطعون', d.inactiveStudents)}
               {stat('حلقات', d.halaqat)}
               {stat('معلمون', teachers)}
             </div>

@@ -25,19 +25,27 @@ export function StudentsPanel({ onClose }: { onClose: () => void }) {
     router.replace(`/admin/students${next.toString() ? `?${next}` : ''}`, { scroll: false });
   };
 
+  /* المنقطع خارج كل عدّ.
+     كان يُحسب في حلقته وفي مساره وفي المجموع، فحلقة فيها منقطعان تقول «١٢»
+     وفيها عشرة يحضرون. والقاعدة المتفق عليها أنه «يبقى محفوظًا ولا يظهر في
+     الإحصاءات» — فهو هنا في خانته وحدها، ومنها يُعاد إلى حلقة إن رجع. */
   const counts = useMemo(() => {
     const byHalaqa = new Map<string, number>();
     const byTrack = new Map<string, number>();
     const byStage = new Map<string, number>();
     const byStatus = new Map<string, number>();
     let orphan = 0;
+    let active = 0;
     for (const s of db.students) {
+      byStatus.set(s.status, (byStatus.get(s.status) ?? 0) + 1);
+      if (s.status !== 'ACTIVE') continue;
+      active++;
       if (s.halaqaId) byHalaqa.set(s.halaqaId, (byHalaqa.get(s.halaqaId) ?? 0) + 1); else orphan++;
       if (s.track) byTrack.set(s.track, (byTrack.get(s.track) ?? 0) + 1);
       if (s.stage) byStage.set(s.stage, (byStage.get(s.stage) ?? 0) + 1);
-      byStatus.set(s.status, (byStatus.get(s.status) ?? 0) + 1);
     }
-    return { byHalaqa, byTrack, byStage, byStatus, orphan };
+    return { byHalaqa, byTrack, byStage, byStatus, orphan, active,
+             inactive: byStatus.get('INACTIVE') ?? 0 };
   }, [db.students]);
 
   const halaqa = sp.get('halaqa');
@@ -55,7 +63,7 @@ export function StudentsPanel({ onClose }: { onClose: () => void }) {
             <Plus size={15} strokeWidth={2} /> إضافة حلقة
           </button>
 
-          <PanelItem active={!halaqa} onClick={() => set('halaqa', null)} count={db.students.length}>
+          <PanelItem active={!halaqa} onClick={() => set('halaqa', null)} count={counts.active}>
             كل الطلاب
           </PanelItem>
 
@@ -89,6 +97,17 @@ export function StudentsPanel({ onClose }: { onClose: () => void }) {
           {counts.orphan > 0 && (
             <PanelItem tone="risk" active={halaqa === 'none'} onClick={() => set('halaqa', 'none')} count={counts.orphan}>
               بلا حلقة
+            </PanelItem>
+          )}
+
+          {/* المنقطعون — محفوظون خارج الحلقات وخارج كل عدّ، ومن هنا يُسندون
+              إلى حلقة إن عادوا. «يبقى محفوظًا في النظام عشان لو عاد تكون
+              بياناته موجودة» (العميل). */}
+          {counts.inactive > 0 && (
+            <PanelItem tone="warn" active={halaqa === 'inactive'}
+              onClick={() => set('halaqa', 'inactive')} count={counts.inactive}
+              sub="خارج الحلقات والإحصاءات">
+              المنقطعون
             </PanelItem>
           )}
         </PanelGroup>

@@ -18,7 +18,9 @@ export function derive(db: DB) {
   };
 
   const byHalaqa = db.halaqat.map((h) => {
-    const list = s.filter((x) => x.halaqaId === h.id);
+    /* النشطون وحدهم. حلقة فيها منقطعان كانت تقول «١٢» وفيها عشرة يحضرون،
+       والمنقطع خارج كل عدّ كما هو خارج كل كشف. */
+    const list = active.filter((x) => x.halaqaId === h.id);
     /* Both figures, because the client's own sheet carries the TOTAL and this
        screen carried only the average — so «٢٠٨٫٦٦» in his file and «١٣٫٩١»
        here described the same halaqa and looked like a contradiction. They are
@@ -52,13 +54,16 @@ export function derive(db: DB) {
     };
   }).sort((a, b) => b.n - a.n);
 
-  const orphans = s.filter((x) => !x.halaqaId).length;
+  const orphans = active.filter((x) => !x.halaqaId).length;
   const flagged = s.filter((x) => x.nationalIdFlag).length;
 
   return {
     isEmpty: s.length === 0,
-    students: s.length,
-    activeStudents: active.length,
+    /* «الطلاب» هو عدد من في الحلقات — وكانت البطاقة تقول «١٢٢ طالبًا · نشط
+       ١٢٠»، وهي حقيقة لا يحتاجها أحد في رأس الصفحة. المنقطعون في خانتهم في
+       «الطلاب والحلقات». */
+    students: active.length,
+    inactiveStudents: s.length - active.length,
     halaqat: db.halaqat.length,
     tracks: count((x) => (x.track ? TRACK_AR[x.track] : null)),
     stages: count((x) => x.stage || null),
