@@ -7,7 +7,8 @@ import {
   SCORE_DEDUCTIONS, PASSING_SCORE, nextLevel, ajzaForLevel, isMidJuz,
   scoreFromCounters, isPassing, isPassingFor, scoreMax, passMarkFor,
   totalCounts, readyForAssociation, suggestionAfter,
-  LEVEL_LATE_AFTER_DAYS, daysSince, isLate, examOverdue, ajzaForExam } from './exams';
+  LEVEL_LATE_AFTER_DAYS, daysSince, isLate, examOverdue, ajzaForExam,
+  completedAjza } from './exams';
 
 describe('level progression — §4.1', () => {
   it('counts down by one, on both tracks', () => {
@@ -343,5 +344,71 @@ describe('readiness needs the diamond, and the juz it was passed on', () => {
       track: 'SILVER', level: 56,
       exams: [{ type: 'BADGE_DIAMOND', passed: true, ajza: null }],
     }).ready).toBe(false);
+  });
+});
+
+/* §4.8 — الجاهزية على جزء أتمّه، لا على جزء يسير فيه.
+   The silver diamond at an EVEN level is sat on the juz being worked through:
+   at level 60 it records juz 1 while only its first half is memorised. Three
+   boys sat on كشف الجاهزين that way, having completed no whole juz. */
+describe('completedAjza', () => {
+  it('الفضي: جزءان لكل مستوى، والعدّ تنازلي', () => {
+    expect(completedAjza('SILVER', 60)).toBe(0);   // نصف الجزء الأول
+    expect(completedAjza('SILVER', 59)).toBe(1);   // تمّ الأول
+    expect(completedAjza('SILVER', 58)).toBe(1);   // ومضى في الثاني
+    expect(completedAjza('SILVER', 57)).toBe(2);
+    expect(completedAjza('SILVER', 55)).toBe(3);
+    expect(completedAjza('SILVER', 53)).toBe(4);
+  });
+
+  it('والذهبي جزء لكل مستوى', () => {
+    expect(completedAjza('GOLDEN', 30)).toBe(1);
+    expect(completedAjza('GOLDEN', 29)).toBe(2);
+    expect(completedAjza('GOLDEN', 1)).toBe(30);
+  });
+
+  it('والتلقين لا مستوى له', () => {
+    expect(completedAjza('TALQEEN', 10)).toBe(0);
+    expect(completedAjza(null, 10)).toBe(0);
+  });
+});
+
+describe('readyForAssociation — الجزء المُتمّ', () => {
+  const diamond = (ajza: number) => ({ type: 'BADGE_DIAMOND', passed: true, ajza });
+
+  it('مستوى ٦٠ بماسي على جزء ١: ليس جاهزًا — لم يُتمّ الجزء', () => {
+    const r = readyForAssociation({ track: 'SILVER', level: 60, exams: [diamond(1)] });
+    expect(r.ready).toBe(false);
+    expect(r.reason).toBe('اجتاز الوسام الماسي ولم يُتمّ الجزء كاملًا بعد');
+  });
+
+  it('ومستوى ٥٩ بالماسي نفسه: جاهز', () => {
+    const r = readyForAssociation({ track: 'SILVER', level: 59, exams: [diamond(1)] });
+    expect(r.ready).toBe(true);
+    expect(r.ajza).toBe(1);
+  });
+
+  it('ويبقى جاهزًا بعد أن يمضي إلى ٥٨', () => {
+    /* أتمّ الجزء الأول ثم انتقل — والجاهزية لا تسقط بمضيّه. */
+    const r = readyForAssociation({ track: 'SILVER', level: 58, exams: [diamond(1)] });
+    expect(r.ready).toBe(true);
+    expect(r.ajza).toBe(1);
+  });
+
+  it('٥٧ و٥٥ و٥٣ — كل جزء عند آخره', () => {
+    for (const [level, ajza] of [[57, 2], [55, 3], [53, 4]] as const) {
+      const r = readyForAssociation({ track: 'SILVER', level, exams: [diamond(ajza)] });
+      expect(r.ready).toBe(true);
+      expect(r.ajza).toBe(ajza);
+    }
+  });
+
+  it('ولا يأخذ الجزء الأعلى إن لم يبلغه', () => {
+    /* ماسيّان: واحد أتمّه وواحد سبق مستواه. */
+    const r = readyForAssociation({
+      track: 'SILVER', level: 59, exams: [diamond(1), diamond(2)],
+    });
+    expect(r.ready).toBe(true);
+    expect(r.ajza).toBe(1);
   });
 });

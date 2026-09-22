@@ -114,6 +114,25 @@ export function ajzaForLevel(track: Track | null, level: number | null): number 
   return null;                                   // TALQEEN has no levels at all
 }
 
+/**
+ * أعلى جزء أتمّه فعلًا — صفر إن لم يُتمّ واحدًا.
+ *
+ * `ajzaForLevel` answers «which juz does this level COMPLETE», and is null on
+ * a silver even level because that level completes none. This answers the
+ * other question: how far has he actually got. They differ exactly where it
+ * matters — a boy who passed his diamond on juz 1 at level 59 and has since
+ * moved to 58 has still completed juz 1, and `ajzaForLevel(58)` is null.
+ *
+ * Silver runs two levels to the juz and counts DOWN, so juz N ends at level
+ * 61 − 2N: juz 1 at 59, juz 2 at 57, juz 3 at 55. Golden is a juz a level.
+ */
+export function completedAjza(track: Track | null, level: number | null): number {
+  if (!track || track === 'TALQEEN' || level === null || level < 1) return 0;
+  if (track === 'GOLDEN') return level <= 30 ? 31 - level : 0;
+  if (track === 'SILVER') return level <= 60 ? Math.floor((61 - level) / 2) : 0;
+  return 0;
+}
+
 /** Silver even levels land mid-juz; the screens say so instead of showing «—». */
 export const isMidJuz = (track: Track | null, level: number | null) =>
   track === 'SILVER' && level !== null && level % 2 === 0;
@@ -187,9 +206,27 @@ export function readyForAssociation(args: {
     if (e.type === 'BADGE_DIAMOND' && e.passed === true) passed.add(e.ajza);
     if (e.type === 'ASSOCIATION') examined.add(e.ajza);
   }
-  const pending = [...passed].filter((a) => !examined.has(a));
+  /* «مفترض الطالب يكون جاهز لاختبار الجمعية بعد الاختبار الالماسي» — and on a
+     juz he has ACTUALLY FINISHED. The diamond at a silver even level is sat on
+     the juz he is working through: at level 60 it is recorded against juz 1
+     while he has memorised only its first half. Reading the pass alone put
+     three boys on كشف الجاهزين having completed no whole juz at all.
+
+     So the pass must be matched by the ground: juz N counts only once his
+     level shows juz N behind him. 22 Sep 2026. */
+  const reached = completedAjza(track, level);
+  const pending = [...passed].filter((a) => !examined.has(a) && a <= reached);
   if (pending.length) {
     return { ready: true, ajza: Math.max(...pending), reason: null };
+  }
+
+  /* اجتاز الماسي، ولم يبلغ آخر ذلك الجزء بعد. */
+  const early = [...passed].filter((a) => !examined.has(a) && a > reached);
+  if (early.length) {
+    return {
+      ready: false, ajza: Math.max(...early),
+      reason: 'اجتاز الوسام الماسي ولم يُتمّ الجزء كاملًا بعد',
+    };
   }
   /* Not ready — say why in terms of where he stands now. */
   const ajza = ajzaForLevel(track, level);
