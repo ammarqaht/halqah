@@ -25,9 +25,10 @@
    save (see prisma/schema.prisma), so this writes straight to it rather than
    through the browser store.
    ───────────────────────────────────────────────────────────────────────── */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Award, Check, FileText, Info, Loader2, Search, X } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
+import { Award, Check, FileText, Info, Loader2, Pencil, Search, X } from 'lucide-react';
 import { Sheet, SheetHead } from '@/components/Sheet';
 import { Btn, Chip, Empty, INPUT_BARE } from '@/components/ui';
 import { Combobox } from '@/components/Combobox';
@@ -45,7 +46,19 @@ type Row = {
 
 type Halaqa = { id: string; name: string; teacher: string };
 
+/** طلبُ معلّمٍ على مقرّر طالب — يُقضى فيه من هنا، على الصفّ نفسه. */
+type Request = {
+  id: string; studentId: string; studentName: string; halaqaId: string | null;
+  level: number | null; from: number | null; to: number;
+  badge: string | null; badgeAr: string; note: string;
+  askedByName: string; at: string;
+};
+
 export function ProgressSettingsCard() {
+  return <Suspense><ProgressCard /></Suspense>;
+}
+
+function ProgressCard() {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [halaqat, setHalaqat] = useState<Halaqa[]>([]);
   const [halaqa, setHalaqa] = useState('');
@@ -55,6 +68,12 @@ export function ProgressSettingsCard() {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [onlyUnset, setOnlyUnset] = useState(false);
 
+  /* طلبات المعلمين. تنبيه الصفحة الأولى يصل بـ`?requests=1`، فتُفتح الشاشة
+     على المصفاة نفسها — رابطٌ يقول «اعرضها» ثم يعرض كل شيء ليس رابطًا. */
+  const sp = useSearchParams();
+  const [requests, setRequests] = useState<Request[]>([]);
+  const [onlyRequests, setOnlyRequests] = useState(() => sp.get('requests') === '1');
+
   const load = useCallback(async () => {
     try {
       const r = await fetch('/api/admin/progress');
@@ -63,6 +82,8 @@ export function ProgressSettingsCard() {
       setRows(d.students ?? []);
       setHalaqat(d.halaqat ?? []);
       setDrafts({});
+      const rq = await fetch('/api/admin/assignment-requests');
+      if (rq.ok) setRequests((await rq.json()).requests ?? []);
     } catch { setErr('تعذّر الاتصال بالخادم.'); }
   }, []);
   useEffect(() => { void load(); }, [load]);
@@ -81,15 +102,35 @@ export function ProgressSettingsCard() {
     finally { setBusy(''); }
   };
 
+  /* القضاء في طلب: القبول يحرّك المؤشّر — من مسار المشرف لا من مسار المعلّم —
+     والرفض يتركه كما هو. وكلاهما يُعيد القراءة، فالصفّ يقول الجديد. */
+  const decide = async (id: string, approve: boolean) => {
+    setBusy(id); setErr('');
+    try {
+      const r = await fetch('/api/admin/assignment-requests', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId: id, approve }),
+      });
+      const d = await r.json();
+      if (!r.ok) { setErr(d.error ?? 'تعذّر تنفيذ الطلب.'); return; }
+      await load();
+    } catch { setErr('تعذّر الاتصال بالخادم.'); }
+    finally { setBusy(''); }
+  };
+
+  const requestOf = useMemo(
+    () => new Map(requests.map((r) => [r.studentId, r])), [requests]);
+
   const shown = useMemo(() => {
     const needle = foldArabic(q.trim());
     return (rows ?? []).filter((r) => {
       if (halaqa && r.halaqaId !== halaqa) return false;
       if (needle && !foldArabic(r.fullName).includes(needle)) return false;
       if (onlyUnset && (r.assignmentNo != null || !r.eligible)) return false;
+      if (onlyRequests && !requestOf.has(r.id)) return false;
       return true;
     });
-  }, [rows, halaqa, q, onlyUnset]);
+  }, [rows, halaqa, q, onlyUnset, onlyRequests, requestOf]);
 
   const unset = (rows ?? []).filter((r) => r.eligible && r.assignmentNo == null).length;
 
@@ -97,9 +138,16 @@ export function ProgressSettingsCard() {
     <Sheet className="rise mb-4">
       <SheetHead title="مقرّرات الطلاب"
         meta="أين وقف كل طالب في خطته — يحدّده المشرف وحده، ثم يتحرّك بإنجاز الدرس"
-        action={unset > 0
-          ? <Chip tone="warn"><Num>{unset}</Num> بلا مقرّر</Chip>
-          : rows ? <Chip tone="ok">الكل محدَّد</Chip> : undefined} />
+        action={<span className="flex flex-wrap items-center gap-2">
+          {requests.length > 0 && (
+            <Chip tone="warn">
+              <Pencil size={12} strokeWidth={2.2} /><Num>{requests.length}</Num> طلب تعديل
+            </Chip>
+          )}
+          {unset > 0
+            ? <Chip tone="warn"><Num>{unset}</Num> بلا مقرّر</Chip>
+            : rows ? <Chip tone="ok">الكل محدَّد</Chip> : null}
+        </span>} />
 
       {err && (
         <p role="alert"
@@ -140,6 +188,19 @@ export function ProgressSettingsCard() {
               : 'border-ink-200 bg-paper text-ink-600 hover:border-ink-300')}>
           بلا مقرّر{unset > 0 && <> · <Num>{unset}</Num></>}
         </button>
+
+        {/* ومصفاة الطلبات بجانبها — سبعون اسمًا وثلاثة طلبات، وهذه تُظهر
+            الثلاثة. */}
+        {requests.length > 0 && (
+          <button type="button" onClick={() => setOnlyRequests((v) => !v)}
+            aria-pressed={onlyRequests}
+            className={cx('press flex h-10 shrink-0 items-center gap-1.5 rounded-md border px-3.5 text-panel font-medium transition-colors',
+              onlyRequests ? 'border-brand-700 bg-brand-50 text-brand-800'
+                : 'border-ink-200 bg-paper text-ink-600 hover:border-ink-300')}>
+            <Pencil size={14} strokeWidth={2} />
+            طلبات التعديل · <Num>{requests.length}</Num>
+          </button>
+        )}
       </div>
 
       {/* ── الصفوف ───────────────────────────────────────────────────────── */}
@@ -149,9 +210,11 @@ export function ProgressSettingsCard() {
         </div>
       ) : shown.length === 0 ? (
         <Empty icon={Search} title="لا نتائج"
-          body={onlyUnset
-            ? 'كل طالب في هذا النطاق له مقرّر محدَّد.'
-            : 'لا طلاب مطابقون لما اخترت.'} />
+          body={onlyRequests
+            ? 'لا طلبات تعديل معلّقة في هذا النطاق.'
+            : onlyUnset
+              ? 'كل طالب في هذا النطاق له مقرّر محدَّد.'
+              : 'لا طلاب مطابقون لما اخترت.'} />
       ) : (
         <ul className="overflow-hidden rounded-xl border border-ink-150">
           {shown.map((r) => {
@@ -159,10 +222,11 @@ export function ProgressSettingsCard() {
             const draft = drafts[r.id] ?? current;
             const dirty = draft !== current;
             const missing = r.eligible && r.assignmentNo == null;
+            const req = requestOf.get(r.id) ?? null;
             return (
               <li key={r.id}
                 className={cx('flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-ink-150 px-4 py-3 last:border-0',
-                  missing ? 'bg-warn-100/40' : 'bg-paper')}>
+                  req ? 'bg-brand-50/60' : missing ? 'bg-warn-100/40' : 'bg-paper')}>
                 {/* من هو، وأين هو */}
                 <div className="min-w-[11rem] flex-1">
                   <p className="flex flex-wrap items-center gap-2 text-body font-medium text-ink-900">
@@ -178,6 +242,34 @@ export function ProgressSettingsCard() {
                     {r.level != null && <span>· المستوى <Num>{r.level}</Num></span>}
                     {r.setByName && <span>· ضبطه {r.setByName}</span>}
                   </p>
+
+                  {/* الطلب على الصفّ نفسه: ما طُلب، ومن طلبه، ولماذا — ثم
+                      يُقبل أو يُرفض بلا مغادرة الشاشة. */}
+                  {req && (
+                    <div className="mt-2 rounded-lg border border-brand-200 bg-paper px-3 py-2.5">
+                      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-panel text-ink-800">
+                        <Pencil size={13} strokeWidth={2} className="shrink-0 text-brand-700" />
+                        طلب معلّمه نقله من المقرّر
+                        <Num className="font-medium">{req.from ?? '—'}</Num> إلى
+                        <Num className="font-medium text-brand-800">{req.to}</Num>
+                        {req.badge && (
+                          <Chip tone="warn"><Award size={12} strokeWidth={2.2} />{req.badgeAr}</Chip>
+                        )}
+                      </p>
+                      {req.note && (
+                        <p className="mt-1 text-micro leading-relaxed text-ink-600">«{req.note}»</p>
+                      )}
+                      <p className="mt-1 text-micro text-ink-500">{req.askedByName}</p>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        <Btn size="sm" variant="primary" icon={Check} disabled={busy === r.id}
+                          onClick={() => decide(req.id, true)}>
+                          {busy === r.id ? <Loader2 size={15} className="animate-spin" /> : 'اقبله وانقله'}
+                        </Btn>
+                        <Btn size="sm" icon={X} disabled={busy === r.id}
+                          onClick={() => decide(req.id, false)}>ارفضه</Btn>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* الرقم، في صندوق بحجم الرقم */}

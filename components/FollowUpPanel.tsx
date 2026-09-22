@@ -40,7 +40,8 @@ export function FollowUpPanel({ onClose }: { onClose: () => void }) {
         byHalaqa.set(r.student.halaqaId, (byHalaqa.get(r.student.halaqaId) ?? 0) + 1);
       }
     }
-    const scoped = halaqa ? rows.filter((r) => r.student.halaqaId === halaqa) : rows;
+    const scoped = halaqa && halaqa !== 'all'
+      ? rows.filter((r) => r.student.halaqaId === halaqa) : rows;
     return { byHalaqa, scoped: scoped.length, ...listCounts(scoped) };
   }, [rows, halaqa]);
 
@@ -68,7 +69,10 @@ export function FollowUpPanel({ onClose }: { onClose: () => void }) {
               طلابها مكانها «الطلاب والحلقات»، حيث تُفتح ملفاتهم وتُعدَّل. */}
           {counts.byHalaqa.size > 0 && (
             <PanelGroup label="الحلقات — حضورها وتسميعها">
-              <PanelItem active={!halaqa} onClick={() => set('halaqa', null)}>كل الحلقات</PanelItem>
+              {/* «كل الحلقات» كشفٌ هي الأخرى — سبعة صفوف، كلّ صفّ أسبوعُ
+                  حلقة. وكانت تمسح الاختيار فتترك الشاشة على «اختر كشفًا أو
+                  حلقة»: زرٌّ يُضغط فلا يفتح شيئًا. */}
+              <PanelItem active={halaqa === 'all'} onClick={() => set('halaqa', 'all')}>كل الحلقات</PanelItem>
               {db.halaqat.map((h) => {
                 const n = counts.byHalaqa.get(h.id) ?? 0;
                 if (!n) return null;

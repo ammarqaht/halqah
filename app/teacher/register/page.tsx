@@ -18,12 +18,12 @@
    record this afternoon must not find Tuesday's card under his thumb.
    ───────────────────────────────────────────────────────────────────────── */
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   AlertTriangle, CalendarDays, CheckCheck, CloudOff, Loader2, Save, Search, Users,
 } from 'lucide-react';
 import { Sheet } from '@/components/Sheet';
-import { Btn, Empty } from '@/components/ui';
+import { Btn, Empty, Modal } from '@/components/ui';
 import { DateField } from '@/components/DateField';
 import { Num } from '@/components/Num';
 import { useMe } from '@/components/teacher/Me';
@@ -60,6 +60,7 @@ const todayIso = () => {
 
 function RegisterScreen() {
   const { me, reload } = useMe();
+  const router = useRouter();
   const sp = useSearchParams();
   /* «إذا ضغطت عليه ينقلني إلى لسان فترة الطالب ويحدّد لي الطالب مباشرة» — the
      student's file links here with the boy already named, so the teacher lands
@@ -163,6 +164,9 @@ function RegisterScreen() {
   }), [day]);
 
   const refresh = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /* حفظٌ ثم مغادرة صار طريقًا معتادًا (حارس المغادرة أدناه)، فلا يُترك مؤقّت
+     يوقظ جلبًا لشاشة غادرها صاحبها. */
+  useEffect(() => () => { if (refresh.current) clearTimeout(refresh.current); }, []);
   const scheduleRefresh = useCallback(() => {
     if (refresh.current) clearTimeout(refresh.current);
     refresh.current = setTimeout(() => { void load(day); reload(); }, 400);
@@ -207,8 +211,8 @@ function RegisterScreen() {
       .filter((id) => drafts[id]),
     [states, drafts]);
 
-  const saveAll = useCallback(async () => {
-    if (!dirtyIds.length || savingAll) return;
+  const saveAll = useCallback(async (): Promise<boolean> => {
+    if (!dirtyIds.length || savingAll) return true;
     setSavingAll(true);
     const cards = dirtyIds.map((id) => bodyOf(id, drafts[id]));
     setStates((s) => {
@@ -231,6 +235,7 @@ function RegisterScreen() {
       });
       setErrors((e) => ({ ...e, ...Object.fromEntries(failed) }));
       scheduleRefresh();
+      return failed.size === 0;
     } catch {
       for (const id of dirtyIds) outbox.enqueue(`${id}:${day}`, { ...bodyOf(id, drafts[id]), queued: true });
       setStates((s) => {
@@ -239,10 +244,66 @@ function RegisterScreen() {
         return next;
       });
       setOffline(true);
+      /* في الصندوق لا في الهواء: البطاقة محفوظة على الجهاز وسترتفع وحدها،
+         فالمغادرة بعدها لا تُضيّع شيئًا. */
+      return true;
     } finally {
       setSavingAll(false);
     }
   }, [dirtyIds, drafts, day, post, bodyOf, scheduleRefresh, savingAll]);
+
+  /* ── حارس المغادرة ─────────────────────────────────────────────────────
+     «التسجيل يُحفظ بطاقةً بطاقة» يعني أن بطاقةً مملوءة غير محفوظة تبدو تمامًا
+     كبطاقة محفوظة: اللون نفسه، والخانات نفسها. فيضغط المعلم لسانًا آخر أو
+     رابطًا، وتُحمَّل الشاشة من جديد، ويذهب ما كتبه بلا أن يقول أحد شيئًا —
+     وهذا يقع على من سجّل عشرين طالبًا، لا على من نسي واحدًا.
+
+     فكل مخرج من الشاشة يمرّ من هنا: يُسمّى مَن لم يُحفظ، ويُعرض الحفظ. */
+  const dirtyNames = useMemo(
+    () => dirtyIds
+      .map((id) => data?.cards.find((c) => c.studentId === id)?.fullName)
+      .filter((n): n is string => !!n),
+    [dirtyIds, data]);
+
+  /** ما سيُفعل بعد الحفظ أو بعد التخلّي — في دالّة، لتبقى النيّة كما هي. */
+  const [leaving, setLeaving] = useState<{ go: () => void } | null>(null);
+  const [leaveErr, setLeaveErr] = useState('');
+
+  const guard = useCallback((go: () => void) => {
+    if (!dirtyIds.length) { go(); return; }
+    setLeaveErr('');
+    setLeaving({ go });
+  }, [dirtyIds.length]);
+
+  /* الروابط تُلتقط عند المستند لا عند كل رابط: شريط التنقّل وبطاقات الطلاب
+     وكل ما في الصفحة روابط، ولفّها واحدًا واحدًا يترك واحدًا بلا حارس. */
+  useEffect(() => {
+    if (!dirtyIds.length) return;
+    const onClick = (e: MouseEvent) => {
+      if (e.defaultPrevented || e.button !== 0) return;
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;   // فتح في تبويب آخر
+      const a = (e.target as HTMLElement | null)?.closest?.('a[href]') as HTMLAnchorElement | null;
+      if (!a || (a.target && a.target !== '_self') || a.hasAttribute('download')) return;
+      let url: URL;
+      try { url = new URL(a.href, window.location.href); } catch { return; }
+      if (url.origin !== window.location.origin) return;
+      if (url.pathname === window.location.pathname && url.search === window.location.search) return;
+      e.preventDefault();
+      e.stopPropagation();
+      guard(() => router.push(url.pathname + url.search));
+    };
+    document.addEventListener('click', onClick, true);
+    return () => document.removeEventListener('click', onClick, true);
+  }, [dirtyIds.length, guard, router]);
+
+  /* وإغلاق اللسان وتحديثه والخروج من البوابة تمسّها رسالة المتصفّح نفسه —
+     لا نملك نافذتنا هناك، ومنعُ الضياع أهمّ من شكل التحذير. */
+  useEffect(() => {
+    if (!dirtyIds.length) return;
+    const bye = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', bye);
+    return () => window.removeEventListener('beforeunload', bye);
+  }, [dirtyIds.length]);
 
   /* ── «الكل حاضر» ───────────────────────────────────────────────────────── */
   const allPresent = useCallback(() => {
@@ -292,7 +353,8 @@ function RegisterScreen() {
 
   return (
     <div>
-      <DayHero me={me} day={day} data={data} mode={mode} onMode={setMode} />
+      <DayHero me={me} day={day} data={data} mode={mode}
+        onMode={(m) => guard(() => setMode(m))} />
 
       <SheetBelow>
         {/* ── the bars that must be seen before a card is touched ──────────── */}
@@ -314,8 +376,9 @@ function RegisterScreen() {
         {/* ── اليوم الذي يسجّله، ثم البحث فيه ────────────────────────────── */}
         {mode === 'PAST' && (
           <div className="rise">
-            <DateField value={pastDay} onChange={setPastDay} max={todayIso()} steppers hijriToo
-              label="اليوم الذي تسجّله" />
+            {/* تغيير اليوم يُعيد تحميل البطاقات، فهو مغادرةٌ أيضًا. */}
+            <DateField value={pastDay} onChange={(v) => guard(() => setPastDay(v))}
+              max={todayIso()} steppers hijriToo label="اليوم الذي تسجّله" />
           </div>
         )}
 
@@ -409,6 +472,37 @@ function RegisterScreen() {
           </ul>
         )}
       </SheetBelow>
+
+      <Modal open={!!leaving} onClose={() => setLeaving(null)} title={COPY.leaveTitle}
+        footer={<>
+          <Btn onClick={() => setLeaving(null)}>{COPY.leaveStay}</Btn>
+          <Btn onClick={() => { const go = leaving?.go; setLeaving(null); go?.(); }}>
+            {COPY.leaveDiscard}
+          </Btn>
+          <Btn variant="primary" icon={Save} disabled={savingAll}
+            onClick={async () => {
+              const ok = await saveAll();
+              if (!ok) { setLeaveErr(COPY.leaveFailed); return; }
+              const go = leaving?.go;
+              setLeaving(null);
+              go?.();
+            }}>
+            {savingAll ? <><Loader2 size={16} className="animate-spin" />{COPY.savingAll}</>
+              : COPY.leaveSave}
+          </Btn>
+        </>}>
+        <p className="text-base2 leading-relaxed text-ink-700">{COPY.leaveBody}</p>
+        {/* بالأسماء لا بالعدد: «ثلاث بطاقات» تجعله يبحث عنها، والاسم يقول له
+            أين كان. */}
+        <ul className="mt-3 space-y-1 rounded-xl border border-warn-200 bg-warn-100/60 px-4 py-3">
+          {dirtyNames.map((n) => (
+            <li key={n} className="flex items-baseline gap-2 text-base2 text-warn-700">
+              <span className="text-warn-700/70">•</span>{n}
+            </li>
+          ))}
+        </ul>
+        {leaveErr && <p className="mt-3 text-panel text-risk-700">{leaveErr}</p>}
+      </Modal>
     </div>
   );
 }

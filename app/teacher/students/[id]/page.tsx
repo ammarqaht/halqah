@@ -24,6 +24,7 @@ import { Sheet, SheetHead } from '@/components/Sheet';
 import { Btn, Chip, Empty } from '@/components/ui';
 import { HijriText, Num, juzPhrase } from '@/components/Num';
 import { Ring } from '@/components/student/motion';
+import { AssignmentRequest } from '@/components/teacher/AssignmentRequest';
 import {
   COPY, KIND_FULL_AR, KIND_TIGHT_AR, STATUS_SHAPE, type StatusCode,
 } from '@/content/teacher';
@@ -287,6 +288,12 @@ export default function StudentFile() {
                 : 'لم يُسجَّل له مقرّر بعد'}
             </p>
           </div>
+
+          {/* القلم على سطر المقرّر: «الملف كله للعرض لا للتعديل» ما زالت
+              قائمة — هذا لا يعدّل شيئًا، بل يكتب طلبًا إلى المشرف ويوصله. */}
+          <AssignmentRequest studentId={s.id} level={s.level}
+            assignmentNo={s.assignmentNo} assignmentOf={s.assignmentOf}
+            eligible={s.track !== 'TALQEEN' && s.assignmentOf > 0} />
         </div>
 
         <dl className="mt-4 grid grid-cols-2 border-t border-ink-150 sm:grid-cols-4">

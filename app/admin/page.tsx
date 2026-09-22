@@ -18,6 +18,7 @@ import { isoDate } from '@/lib/dates';
 import { derive } from '@/lib/derive';
 import { cx } from '@/lib/cx';
 import { TodayProgress } from '@/components/TodayProgress';
+import { AssignmentRequestsAlert } from '@/components/AssignmentRequestsAlert';
 import { useMyName, greeting, shortGreetingName } from '@/lib/useMe';
 
 const TRACK_TONE: Record<string, string> = {
@@ -83,6 +84,10 @@ export default function OverviewPage() {
           <KPI label="تحتاج مراجعة" value={d.flagged} unit="سجلًا" icon={AlertTriangle} delay={180}
             sub="أرقام هوية قصيرة أو مكرّرة" />
         </div>
+
+        {/* طلبات المعلمين على المقرّرات — تظهر قبل كل شيء حين تكون، وتغيب
+            حين لا تكون. */}
+        <AssignmentRequestsAlert />
 
         {/* اختبارات اليوم — the panel counts them, but the panel is closed
             most of the time and a booking is a thing with a date on it. It

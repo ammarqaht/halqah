@@ -190,13 +190,16 @@ export function Combobox({
                     <span className="mt-0.5 w-4 shrink-0">
                       {isSel && <Check size={14} strokeWidth={2.4} className="text-brand-700" />}
                     </span>
+                    {/* سطر واحد للاسم دائمًا. الاسم الملفوف على سطرين يجعل
+                        القائمة تقفز بين ارتفاعين، ويصير المسح بالعين عبر عشرين
+                        اسمًا أصعب من قراءة الاسم الطويل نفسه. */}
                     {stack ? (
                       <span className="min-w-0 flex-1">
-                        <span className="block break-words leading-snug">{o.label}</span>
-                        {o.hint && <span className="mt-0.5 block text-micro font-normal text-ink-500">{o.hint}</span>}
+                        <span className="block truncate leading-snug">{o.label}</span>
+                        {o.hint && <span className="mt-0.5 block truncate text-micro font-normal text-ink-500">{o.hint}</span>}
                       </span>
                     ) : (<>
-                      <span className="min-w-0 flex-1 break-words leading-snug">{o.label}</span>
+                      <span className="min-w-0 flex-1 truncate leading-snug">{o.label}</span>
                       {o.hint && <span className="shrink-0 text-micro text-ink-500">{o.hint}</span>}
                     </>)}
                   </button>

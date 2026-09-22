@@ -275,8 +275,14 @@ function HalaqaDay({ halaqa, day, onClose }: { halaqa: Row; day: string; onClose
       ) : !list ? (
         <div className="space-y-2">{[0, 1, 2, 3].map((i) => <div key={i} className="skel h-10 rounded" />)}</div>
       ) : (
-        <div className="-mx-1 max-h-[65vh] overflow-auto">
-          <table className="w-full min-w-[40rem] border-collapse text-body">
+        <div className="-mx-1 max-h-[65vh] overflow-y-auto overflow-x-hidden px-1">
+          {/* لأسفل لا إلى الجانب: نافذة تُقرأ بالتمرير الأفقي تُخفي عمودًا
+              كاملًا خلف حافّتها، والعمود المخفيّ هنا هو التسميع نفسه. */}
+          <table className="w-full table-fixed border-collapse text-body">
+            <colgroup>
+              <col className="w-[34%]" /><col className="w-[16%]" />
+              <col className="w-[10%]" /><col />
+            </colgroup>
             <thead className="sticky top-0 bg-paper">
               <tr className="border-b border-ink-200 text-cap text-ink-500">
                 <th className="px-2 pb-2 text-start font-medium">الطالب</th>
@@ -331,7 +337,7 @@ function HalaqaDay({ halaqa, day, onClose }: { halaqa: Row; day: string; onClose
                         <span className="text-ink-300">—</span>
                       )}
                       {lines.map((l) => (
-                        <span key={l.kind} className="flex items-baseline gap-1.5 text-panel">
+                        <span key={l.kind} className="flex flex-wrap items-baseline gap-x-1.5 text-panel">
                           {saved ? (
                             l.recited
                               ? <Check size={13} strokeWidth={2.6} className="shrink-0 translate-y-0.5 text-ok-700" aria-label="سمّع" />

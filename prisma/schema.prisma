@@ -96,17 +96,16 @@ model Halaqa {
 }
 
 model Student {
-  id       String @id @default(cuid())
-  fullName String @map("full_name")
+  id        String  @id @default(cuid())
+  fullName  String  @map("full_name")
   /**
    * تاريخ الميلاد — ميلادي، `YYYY-MM-DD`.
-   *
    * A date and not an age: an age is a fact with a shelf life, and a roster
    * that stores one is wrong by one every year. Nullable because the client's
    * own files do not carry it for everyone, and a guessed birthday is worse
    * than a blank.
    */
-  birthDate    String? @map("birth_date")
+  birthDate String? @map("birth_date")
 
   // Stored exactly as found: abs() of the roster value, no length validation.
   // NOT unique — the client's roster legitimately carries one id on two rows.
@@ -129,6 +128,7 @@ model Student {
   /**
    * /**
    * /**
+   * /**
    * /** «الحضور» is a COUNT OF DAYS in the roster — 0 to 7 — not a yes/no.
    * Read as a boolean, a boy present three days out of three came back «غائب».
    */
@@ -139,27 +139,31 @@ model Student {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  halaqa     Halaqa?            @relation(fields: [halaqaId], references: [id], onDelete: SetNull)
-  transfers  HalaqaTransfer[]
+  halaqa             Halaqa?             @relation(fields: [halaqaId], references: [id], onDelete: SetNull)
+  transfers          HalaqaTransfer[]
   /**
    * Everything a student accumulates, now that it lives in the database.
    */
-  credential StudentCredential?
-  txns       PointTxn[]
-  orders     Order[]
-  exams      Exam[]
-  bookings   ExamBooking[]
-  plans      StudentPlan[]
+  credential         StudentCredential?
+  txns               PointTxn[]
+  orders             Order[]
+  exams              Exam[]
+  bookings           ExamBooking[]
+  plans              StudentPlan[]
   /**
    * What his teacher records about him, day by day.
    */
-  days       DayEntry[]
-  progress   StudentProgress?
+  days               DayEntry[]
+  progress           StudentProgress?
   /**
    * رسائل الإدارة الموجَّهة إليه وحده، وما قرأه من تنبيهاته.
    */
-  messages   AdminMessage[]
-  alertReads StudentAlertRead[]
+  messages           AdminMessage[]
+  alertReads         StudentAlertRead[]
+  /**
+   * ما طلبه معلّمه من تعديل مقرّره، وما قُضي فيه.
+   */
+  assignmentRequests AssignmentRequest[]
 
   @@index([halaqaId])
   @@index([track])
@@ -774,13 +778,11 @@ model StudentProgress {
 
   /**
    * «الطالب ليس مستعدًّا للاختبار ويحتاج مراجعة» — رأي معلّمه.
-   *
    * The pointer already says when a boy has REACHED his exam مقرّر; it never
    * said whether he is ready to sit it, and the only person who knows that
    * hears him five afternoons a week. «عند المعلم في صفحة الاختبارات أبي يظهر
    * زر أن الطالب مب جاهز للاختبار ويحتاج مراجعة، ويظهر عند المشرف والطالب»
    * (client, 18 Sep 2026).
-   *
    * An OPINION, not a gate: it blocks no booking and cancels no sitting. The
    * supervisor is told before he books, the boy is told he has work to do, and
    * whoever sets it is named — a judgement nobody signs is one nobody lifts.
@@ -890,4 +892,71 @@ model TeacherAlertRead {
   @@id([teacherId, key])
   @@index([teacherId, readAt])
   @@map("teacher_alert_reads")
+}
+
+/**
+ * طلب تعديل مقرّر — من المعلّم إلى المشرف.
+ * «المعلم لا يمكن أن يحدد مقرر الطالب … عليه التوجه إلى مشرف الحلقة» (العميل،
+ * ١٨ سبتمبر ٢٠٢٦) — والقاعدة باقية كما هي: لا يكتب المعلّم في `student_progress`
+ * حرفًا. لكن «التوجه إلى المشرف» كان يعني مكالمةً أو ورقةً في جيب، فيضيع الطلب
+ * أو يُنسى أيّهما كان.
+ * فهذا هو الطلب نفسه مكتوبًا: يقوله المعلّم من بطاقة الطالب، ويظهر عند المشرف
+ * في صفحته الأولى، ويُقبل أو يُرفض بضغطة. والقبول وحده هو ما يحرّك المؤشّر —
+ * وبيد المشرف، كما كان.
+ * ويُحفظ معه أين كان الطالب ساعةَ الطلب: المؤشّر يتحرّك بالتسميع كل عصر، وطلبٌ
+ * يُقرأ بعد يومين لا يُفهم إن لم يقل من أين أراد نقله.
+ */
+model AssignmentRequest {
+  id        String  @id @default(cuid())
+  studentId String  @map("student_id")
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  /**
+   * الحلقة ساعةَ الطلب — كـ`DayEntry.halaqaId`، فانتقال الطالب لا ينقل طلبه.
+   */
+  halaqaId  String? @map("halaqa_id")
+
+  /**
+   * من طلب: معلّم الحلقة، أو المشرف نفسه إن سجّل عنه.
+   */
+  askedById   String? @map("asked_by_id")
+  askedByRole String  @default("TEACHER") @map("asked_by_role")
+  askedByName String  @default("") @map("asked_by_name")
+
+  /**
+   * أين كان — لقطةً لا مرجعًا: المؤشّر يتحرّك، والطلب يبقى مفهومًا.
+   */
+  track            String?
+  level            Int?
+  fromAssignmentNo Int?    @map("from_assignment_no")
+  /**
+   * وإلى أين يريده.
+   */
+  toAssignmentNo   Int     @map("to_assignment_no")
+  /**
+   * ويُحسب من المقرّر المطلوب: ١٢ و٢٤ مقرّرا وسام، فالطلب يقول وسامًا أيضًا.
+   */
+  toBadge          String? @map("to_badge")
+  note             String  @default("")
+
+  /**
+   * `PENDING` · `APPROVED` · `REJECTED` · `CANCELLED`
+   */
+  status        String    @default("PENDING")
+  decidedById   String?   @map("decided_by_id")
+  decidedByName String    @default("") @map("decided_by_name")
+  decidedAt     DateTime? @map("decided_at")
+  /**
+   * سبب الرفض، إن كتبه — «لا» بلا سبب تُعاد غدًا كما هي.
+   */
+  decisionNote  String    @default("") @map("decision_note")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  /**
+   * طلبٌ واحد معلّق لكل طالب — والثاني يستبدل الأول لا يصطفّ خلفه.
+   */
+  @@index([status, createdAt])
+  @@index([studentId, status])
+  @@index([halaqaId, status])
+  @@map("assignment_requests")
 }

@@ -151,7 +151,8 @@ function FollowUpScreen() {
   const all = useMemo(() => followUpRows(db), [db]);
   const followed = useMemo(() => followedRows(all), [all]);
   const inHalaqa = useMemo(
-    () => (halaqaFilter ? followed.filter((r) => r.student.halaqaId === halaqaFilter) : followed),
+    () => (halaqaFilter && halaqaFilter !== 'all'
+      ? followed.filter((r) => r.student.halaqaId === halaqaFilter) : followed),
     [followed, halaqaFilter]);
 
   const counts = useMemo(() => ({
@@ -176,6 +177,8 @@ function FollowUpScreen() {
   const teacherOf = useMemo(
     () => (id: string | null) => teacherName(db.halaqat, id), [db.halaqat]);
   const halaqa = halaqaFilter ? db.halaqat.find((h) => h.id === halaqaFilter) ?? null : null;
+  /* «كل الحلقات» نطاقٌ اسمه لا حلقةٌ بعينها — فعمود الحلقة يبقى في الكشف. */
+  const oneHalaqa = !!halaqa;
 
   const studentOptions = useMemo(() => followed.map((r) => ({
     value: r.student.id,
@@ -226,7 +229,8 @@ function FollowUpScreen() {
             تُفتح ملفات الطلاب وتُعدَّل، لا هنا حيث يُتابَع سيرهم.
             أمّا الكشوف الجاهزة فتعمل داخل الحلقة كما كانت. */}
         {halaqaFilter && halaqaFilter !== 'none' && !listParam ? (
-          <Register halaqaId={halaqaFilter} />
+          /* «كل الحلقات» هي السجلّ بلا نطاق — سبعة صفوف لا واحد. */
+          <Register halaqaId={halaqaFilter === 'all' ? null : halaqaFilter} />
         ) : (<>
 
         {/* كل بطاقة تفتح كشفها — والسهم أسفل يسارها يقول ذلك (قرار العميل ١ سبتمبر). */}
@@ -283,7 +287,7 @@ function FollowUpScreen() {
                     <thead>
                       <tr className="border-b border-ink-200 bg-page/50 text-cap text-ink-500">
                         {['الطالب',
-                          ...(halaqaFilter ? [] : ['الحلقة']),
+                          ...(oneHalaqa ? [] : ['الحلقة']),
                           /* Attendance and today's pages come from one Ratel
                              report on one day. Follow-up asks who is behind
                              ACROSS levels and exams, and a column of «غائب» and
@@ -308,7 +312,7 @@ function FollowUpScreen() {
                             )}
                             {r.student.fullName}
                           </td>
-                          {!halaqaFilter && (
+                          {!oneHalaqa && (
                             <td className="px-3 py-3 text-panel text-ink-600">{teacherOf(r.student.halaqaId)}</td>
                           )}
                           <td className="px-3 py-3 text-panel text-ink-600">{r.student.grade || '—'}</td>
