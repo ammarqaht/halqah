@@ -106,6 +106,41 @@ const SYNCED = [
   'bookings', 'plans', 'tajweedTopics',
 ] as const;
 
+/* ── ما لم يبلغ الخادم بعد ────────────────────────────────────────────────
+   The hydrate below has to answer one question about every list: is the server
+   empty because it never received this browser's work, or because somebody
+   deleted it? Answering it by LENGTH — «فارغ عند الخادم وعندي صفوف ⇒ احمل
+   صفوفي» — made emptying a list impossible. Delete the last gift and the next
+   browser to open, any of the four supervisors', would hand its stale copy
+   straight back and everyone would see the gifts return.
+
+   So the browser records what it has actually failed to send. A commit marks
+   the lists it touched; a save that lands clears them. Then a list this device
+   has nothing outstanding on takes the server's word — including the server's
+   word that it is empty — and a list with unsent rows still carries them,
+   which is the whole and only purpose of the rule. */
+const UNSENT_KEY = 'halqah.unsent.v1';
+let unsent = new Set<string>();
+let unsentLoaded = false;
+
+function readUnsent(): Set<string> {
+  if (unsentLoaded) return unsent;
+  unsentLoaded = true;
+  try {
+    const raw = localStorage.getItem(UNSENT_KEY);
+    const v = raw ? JSON.parse(raw) : [];
+    if (Array.isArray(v)) unsent = new Set(v.map(String));
+  } catch { /* private mode — an empty set is the safe reading */ }
+  return unsent;
+}
+
+function writeUnsent() {
+  try {
+    if (unsent.size) localStorage.setItem(UNSENT_KEY, JSON.stringify([...unsent]));
+    else localStorage.removeItem(UNSENT_KEY);
+  } catch { /* as above — it survives in memory for this tab at least */ }
+}
+
 type SyncState = 'idle' | 'saving' | 'saved' | 'offline' | 'unauthorized';
 let syncState: SyncState = 'idle';
 let hydrated = false;
@@ -197,6 +232,11 @@ async function pushNow(): Promise<void> {
     setSync(res.status === 401 ? 'unauthorized'
       : res.status === 409 ? 'idle'
       : res.ok ? 'saved' : 'offline');
+    /* The save landed, so nothing is outstanding any more: this browser and the
+       server now agree, and the next hydrate may take the server's word for
+       every list — an empty one included. A 401, a 409 or a dead connection
+       leaves the marks standing, which is exactly when they are needed. */
+    if (res.ok) { readUnsent(); unsent.clear(); writeUnsent(); }
     /* If the server could not place some rows, say so — a save that keeps two
        thirds of what it was given must not read as a clean save. */
     if (res.ok) {
@@ -248,6 +288,9 @@ export async function hydrateFromServer(): Promise<void> {
       try { seen = localStorage.getItem(RESET_KEY); } catch { /* private mode */ }
       if (seen !== remote.resetAt) {
         db = { ...EMPTY };
+        /* And nothing is owed any more. A mark left standing here would make
+           the next hydrate carry rows this device was just told to forget. */
+        readUnsent(); unsent.clear(); writeUnsent();
         try {
           localStorage.setItem(KEY, JSON.stringify(db));
           localStorage.setItem(RESET_KEY, String(remote.resetAt));
@@ -260,13 +303,28 @@ export async function hydrateFromServer(): Promise<void> {
     }
     /* The server is the record. A cache holding work this device made while
        signed out would be silently replaced, so anything the server does not
-       have yet is kept and pushed straight back. */
+       have yet is kept and pushed straight back.
+
+       «Has not got yet» is read from what this browser failed to SEND, not from
+       what the server happens to be short of. Read the other way it made an
+       empty list unreachable: every gift deleted, the server duly emptied, and
+       then any supervisor's browser — stale, and with nothing outstanding —
+       treated the emptiness as loss, kept its copy and uploaded it back. The
+       catalogue came back from the dead for all four of them, and no amount of
+       deleting it again would stick, because the next load did it again.
+
+       A list with nothing unsent now takes the server's word, emptiness and
+       all. A list with unsent rows still carries them, which is the whole and
+       only thing the rule was for. */
+    readUnsent();
     const merged: DB = { ...cur };
     let carried = 0;
     for (const k of SYNCED) {
       const server = (remote[k] ?? []) as { id?: string }[];
       const local = (cur[k] ?? []) as { id?: string }[];
-      if (server.length === 0 && local.length > 0) { carried += local.length; continue; }
+      if (unsent.has(k) && server.length === 0 && local.length > 0) {
+        carried += local.length; continue;
+      }
       (merged as Record<string, unknown>)[k] = server;
     }
 
@@ -322,6 +380,17 @@ export const orphanedOnLastSave = () => lastOrphaned;
 let persistError: string | null = null;
 
 function commit(next: DB) {
+  /* Which lists this edit touched. Every mutation above builds a NEW array for
+     the list it changes and reuses the rest, so identity is an exact answer and
+     a free one — no row-by-row comparison. Recorded BEFORE `db` moves on. */
+  readUnsent();
+  const prev = db;
+  let marked = false;
+  for (const k of SYNCED) {
+    if (next[k] !== prev[k] && !unsent.has(k)) { unsent.add(k); marked = true; }
+  }
+  if (marked) writeUnsent();
+
   db = next;
   schedulePush();
   try {
