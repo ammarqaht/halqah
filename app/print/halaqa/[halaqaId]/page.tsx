@@ -1,9 +1,15 @@
 'use client';
 /* تقرير حلقة المعلّم — SPEC.md §6.11 (إد-٥-هـ), layout approved 1 Sep 2026.
    The teacher's whole roster on one sheet, and the client's manual green
-   highlighting replaced structurally: a student the association has examined
-   gets a shaded row AND a ✓ in its own column, so the mark survives a
-   greyscale photocopier (DESIGN.md §1.4 — colour is never the only carrier). */
+   highlighting replaced structurally: the row is shaded AND carries a mark in
+   its own column, so it survives a greyscale photocopier (DESIGN.md §1.4 —
+   colour is never the only carrier).
+
+   THE SHADING IS FOR PASSING, not for sitting — 22 Sep 2026. It used to fall
+   on everyone the association had examined, so a boy who failed printed the
+   same green as one who passed, and the sheet was being read at a glance by
+   someone who could not tell them apart. A pass is «✓ ٣» — the mark and how
+   many ajza it covered; a failure is «✗ ٣» on an unshaded row. */
 import { use, useMemo } from 'react';
 import { Printer } from 'lucide-react';
 import { PrintHead, PrintFoot, PCELL } from '@/components/PrintHead';
@@ -43,7 +49,10 @@ export default function HalaqaReport({ params }: { params: Promise<{ halaqaId: s
     );
   }
 
-  const examined = rows.filter((r) => r.lastAssociation !== null).length;
+  /* عدّان لا واحد: التظليل صار للناجح، فعدّ «من اختُبر» وحده يترك القارئ
+     يحسب الفرق بنفسه — وهو الرقم الذي جاء يقرأ الورقة لأجله. */
+  const passed = rows.filter((r) => r.lastAssociation?.passed === true).length;
+  const failed = rows.filter((r) => r.lastAssociation && r.lastAssociation.passed !== true).length;
 
   return (
     <>
@@ -77,9 +86,13 @@ export default function HalaqaReport({ params }: { params: Promise<{ halaqaId: s
                 /* ONE definition of «آخر اختبار» — the row's own, so this
                    paper can never disagree with the follow-up screen. */
                 const last = r.lastExam;
-                const byAssoc = r.lastAssociation !== null;
+                /* اختبرته الجمعية، واجتاز. كان التظليل يقع على كل من اختُبر —
+                   فالراسب يظهر في اللون نفسه الذي يظهر فيه الناجح، وورقة تُقرأ
+                   بلمحة لا تحتمل ذلك. */
+                const assoc = r.lastAssociation;
+                const assocPassed = assoc?.passed === true;
                 return (
-                  <tr key={s.id} className={cx('keep h-[26px]', byAssoc && 'bg-ok-100')}>
+                  <tr key={s.id} className={cx('keep h-[26px]', assocPassed && 'bg-ok-100')}>
                     <td className={PCELL}><Num>{toArabicDigits(i + 1)}</Num></td>
                     <td className={`${PCELL} text-start`}>{s.fullName}</td>
                     <td className={PCELL}>{s.grade || '—'}</td>
@@ -111,7 +124,19 @@ export default function HalaqaReport({ params }: { params: Promise<{ halaqaId: s
                             <Num className="text-ink-500">{toArabicDigits(formatDate(last.takenOn))}</Num></>
                         : '—'}
                     </td>
-                    <td className={`${PCELL} font-bold text-ok-700`}>{byAssoc ? '✓' : ''}</td>
+                    {/* كم جزءًا اختبرته الجمعية — لا مجرّد أنها اختبرته.
+                        والراسب يُعلَّم ✗ ولا يُظلَّل. */}
+                    <td className={PCELL}>
+                      {!assoc ? '' : assocPassed ? (
+                        <span className="font-bold text-ok-700">
+                          ✓{assoc.ajza != null && <> <Num>{toArabicDigits(assoc.ajza)}</Num></>}
+                        </span>
+                      ) : (
+                        <span className="font-bold text-risk-700">
+                          ✗{assoc.ajza != null && <> <Num>{toArabicDigits(assoc.ajza)}</Num></>}
+                        </span>
+                      )}
+                    </td>
                     <td className={PCELL}>
                       {s.track === 'TALQEEN' ? '—' : <Num>{toArabicDigits(r.balance)}</Num>}
                     </td>
@@ -123,8 +148,11 @@ export default function HalaqaReport({ params }: { params: Promise<{ halaqaId: s
         )}
 
         <PrintFoot>
-          الصف المظلَّل مع ✓: اختبرته الجمعية
-          {examined > 0 && <> — <Num>{toArabicDigits(examined)}</Num> من <Num>{toArabicDigits(rows.length)}</Num></>}.
+          الصف المظلَّل مع ✓: اجتاز اختبار الجمعية، والرقم بعده عدد أجزائه. و✗: اختُبر ولم يجتز
+          {(passed > 0 || failed > 0) && (
+            <> — اجتاز <Num>{toArabicDigits(passed)}</Num> من <Num>{toArabicDigits(rows.length)}</Num>
+              {failed > 0 && <>، ولم يجتز <Num>{toArabicDigits(failed)}</Num></>}</>
+          )}.
           العلامة تبقى مقروءة في النسخ الرمادي.
         </PrintFoot>
       </div>
