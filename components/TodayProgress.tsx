@@ -26,8 +26,9 @@
    written in بوابة المعلم, and `PUT /api/state` never carries it. */
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Inbox } from 'lucide-react';
+import { ArrowLeft, Inbox, Check, X, Shirt } from 'lucide-react';
 import { Sheet, SheetHead } from '@/components/Sheet';
+import { Modal } from '@/components/ui';
 import { HijriText, Num } from '@/components/Num';
 import { TRACK_AR, type Track } from '@/lib/types';
 import { formatDate } from '@/lib/dates';
@@ -72,6 +73,8 @@ const pages = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 export function TodayProgress() {
   const [d, setD] = useState<Payload | null>(null);
   const [err, setErr] = useState('');
+  /* The halaqa whose afternoon is open in the window. */
+  const [open, setOpen] = useState<Row | null>(null);
 
   useEffect(() => {
     fetch('/api/admin/today')
@@ -125,8 +128,15 @@ export function TodayProgress() {
             <tbody>
               {d.halaqat.map((h) => (
                 <tr key={h.id}
+                  /* A halaqa that has opened its register opens its afternoon:
+                     who came, who recited what, and the thobe. One that has not
+                     has nothing to show yet. */
+                  onClick={h.recorded > 0 ? () => setOpen(h) : undefined}
+                  onKeyDown={h.recorded > 0 ? (e) => { if (e.key === 'Enter') setOpen(h); } : undefined}
+                  tabIndex={h.recorded > 0 ? 0 : undefined}
+                  title={h.recorded > 0 ? 'اعرض تفاصيل اليوم' : undefined}
                   className={cx('border-b border-ink-150 transition-colors last:border-0 hover:bg-brand-50',
-                    h.recorded === 0 && 'opacity-60')}>
+                    h.recorded === 0 ? 'opacity-60' : 'cursor-pointer focus:bg-brand-50 focus:outline-none')}>
                   <td className="px-2 py-3">
                     <span className="block font-medium text-ink-900">{h.teacher}</span>
                     {/* An afternoon nobody has opened is not an afternoon of
@@ -211,6 +221,142 @@ export function TodayProgress() {
           )}
         </div>
       )}
+      {d && open && (
+        <HalaqaDay halaqa={open} day={d.day} onClose={() => setOpen(null)} />
+      )}
     </Sheet>
+  );
+}
+
+/* ── the afternoon of one halaqa ───────────────────────────────────────────
+   Read from the register — the same route «كشف الأسبوع» reads — and cut to
+   today. A boy not yet recorded is not absent: he shows what he is due to
+   recite, from where his pointer stands, and a dash where the mark will go. */
+type Line = { kind: string; kindAr: string; recited?: boolean; errors?: number; passage: string | null; note?: string | null };
+type Cell = {
+  day: string; status: string | null; statusAr?: string; thobe?: boolean;
+  talqeen?: string | null; incomplete?: boolean; note?: string | null; lines?: Line[];
+};
+type RegStudent = {
+  id: string; fullName: string; track: string | null; level: number | null; cells: Cell[];
+  planned: { assignmentNo: number | null; awaitingExam: string | null; talqeen: string | null; lines: Line[] } | null;
+};
+
+const STATUS_TONE: Record<string, string> = {
+  PRESENT: 'bg-ok-100 text-ok-700', LATE: 'bg-warn-100 text-warn-700', ABSENT: 'bg-risk-100 text-risk-700',
+};
+const BADGE_AR: Record<string, string> = { BADGE_GOLDEN: 'الوسام الذهبي', BADGE_DIAMOND: 'الوسام الماسي' };
+
+function HalaqaDay({ halaqa, day, onClose }: { halaqa: Row; day: string; onClose: () => void }) {
+  const [list, setList] = useState<RegStudent[] | null>(null);
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    fetch(`/api/admin/register?halaqa=${encodeURIComponent(halaqa.id)}&week=${day}`)
+      .then(async (r) => {
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) { setErr(j.error ?? 'تعذّر قراءة اليوم.'); return; }
+        setList(j.halaqat?.[0]?.students ?? []);
+      })
+      .catch(() => setErr('تعذّر الاتصال بالخادم.'));
+  }, [halaqa.id, day]);
+
+  return (
+    <Modal open onClose={onClose} wide title={`حلقة ${halaqa.teacher} — اليوم`}>
+      <p className="mb-3 text-panel text-ink-600">
+        سُجِّل <Num>{halaqa.recorded}</Num> من <Num>{halaqa.students}</Num>
+        {' '}· حاضر <Num>{halaqa.present}</Num>
+        {halaqa.late > 0 && <> · متأخر <Num>{halaqa.late}</Num></>}
+        {halaqa.absent > 0 && <> · غائب <Num>{halaqa.absent}</Num></>}
+        {' '}· الثوب <Num>{halaqa.thobe}</Num>
+      </p>
+      {err ? (
+        <p className="py-6 text-center text-panel text-ink-500">{err}</p>
+      ) : !list ? (
+        <div className="space-y-2">{[0, 1, 2, 3].map((i) => <div key={i} className="skel h-10 rounded" />)}</div>
+      ) : (
+        <div className="-mx-1 max-h-[65vh] overflow-auto">
+          <table className="w-full min-w-[40rem] border-collapse text-body">
+            <thead className="sticky top-0 bg-paper">
+              <tr className="border-b border-ink-200 text-cap text-ink-500">
+                <th className="px-2 pb-2 text-start font-medium">الطالب</th>
+                <th className="px-2 pb-2 text-start font-medium">الحضور</th>
+                <th className="px-2 pb-2 text-center font-medium">الثوب</th>
+                <th className="px-2 pb-2 text-start font-medium">تسميع اليوم</th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.map((st) => {
+                const c = st.cells.find((x) => x.day === day);
+                const saved = !!c?.status;
+                const lines = saved ? (c!.lines ?? []) : (st.planned?.lines ?? []);
+                const talqeen = saved ? c!.talqeen : st.planned?.talqeen;
+                const waiting = !saved && st.planned?.awaitingExam;
+                return (
+                  <tr key={st.id} className="border-b border-ink-150 align-top last:border-0">
+                    <td className="px-2 py-2.5">
+                      <span className="block font-medium text-ink-900">{st.fullName}</span>
+                      <span className="block text-micro text-ink-500">
+                        {st.track ? TRACK_AR[st.track as Track] : '—'}
+                        {st.track !== 'TALQEEN' && st.level != null && <> <Num>{st.level}</Num></>}
+                        {st.planned?.assignmentNo != null && <> · المقرّر <Num>{st.planned.assignmentNo}</Num></>}
+                      </span>
+                    </td>
+                    <td className="px-2 py-2.5">
+                      {saved ? (
+                        <span className={cx('inline-block rounded px-2 py-0.5 text-micro font-medium',
+                          STATUS_TONE[c!.status!] ?? 'bg-ink-100 text-ink-700')}>{c!.statusAr}</span>
+                      ) : (
+                        <span className="text-micro text-ink-400">لم يُسجَّل</span>
+                      )}
+                    </td>
+                    <td className="px-2 py-2.5 text-center">
+                      {saved && c!.thobe
+                        ? <Shirt size={16} className="inline text-brand-700" aria-label="الثوب" />
+                        : <span className="text-ink-300">—</span>}
+                    </td>
+                    <td className="px-2 py-2.5">
+                      {!saved && lines.length > 0 && (
+                        <span className="mb-0.5 block text-micro text-ink-400">مقرّره اليوم</span>
+                      )}
+                      {waiting && (
+                        <span className="block text-panel text-warn-700">
+                          ينتظر {BADGE_AR[waiting] ?? waiting}
+                        </span>
+                      )}
+                      {talqeen && (
+                        <span className="block text-panel text-ink-800">تلقين — {talqeen}</span>
+                      )}
+                      {lines.length === 0 && !talqeen && !waiting && (
+                        <span className="text-ink-300">—</span>
+                      )}
+                      {lines.map((l) => (
+                        <span key={l.kind} className="flex items-baseline gap-1.5 text-panel">
+                          {saved ? (
+                            l.recited
+                              ? <Check size={13} strokeWidth={2.6} className="shrink-0 translate-y-0.5 text-ok-700" aria-label="سمّع" />
+                              : <X size={13} strokeWidth={2.6} className="shrink-0 translate-y-0.5 text-risk-700" aria-label="لم يسمّع" />
+                          ) : <span className="w-[13px] shrink-0" />}
+                          <span className="shrink-0 text-ink-500">{l.kindAr}</span>
+                          <span className={cx(saved && !l.recited ? 'text-ink-400' : 'text-ink-900')}>
+                            {l.passage ?? '—'}
+                          </span>
+                          {saved && l.recited && (l.errors ?? 0) > 0 && (
+                            <span className="text-micro text-warn-700">· <Num>{l.errors}</Num> أخطاء</span>
+                          )}
+                        </span>
+                      ))}
+                      {saved && c!.note && (
+                        <span className="mt-0.5 block text-micro text-ink-500">{c!.note}</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Modal>
   );
 }

@@ -69,7 +69,15 @@ export function Combobox({
       if (!b) return;
       const room = window.innerHeight - b.bottom;
       const above = room < 260 && b.top > room;
-      setRect({ top: above ? b.top : b.bottom + 6, left: b.left, width: b.width, above });
+      /* Never narrower than a name can be read in, never wider than the
+         screen. A trigger in a narrow side panel used to hand its list the same
+         narrow width, and a four-part name with «المستوى ٥٦» beside it
+         truncated to «سطام عبد الله …». Anchored on the trigger's RIGHT edge —
+         this is a right-to-left page — and pulled back inside the viewport. */
+      const vw = window.innerWidth;
+      const width = Math.min(Math.max(b.width, 260), vw - 16);
+      const left = Math.min(Math.max(b.right - width, 8), vw - width - 8);
+      setRect({ top: above ? b.top : b.bottom + 6, left, width, above });
     };
     place();
     window.addEventListener('scroll', place, true);
@@ -166,21 +174,31 @@ export function Combobox({
             )}
             {filtered.map((o, i) => {
               const isSel = o.value === value;
+              /* A narrow list gives the NAME the whole line and puts the hint
+                 (المسار والمستوى) under it; a wide one keeps them side by side. */
+              const stack = rect.width < 360;
               return (
                 <li key={o.value} role="option" aria-selected={isSel}>
                   <button
                     type="button" onClick={() => commit(o.value)} onMouseEnter={() => setActive(i)}
                     className={cx(
-                      'flex w-full items-center gap-2 px-3 py-2 text-start text-panel transition-colors',
+                      'flex w-full items-start gap-2 px-3 py-2 text-start text-panel transition-colors',
                       i === active ? 'bg-brand-50' : 'bg-transparent',
                       isSel ? 'font-medium text-brand-800' : 'text-ink-800',
                     )}
                   >
-                    <span className="w-4 shrink-0">
+                    <span className="mt-0.5 w-4 shrink-0">
                       {isSel && <Check size={14} strokeWidth={2.4} className="text-brand-700" />}
                     </span>
-                    <span className="min-w-0 flex-1 truncate">{o.label}</span>
-                    {o.hint && <span className="shrink-0 text-micro text-ink-500">{o.hint}</span>}
+                    {stack ? (
+                      <span className="min-w-0 flex-1">
+                        <span className="block break-words leading-snug">{o.label}</span>
+                        {o.hint && <span className="mt-0.5 block text-micro font-normal text-ink-500">{o.hint}</span>}
+                      </span>
+                    ) : (<>
+                      <span className="min-w-0 flex-1 break-words leading-snug">{o.label}</span>
+                      {o.hint && <span className="shrink-0 text-micro text-ink-500">{o.hint}</span>}
+                    </>)}
                   </button>
                 </li>
               );

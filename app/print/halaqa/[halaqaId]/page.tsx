@@ -56,11 +56,15 @@ export default function HalaqaReport({ params }: { params: Promise<{ halaqaId: s
 
   return (
     <>
-      <div className="no-print mx-auto mb-4 flex w-[794px] max-w-full items-center justify-end px-2">
+      {/* عرضيّ — 22 Sep 2026: ten columns and a passage in one of them do not
+          fit a portrait page without crushing the names. A page box is
+          per-DOCUMENT, so the sheet declares its own. */}
+      <style>{'@page { size: A4 landscape; margin: 10mm; }'}</style>
+      <div className="no-print mx-auto mb-4 flex w-[1123px] max-w-full items-center justify-end px-2">
         <Btn variant="primary" icon={Printer} onClick={() => window.print()}>طباعة</Btn>
       </div>
 
-      <div className="sheet-a4 font-sans" dir="rtl">
+      <div className="sheet-a4 landscape font-sans" dir="rtl">
         <PrintHead title={`تقرير حلقة ${halaqa.teacher}`}
           sub={`جامع محمد العبدالكريم — ${toArabicDigits(plural(rows.length, 'طالب واحد', 'طالبان', 'طلاب', 'طالبًا'))}`
             + (attRate !== null ? ` · الحضور ${toArabicDigits(attRate)}٪ من ${toArabicDigits(att!.total.recorded)} تسجيلًا` : '')} />
@@ -76,7 +80,7 @@ export default function HalaqaReport({ params }: { params: Promise<{ halaqaId: s
                     recited something. Both were the uploaded file's term totals
                     before, which could not name a day and went stale the moment
                     the teacher's portal recorded one. */}
-                {['#', 'الطالب', 'الصف', 'المسار', 'المستوى', 'الحضور', 'سمّع', 'آخر اختبار', 'جمعية', 'النقاط'].map((h) => (
+                {['#', 'الطالب', 'الصف', 'المستوى', 'الحضور', 'سمّع', 'آخر درس', 'آخر اختبار', 'جمعية', 'النقاط'].map((h) => (
                   <th key={h} className={PCELL}>{h}</th>))}
               </tr>
             </thead>
@@ -94,12 +98,16 @@ export default function HalaqaReport({ params }: { params: Promise<{ halaqaId: s
                 return (
                   <tr key={s.id} className={cx('keep h-[26px]', assocPassed && 'bg-ok-100')}>
                     <td className={PCELL}><Num>{toArabicDigits(i + 1)}</Num></td>
-                    <td className={`${PCELL} text-start`}>{s.fullName}</td>
+                    <td className={`${PCELL} whitespace-nowrap text-start`}>{s.fullName}</td>
                     <td className={PCELL}>{s.grade || '—'}</td>
-                    <td className={PCELL}>{s.track ? TRACK_AR[s.track] : '—'}</td>
-                    <td className={PCELL}>
-                      {s.track === 'TALQEEN' ? '—'
-                        : s.currentLevel != null ? <Num>{toArabicDigits(s.currentLevel)}</Num> : '—'}
+                    {/* المسار والمستوى في خلية واحدة: «ذهبي ١٥». */}
+                    <td className={`${PCELL} whitespace-nowrap`}>
+                      {!s.track ? '—' : (<>
+                        {TRACK_AR[s.track]}
+                        {s.track !== 'TALQEEN' && s.currentLevel != null && (
+                          <> <Num>{toArabicDigits(s.currentLevel)}</Num></>
+                        )}
+                      </>)}
                     </td>
                     <td className={PCELL}>
                       {(() => {
@@ -116,6 +124,15 @@ export default function HalaqaReport({ params }: { params: Promise<{ halaqaId: s
                         const a = att?.students[s.id];
                         if (!a || a.recorded === 0) return '—';
                         return <Num>{toArabicDigits(a.recitedDays)}</Num>;
+                      })()}
+                    </td>
+                    <td className={`${PCELL} whitespace-nowrap`}>
+                      {(() => {
+                        const l = att?.lastLesson?.[s.id];
+                        if (!l) return '—';
+                        return (<>
+                          {l.surah}{l.ayah && <> <Num>{toArabicDigits(l.ayah)}</Num></>}
+                        </>);
                       })()}
                     </td>
                     <td className={`${PCELL} text-start`}>

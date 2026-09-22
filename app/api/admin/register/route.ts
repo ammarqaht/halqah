@@ -67,8 +67,21 @@ export async function GET(req: Request) {
     }),
   ]);
 
+  /* مقرّر اليوم لمن لم يُسجَّل بعد — مؤشّره حيث وقف. Only for one halaqa:
+     it is what the day's window on the dashboard asks «ماذا يسمّع اليوم». */
+  const pointers = halaqaId
+    ? await db.studentProgress.findMany({
+        where: { studentId: { in: students.map((st) => st.id) } },
+        select: {
+          studentId: true, track: true, level: true, assignmentNo: true,
+          awaitingExam: true, talqeenSurah: true, talqeenAyah: true,
+        },
+      })
+    : [];
+  const pointerOf = new Map(pointers.map((p) => [p.studentId, p]));
+
   /* سور كل مقرّر وآياته — استعلام واحد لكل (مسار، مستوى) لمسته البطاقات. */
-  const passages = await passagesFor(entries);
+  const passages = await passagesFor([...entries, ...pointers]);
 
   /* Keyed by the STUDENT, not the halaqa stamped on the row: a boy who moved
      halaqa mid-term keeps his history where it happened (that is why the column
@@ -99,6 +112,8 @@ export async function GET(req: Request) {
           thobe: e.thobe,
           assignmentNo: e.assignmentNo,
           incomplete: e.incomplete,
+          talqeen: e.talqeenSurah
+            ? `${e.talqeenSurah}${e.talqeenAyah != null ? ` ${e.talqeenAyah}` : ''}` : null,
           note: e.note || null,
           savedBy: e.savedByName || null,
           savedByRole: e.savedByRole,
@@ -109,10 +124,22 @@ export async function GET(req: Request) {
       });
 
       const seen = cells.filter((c) => c.status !== null);
+      const ptr = pointerOf.get(st.id);
       return {
         id: st.id, fullName: st.fullName,
         track: st.track, level: st.currentLevel,
         cells,
+        /* Where his pointer stands now: the مقرّر he is due to recite next. */
+        planned: !ptr ? null : {
+          assignmentNo: ptr.assignmentNo,
+          awaitingExam: ptr.awaitingExam,
+          talqeen: ptr.talqeenSurah
+            ? `${ptr.talqeenSurah}${ptr.talqeenAyah != null ? ` ${ptr.talqeenAyah}` : ''}` : null,
+          lines: KIND_ORDER.map((kind) => ({
+            kind, kindAr: KIND_AR[kind],
+            passage: passageLabel(passages.get(passageKey(ptr.track, ptr.level, ptr.assignmentNo, kind))),
+          })).filter((l) => l.passage),
+        },
         present: seen.filter((c) => c.status === 'PRESENT').length,
         late: seen.filter((c) => c.status === 'LATE').length,
         absent: seen.filter((c) => c.status === 'ABSENT').length,

@@ -14,7 +14,7 @@
    never prints. Sheets already printed are paper; they do not change. */
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Save, AlertTriangle, Users2, Printer, Inbox } from 'lucide-react';
+import { Save, AlertTriangle, Users2, Printer, Inbox, Award } from 'lucide-react';
 import Link from 'next/link';
 import { TopBar } from '@/components/TopBar';
 import { Sheet, SheetHead } from '@/components/Sheet';
@@ -24,7 +24,7 @@ import { Grid, GridCell } from '@/components/Grid';
 import { Num, juzPhrase } from '@/components/Num';
 import { usePanel } from '@/components/PanelState';
 import { store, useDB, ensureCurriculum } from '@/lib/store';
-import { incompleteDays, DEFAULT_DAY_COUNT, coverage } from '@/lib/curriculum';
+import { incompleteDays, DEFAULT_DAY_COUNT, DEFAULT_EXAM_DAYS, coverage } from '@/lib/curriculum';
 import { ajzaExact } from '@/lib/exams';
 import { ASSOCIATION_NOTE } from '@/lib/importers/curriculum';
 import {
@@ -36,6 +36,13 @@ import { cx } from '@/lib/cx';
 const KINDS: PlanKind[] = ['MURAJAA_KUBRA', 'MURAJAA_SUGHRA', 'DARS'];
 const FIELDS = ['fromSurah', 'fromAyah', 'toSurah', 'toAyah', 'note'] as const;
 const HEADS = ['اليوم', 'المقرَّر', 'من سورة', 'من آية', 'إلى سورة', 'إلى آية', 'ملاحظة', ''];
+/* Days 12 and 24 are the two badges — «لا بمقرّر حفظ». The sheet prints them
+   as one band, so the editor draws the same band and offers nothing to type:
+   a range written there would never reach a student. */
+const BADGE_OF: Record<number, string> = {
+  [DEFAULT_EXAM_DAYS.BADGE_GOLDEN]: 'الوسام الذهبي',
+  [DEFAULT_EXAM_DAYS.BADGE_DIAMOND]: 'الوسام الماسي',
+};
 
 function PlanEditorScreen() {
   const { panelOpen, setPanelOpen } = usePanel();
@@ -188,7 +195,8 @@ function LevelCurriculumEditor({ onToast }: { onToast: (s: string) => void }) {
   /* Which days are not filled in. A gap prints as a blank row on a student's
      sheet, so it is named here rather than discovered on the paper. */
   const gaps = useMemo(
-    () => (levelNum === null ? [] : incompleteDays(draft, dayCount)), [draft, dayCount, levelNum]);
+    () => (levelNum === null ? [] : incompleteDays(draft, dayCount).filter((g) => !BADGE_OF[g.day])),
+    [draft, dayCount, levelNum]);
 
   /* Jumping to a gap puts the caret in the first field it is missing, which is
      «من سورة» — the column the grid completes. */
@@ -302,9 +310,44 @@ function LevelCurriculumEditor({ onToast }: { onToast: (s: string) => void }) {
                       /* One flat index across the whole sheet: the grid walks
                          off the end of a row onto the next, the way Tab does. */
                       const r = (dayNo - 1) * KINDS.length + i;
+                      const badge = BADGE_OF[dayNo];
+                      /* The row above, stepping over a badge day — it has no
+                         lines, and the surah offer should come from the last
+                         day that did. */
+                      const prevDay = dayNo - 1 - (BADGE_OF[dayNo - 1] ? 1 : 0);
                       const above = r === 0 ? undefined
-                        : draft.find((d) => d.dayNo === (i === 0 ? dayNo - 1 : dayNo)
+                        : draft.find((d) => d.dayNo === (i === 0 ? prevDay : dayNo)
                                          && d.kind === KINDS[(i + KINDS.length - 1) % KINDS.length]);
+                      if (badge) {
+                        if (i > 0) return null;
+                        return (
+                          <tr key={`${dayNo}-badge`} className="border-b border-ink-150">
+                            <td className="px-3 py-2.5 align-top">
+                              <span className="block font-medium text-ink-900"><Num>{dayNo}</Num></span>
+                              <label className="mt-1.5 flex cursor-pointer items-start gap-1.5"
+                                title="يوم اختبار الجمعية">
+                                <input type="checkbox" checked={hasAssociation(dayNo)}
+                                  onChange={(e) => setAssociation(dayNo, e.target.checked)}
+                                  className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded-sm border-ink-300 accent-assoc-700" />
+                                <span className="text-[10px] leading-tight text-ink-500">جمعية</span>
+                              </label>
+                            </td>
+                            <td colSpan={FIELDS.length + 1} className="px-1.5 py-1.5">
+                              <div className={cx('flex h-11 items-center gap-2 rounded-lg border px-4 text-body font-medium',
+                                dayNo === DEFAULT_EXAM_DAYS.BADGE_GOLDEN
+                                  ? 'border-warn-200 bg-warn-100 text-warn-700'
+                                  : 'border-info-200 bg-info-100 text-info-700')}>
+                                <Award size={16} className="shrink-0" />
+                                اختبار {badge}
+                                {hasAssociation(dayNo) && (
+                                  <span className="text-assoc-700">· واختبار الجمعية</span>
+                                )}
+                                <span className="ms-auto text-micro font-normal opacity-75">لا مقرّر حفظ في هذا اليوم</span>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      }
                       return (
                         <tr key={`${dayNo}-${kind}`} className="border-b border-ink-150">
                           {i === 0 ? (

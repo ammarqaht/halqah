@@ -9,6 +9,8 @@ export type AttendancePayload = {
   students: Record<string, Attendance>;
   total: Attendance;
   lastDay: string | null;
+  /** Only when asked for a halaqa or a student. */
+  lastLesson?: Record<string, { day: string; surah: string; ayah: string }>;
 };
 
 /* حصيلة الحضور من سجلّ المعلم — للتقارير المطبوعة.

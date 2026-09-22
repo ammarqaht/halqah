@@ -46,7 +46,7 @@ const iso = (d: Date) => {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 };
 
-type Id = 'roster' | 'absence' | 'incomplete' | 'weekly' | 'due' | 'honour' | 'knights';
+type Id = 'roster' | 'absence' | 'incomplete' | 'due' | 'honour' | 'knights';
 
 type Report = {
   id: Id;
@@ -57,9 +57,6 @@ type Report = {
   print: string;
   /** True when the sheet covers the chosen period. */
   periodic?: boolean;
-  /** الورقة الأسبوعية is a blank form to fill with a pen. There is nothing to
-      read on a screen: it exists for the afternoon the phone is dead. */
-  paperOnly?: boolean;
   group: 'halaqa' | 'outward';
 };
 
@@ -93,11 +90,6 @@ const REPORTS: Report[] = [
     id: 'honour', title: 'لوحة الشرف', icon: Trophy, group: 'outward',
     body: 'أعلى خمسة في النقاط — تُعلَّق في مكان الحلقة.',
     print: '/teacher/print/honour',
-  },
-  {
-    id: 'weekly', title: 'الورقة الأسبوعية', icon: Printer, group: 'halaqa', paperOnly: true,
-    body: 'ورقة فارغة تُملأ بالقلم، للاحتياط عند تعطّل الجوال.',
-    print: '/teacher/print/weekly',
   },
 ];
 
@@ -167,18 +159,10 @@ function Group({ title, reports, onOpen }: {
       <ul className="space-y-2">
         {reports.map((r) => (
           <li key={r.id}>
-            {r.paperOnly ? (
-              /* لا شيء يُقرأ فيها على الشاشة — فتذهب إلى الطابعة مباشرة. */
-              <Link href={r.print} target="_blank"
-                className="press block rounded-2xl border border-ink-150 bg-paper px-[18px] py-3.5 shadow-soft transition-colors hover:border-brand-200">
-                <Row r={r} trailing={<Printer size={16} className="text-ink-300" strokeWidth={1.9} />} />
-              </Link>
-            ) : (
-              <button onClick={() => onOpen(r.id)}
-                className="press block w-full rounded-2xl border border-ink-150 bg-paper px-[18px] py-3.5 text-start shadow-soft transition-colors hover:border-brand-200">
-                <Row r={r} trailing={<ChevronLeft size={16} className="text-ink-300" strokeWidth={1.9} />} />
-              </button>
-            )}
+            <button onClick={() => onOpen(r.id)}
+              className="press block w-full rounded-2xl border border-ink-150 bg-paper px-[18px] py-3.5 text-start shadow-soft transition-colors hover:border-brand-200">
+              <Row r={r} trailing={<ChevronLeft size={16} className="text-ink-300" strokeWidth={1.9} />} />
+            </button>
           </li>
         ))}
       </ul>
@@ -196,7 +180,6 @@ function Row({ r, trailing }: { r: Report; trailing: React.ReactNode }) {
         <p className="flex flex-wrap items-center gap-2 text-base2 font-medium text-ink-900">
           {r.title}
           {r.periodic && <Chip tone="ink">بالمدة</Chip>}
-          {r.paperOnly && <Chip tone="ink">للطباعة</Chip>}
         </p>
         <p className="mt-0.5 text-xs2 leading-relaxed text-ink-600">{r.body}</p>
       </div>

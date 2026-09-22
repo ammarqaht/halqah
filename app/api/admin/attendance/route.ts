@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { readSession } from '@/lib/auth';
 import { summariseAll, totalFor, type DayRow } from '@/lib/attendance';
+import { passagesFor, passageKey } from '@/lib/passage';
 
 /* حصيلة الحضور والتسميع للتقارير.
  *
@@ -40,12 +41,39 @@ export async function GET(req: Request) {
     },
     select: {
       studentId: true, day: true, status: true, thobe: true, incomplete: true,
+      track: true, level: true, assignmentNo: true, talqeenSurah: true, talqeenAyah: true,
       lines: { select: { kind: true, recited: true, errors: true } },
     },
   });
 
   const rows = entries as unknown as DayRow[];
   const per = summariseAll(rows);
+
+  /* «آخر درس» — where the lesson line last reached: the latest afternoon he
+     recited his الدرس, read as the surah and ayah it ENDS on. A talqeen boy
+     has no lesson line; where his teacher left him is his last lesson. Only
+     for a halaqa or one boy — the whole mosque's history is not a report. */
+  const lastLesson: Record<string, { day: string; surah: string; ayah: string }> = {};
+  if (halaqaId || studentId) {
+    const latest = new Map<string, typeof entries[number]>();
+    for (const e of entries) {
+      const lesson = e.talqeenSurah
+        || e.lines.some((l) => l.kind === 'DARS' && l.recited);
+      if (!lesson) continue;
+      const prev = latest.get(e.studentId);
+      if (!prev || prev.day < e.day) latest.set(e.studentId, e);
+    }
+    const passages = await passagesFor([...latest.values()]);
+    for (const [sid, e] of latest) {
+      if (e.talqeenSurah) {
+        lastLesson[sid] = { day: e.day, surah: e.talqeenSurah, ayah: e.talqeenAyah != null ? String(e.talqeenAyah) : '' };
+        continue;
+      }
+      const p = passages.get(passageKey(e.track, e.level, e.assignmentNo, 'DARS'));
+      const surah = p?.toSurah || p?.fromSurah;
+      if (surah) lastLesson[sid] = { day: e.day, surah, ayah: p?.toAyah || p?.fromAyah || '' };
+    }
+  }
 
   return NextResponse.json({
     /** كم يومًا سُجِّل في النظام كلّه — الشاشة تصمت قبل أول حفظ. */
@@ -54,6 +82,8 @@ export async function GET(req: Request) {
     to: ok(to) ? to : null,
     /** حصيلة كل طالب، بمعرّفه. */
     students: Object.fromEntries(per),
+    /** آخر درس سمّعه كل طالب — السورة وآخر آية. */
+    lastLesson,
     /** وحصيلة المجموع — محسوبة على كل عصر لا كمتوسّط متوسّطات. */
     total: totalFor(rows),
     /** آخر يوم سُجِّل في هذا النطاق، ليقول التقرير إلى متى يمتدّ. */

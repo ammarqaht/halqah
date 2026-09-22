@@ -227,7 +227,7 @@ export default function TeacherHome() {
             )}
 
             {feed.exams.length > 0 && (
-            <ul className="no-bar -mx-5 flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-5 pb-1 md:mx-0 md:px-0">
+            <ul className="no-bar -mx-5 flex snap-x snap-mandatory scroll-px-5 gap-2.5 overflow-x-auto px-5 pb-1 md:mx-0 md:scroll-px-0 md:px-0">
               {feed.exams.map((e) => {
                 const ok = e.passed === true;
                 const bad = e.passed === false;

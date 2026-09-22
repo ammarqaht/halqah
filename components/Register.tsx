@@ -19,14 +19,14 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Check, X, Clock, Minus, ChevronRight, ChevronLeft, ChevronDown,
-  CalendarX, AlertTriangle,
+  Check, X, Clock, Minus, ChevronDown, CalendarX, AlertTriangle,
 } from 'lucide-react';
 import { Sheet } from '@/components/Sheet';
 import { Num } from '@/components/Num';
 import { Empty } from '@/components/ui';
 import { DayDetail, type StripDay } from '@/components/WeekStrip';
-import { WEEKDAY_AR, dayLabel, weekLabel } from '@/lib/week';
+import { WeekBar } from '@/components/WeekBar';
+import { WEEKDAY_AR, dayLabel } from '@/lib/week';
 import { halaqaLabel, shortName } from '@/lib/normalise';
 import { cx } from '@/lib/cx';
 
@@ -56,7 +56,13 @@ const ICON: Record<string, typeof Check> = { PRESENT: Check, LATE: Clock, ABSENT
 export function Register({ halaqaId }: { halaqaId?: string | null }) {
   const [d, setD] = useState<Payload | null>(null);
   const [week, setWeek] = useState<string | null>(null);
-  const [open, setOpen] = useState<string | null>(null);
+  /* Which halaqat are open. A SET, and the header only ever opens one:
+     «بطاقة التفاصيل ما ابيها تختفي اذا ضغطت على ترويستها» (client, 22 Sep
+     2026) — the card he is reading must not vanish under a stray click on its
+     title. Closing is the chevron's job alone. */
+  const [open, setOpen] = useState<Set<string>>(new Set());
+  const openOne = (id: string) => setOpen((s) => (s.has(id) ? s : new Set(s).add(id)));
+  const closeOne = (id: string) => setOpen((s) => { const n = new Set(s); n.delete(id); return n; });
   const [cell, setCell] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -73,7 +79,7 @@ export function Register({ halaqaId }: { halaqaId?: string | null }) {
   }, [week, halaqaId]);
 
   /* One halaqa asked for: open it, there is nothing to choose between. */
-  useEffect(() => { if (halaqaId) setOpen(halaqaId); }, [halaqaId]);
+  useEffect(() => { if (halaqaId) openOne(halaqaId); }, [halaqaId]);
 
   /* What needs him first.
      The first cut of this ranked «لم يُسجَّل» above everything, reasoning that
@@ -118,18 +124,9 @@ export function Register({ halaqaId }: { halaqaId?: string | null }) {
   return (
     <>
       {/* ── الأسبوع وحصيلته ────────────────────────────────────────────────── */}
-      <Sheet className="rise mb-4">
-        <div className="flex items-center justify-between gap-3">
-          <button onClick={() => setWeek(d.prevWeek)} disabled={busy}
-            aria-label="الأسبوع السابق"
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-ink-200 text-ink-600 transition hover:bg-page disabled:opacity-40">
-            <ChevronRight size={17} />
-          </button>
-
-          <div className={cx('min-w-0 flex-1 text-center transition', busy && 'opacity-40')}>
-            <p className="text-base2 text-ink-900">
-              {d.isThisWeek ? 'هذا الأسبوع' : weekLabel(d.week)}
-            </p>
+      <div className="rise mb-4">
+        <WeekBar week={d.week} isThisWeek={d.isThisWeek}
+          prevWeek={d.prevWeek} nextWeek={d.nextWeek} onChange={setWeek} busy={busy}>
             <p className="mt-1 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-cap">
               <span className="text-brand-700"><Num>{all.present + all.late}</Num> حضور</span>
               <span className="text-risk-700"><Num>{all.absent}</Num> غياب</span>
@@ -140,27 +137,25 @@ export function Register({ halaqaId }: { halaqaId?: string | null }) {
                 </span>
               )}
             </p>
-          </div>
-
-          <button onClick={() => d.nextWeek && setWeek(d.nextWeek)} disabled={busy || !d.nextWeek}
-            aria-label="الأسبوع التالي"
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-ink-200 text-ink-600 transition hover:bg-page disabled:opacity-30">
-            <ChevronLeft size={17} />
-          </button>
-        </div>
-      </Sheet>
+        </WeekBar>
+      </div>
 
       {/* ── صفّ لكل حلقة ───────────────────────────────────────────────────── */}
       <Sheet className="rise" pad={false}>
         <ul>
           {ordered.map((h, i) => {
-            const isOpen = open === h.id;
+            const isOpen = open.has(h.id);
             const quiet = h.present + h.late + h.absent === 0;
+            /* A register scoped to one halaqa is that halaqa: always open, and
+               its header is a title, not a switch. */
+            const fixed = !!halaqaId;
             return (
               <li key={h.id} className={cx(i > 0 && 'border-t border-ink-150')}>
-                <button onClick={() => setOpen(isOpen ? null : h.id)}
-                  className={cx('flex w-full items-center gap-4 px-5 py-3.5 text-start transition hover:bg-page/60',
-                    isOpen && 'bg-page/40')}>
+                <div role={isOpen ? undefined : 'button'} tabIndex={isOpen ? undefined : 0}
+                  onClick={isOpen ? undefined : () => openOne(h.id)}
+                  onKeyDown={isOpen ? undefined : (e) => { if (e.key === 'Enter') openOne(h.id); }}
+                  className={cx('flex w-full items-center gap-4 px-5 py-3.5 text-start transition',
+                    isOpen ? 'bg-page/40' : 'cursor-pointer hover:bg-page/60')}>
                   {/* الاسم وحصيلته */}
                   <div className="min-w-0 flex-1">
                     <p className="flex items-center gap-2 truncate text-base2 text-ink-900">
@@ -190,25 +185,18 @@ export function Register({ halaqaId }: { halaqaId?: string | null }) {
                     </p>
                   </div>
 
-                  {/* شريط الأيام الخمسة — مضغوط، يُقرأ بلمحة */}
-                  <div className="hidden shrink-0 gap-1 sm:flex" aria-hidden>
-                    {h.days.map((x) => (
-                      <span key={x.day}
-                        title={`${dayLabel(x.day)} — ${x.state === 'NONE' ? 'لم يُسجَّل' : `${x.saved} من ${x.roster}`}`}
-                        className={cx('grid h-8 w-8 place-items-center rounded-md border text-micro tabular-nums',
-                          x.state === 'NONE' ? 'border-dashed border-ink-200 text-ink-300'
-                            : x.state === 'PARTIAL' ? 'border-warn-200 bg-warn-100/50 text-warn-700'
-                            : 'border-brand-200 bg-brand-50 text-brand-700',
-                          x.future && 'opacity-35',
-                          x.day === d.today && 'ring-2 ring-ink-300 ring-offset-1')}>
-                        {x.state === 'NONE' ? '·' : x.present + x.late}
-                      </span>
-                    ))}
-                  </div>
-
-                  <ChevronDown size={16}
-                    className={cx('shrink-0 text-ink-400 transition', isOpen && 'rotate-180')} />
-                </button>
+                  {/* The five small squares that sat here are gone — «فكرتها
+                      غير جيدة وغير واضحة المعنى». A day's attendance is written
+                      under that day's name in the table, in words. */}
+                  {fixed ? null : isOpen ? (
+                    <button type="button" onClick={() => closeOne(h.id)} aria-label="إخفاء الطلاب"
+                      className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-ink-400 transition hover:bg-page hover:text-ink-700">
+                      <ChevronDown size={16} className="rotate-180" />
+                    </button>
+                  ) : (
+                    <ChevronDown size={16} className="shrink-0 text-ink-400" />
+                  )}
+                </div>
 
                 {isOpen && <HalaqaDetail h={h} today={d.today} cell={cell} setCell={setCell} />}
               </li>
@@ -255,9 +243,19 @@ function HalaqaDetail({
           <thead>
             <tr className="text-cap text-ink-500">
               <th className="pb-2 pe-3 text-start font-medium">الطالب</th>
-              {WEEKDAY_AR.map((w) => (
-                <th key={w} className="px-1 pb-2 text-center font-medium">{w}</th>
-              ))}
+              {WEEKDAY_AR.map((w, i) => {
+                const x = h.days[i];
+                return (
+                  <th key={w} className="px-1 pb-2 text-center align-bottom font-medium">
+                    <span className={cx('block', x?.day === today && 'text-ink-900')}>{w}</span>
+                    {/* «اسفل اسم اليوم بخط صغير: الحضور ٥» */}
+                    <span className="block text-[10px] font-normal leading-tight text-ink-400">
+                      {!x || x.state === 'NONE' ? '—'
+                        : <>الحضور <Num className="text-brand-700">{x.present + x.late}</Num></>}
+                    </span>
+                  </th>
+                );
+              })}
               <th className="ps-3 pb-2 text-center font-medium">سمّع</th>
               <th className="ps-2 pb-2 text-center font-medium">أخطاء</th>
             </tr>

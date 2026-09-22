@@ -11,12 +11,11 @@
  * ثمانية وعشرين يومًا» is arithmetic nobody asked for.
  */
 import { useEffect, useState } from 'react';
-import { ChevronRight, ChevronLeft, CalendarX } from 'lucide-react';
+import { CalendarX } from 'lucide-react';
 import { Sheet, SheetHead } from '@/components/Sheet';
 import { Num } from '@/components/Num';
 import { WeekStrip, DayDetail, type StripDay } from '@/components/WeekStrip';
-import { weekLabel } from '@/lib/week';
-import { cx } from '@/lib/cx';
+import { WeekBar } from '@/components/WeekBar';
 
 type Payload = {
   today: string; week: string; prevWeek: string; nextWeek: string | null;
@@ -64,20 +63,9 @@ export function StudentWeek({ studentId }: { studentId: string }) {
     <Sheet>
       <SheetHead title="حضوره وتسميعه" meta="من سجلّ معلمه" />
 
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <button onClick={() => setWeek(d.prevWeek)} disabled={busy}
-          aria-label="الأسبوع السابق"
-          className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-ink-200 text-ink-600 transition hover:bg-page disabled:opacity-40">
-          <ChevronRight size={15} />
-        </button>
-        <p className={cx('text-panel text-ink-700 transition', busy && 'opacity-40')}>
-          {d.isThisWeek ? 'هذا الأسبوع' : weekLabel(d.week)}
-        </p>
-        <button onClick={() => d.nextWeek && setWeek(d.nextWeek)} disabled={busy || !d.nextWeek}
-          aria-label="الأسبوع التالي"
-          className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-ink-200 text-ink-600 transition hover:bg-page disabled:opacity-30">
-          <ChevronLeft size={15} />
-        </button>
+      <div className="mb-3">
+        <WeekBar size="sm" week={d.week} isThisWeek={d.isThisWeek}
+          prevWeek={d.prevWeek} nextWeek={d.nextWeek} onChange={setWeek} busy={busy} />
       </div>
 
       <WeekStrip days={d.days} today={d.today} onPick={setOpen} picked={open} />

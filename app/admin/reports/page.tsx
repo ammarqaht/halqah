@@ -14,6 +14,7 @@ import { usePanel } from '@/components/PanelState';
 import { REPORTS, type ReportId } from '@/components/ReportsPanel';
 import { useDB } from '@/lib/store';
 import { shortName } from '@/lib/normalise';
+import { cx } from '@/lib/cx';
 
 /** Where each report actually lives, once its choices are filled in. */
 function printHref(id: ReportId, halaqa: string, student: string, sections = '',
@@ -52,6 +53,8 @@ function ReportsScreen() {
   const report = REPORTS.find((r) => r.id === id) ?? REPORTS[0];
   const halaqa = sp.get('halaqa') ?? '';
   const student = sp.get('student') ?? '';
+  /* The sheets that print sideways get a frame that is sideways too. */
+  const landscape = id === 'halaqa' || id === 'registration';
   const href = printHref(id, halaqa, student, sp.get('sections') ?? '',
     sp.get('from') ?? '', sp.get('to') ?? '');
 
@@ -117,10 +120,11 @@ function ReportsScreen() {
           /* A4 at its real proportions (794 × 1123), scaled to fit the column.
              Rendering the print route itself means the preview cannot drift
              from the sheet: they are the same page. */
-          <div className="rise mx-auto w-full max-w-[860px]">
-            <div className="overflow-hidden rounded-xl border border-ink-200 bg-white shadow-soft">
+          <div className={cx('rise mx-auto w-full', landscape ? 'max-w-[1190px]' : 'max-w-[860px]')}>
+            <div className="overflow-x-auto overflow-y-hidden rounded-xl border border-ink-200 bg-white shadow-soft">
               <iframe id="report-frame" key={href} src={href} title={report.label}
-                className="block h-[1123px] w-full border-0 bg-white" />
+                className={cx('block w-full border-0 bg-white',
+                  landscape ? 'h-[900px] min-w-[1140px]' : 'h-[1123px]')} />
             </div>
             <p className="mt-3 text-center text-micro text-ink-500">
               هذه الصفحة نفسها هي ما يُطبع — بمقاس A4.

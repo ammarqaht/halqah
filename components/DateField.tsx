@@ -60,7 +60,7 @@ function Gregorian({ iso, year = true }: { iso: string; year?: boolean }) {
 
 /* ── the grid both fields share ──────────────────────────────────────────── */
 
-function MonthGrid({ cursor, setCursor, max, min, isOn, inRange, onPick, onHover }: {
+export function MonthGrid({ cursor, setCursor, max, min, isOn, inRange, onPick, onHover }: {
   cursor: Date;
   setCursor: (d: Date) => void;
   max?: string; min?: string;

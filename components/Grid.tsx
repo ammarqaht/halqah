@@ -22,6 +22,7 @@ import { INPUT } from '@/components/ui';
 type Ctx = {
   register: (key: string, el: HTMLInputElement | null) => void;
   focus: (row: number, col: number) => void;
+  has: (row: number, col: number) => boolean;
   rows: number; cols: number;
 };
 const GridCtx = createContext<Ctx | null>(null);
@@ -44,8 +45,10 @@ export function Grid({ rows, cols, children }: {
     el.select();
   }, []);
 
+  const has = useCallback((row: number, col: number) => cells.current.has(`${row}:${col}`), []);
+
   return (
-    <GridCtx.Provider value={{ register, focus, rows, cols }}>{children}</GridCtx.Provider>
+    <GridCtx.Provider value={{ register, focus, has, rows, cols }}>{children}</GridCtx.Provider>
   );
 }
 
@@ -102,6 +105,10 @@ export function GridCell({
        in a spreadsheet — it is one long list of cells, not a set of islands. */
     if (c < 0) { c = grid.cols - 1; r -= 1; }
     if (c >= grid.cols) { c = 0; r += 1; }
+    /* A row may hold no cells at all (a badge day) — step over it in the
+       direction of travel rather than stopping at it. */
+    const step = r === row ? 0 : Math.sign(r - row);
+    while (step && r >= 0 && r < grid.rows && !grid.has(r, c)) r += step;
     if (r < 0 || r >= grid.rows) return;
     grid.focus(r, c);
   };

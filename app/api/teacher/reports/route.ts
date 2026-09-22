@@ -21,7 +21,7 @@ import { PLAN_KIND_AR, TRACK_AR, type PlanKind, type Track } from '@/lib/types';
    truncating a sheet the teacher will hand to a parent. */
 
 export type ReportKind =
-  'ROSTER' | 'ABSENCE' | 'INCOMPLETE' | 'DUE' | 'WEEKLY' | 'KNIGHTS';
+  'ROSTER' | 'ABSENCE' | 'INCOMPLETE' | 'DUE' | 'KNIGHTS';
 
 
 export async function GET(req: Request) {
@@ -66,7 +66,7 @@ export async function GET(req: Request) {
 
   /* ── كشف حلقتي — «طلابه ومستوياتهم ومقرّراتهم وآخر تسميع ونقاطهم، ورقة واحدة
      يحملها معه». The one report he carries rather than sends. */
-  if (kind === 'ROSTER' || kind === 'WEEKLY') {
+  if (kind === 'ROSTER') {
     const [txns, lastRecited, plans, exams] = await Promise.all([
       db.pointTxn.findMany({ where: { studentId: { in: ids } } }),
       db.dayEntry.findMany({
@@ -91,10 +91,6 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
       kind, ...head,
-      /** The weekly sheet needs the days its columns are headed with — «الورقة
-          الحالية بأعمدتها، للاحتياط عند تعطّل الجوال». */
-      days: kind === 'WEEKLY'
-        ? daysInPeriod(from, to, weekdays, today).slice(-7) : undefined,
       rows: students.map((s) => {
         const track = s.track as Track | null;
         const plan = planOf.get(s.id) ?? null;
