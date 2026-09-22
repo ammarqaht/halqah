@@ -236,7 +236,13 @@ async function pushNow(): Promise<void> {
        server now agree, and the next hydrate may take the server's word for
        every list — an empty one included. A 401, a 409 or a dead connection
        leaves the marks standing, which is exactly when they are needed. */
-    if (res.ok) { readUnsent(); unsent.clear(); writeUnsent(); }
+    if (res.ok) {
+      readUnsent(); unsent.clear(); writeUnsent();
+      /* والمنهج معها: علامته تُرفع عند استيراده أو تعديل مستوى منه، وتبقى
+         مرفوعة لو لم تُمسح هنا — فيرسل المتصفّح ٣٥٧٢ صفًّا مع كل حفظ بعده،
+         وهي أثقل ما كان في الحمل وأُخرج منه لهذا السبب بعينه. */
+      curriculumDirty = false;
+    }
     /* If the server could not place some rows, say so — a save that keeps two
        thirds of what it was given must not read as a clean save. */
     if (res.ok) {

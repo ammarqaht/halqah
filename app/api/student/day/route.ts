@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { scope } from '../_scope';
 import { isoDate } from '@/lib/dates';
 import { weekOf, weekDays, shiftWeek } from '@/lib/week';
+import { passagesFor, passageKey, passageLabel } from '@/lib/passage';
 
 /* حضوري وتسميعي — what his teacher wrote about him, read back to him.
  *
@@ -55,6 +56,8 @@ export async function GET(req: Request) {
     include: { lines: true },
   });
   const byDay = new Map(entries.map((e) => [e.day, e]));
+  /* سوره وآياته — فيعرف ما سمّعه لا أنه سمّع فحسب. */
+  const passages = await passagesFor(entries);
 
   const shape = (day: string) => {
     const e = byDay.get(day);
@@ -68,6 +71,8 @@ export async function GET(req: Request) {
       .map((l) => ({
         kind: l.kind, kindAr: KIND_AR[l.kind] ?? l.kind,
         recited: l.recited, errors: l.errors, note: l.note || null,
+        passage: passageLabel(
+          passages.get(passageKey(e.track, e.level, e.assignmentNo, l.kind))),
       }));
     return {
       day,

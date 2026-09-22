@@ -18,6 +18,7 @@ import { cx } from '@/lib/cx';
 
 type Line = {
   kind: string; kindAr: string; recited: boolean; errors: number; note: string | null;
+  passage?: string | null;
 };
 type Day = {
   day: string; status: 'PRESENT' | 'LATE' | 'ABSENT' | null; statusAr: string | null;
@@ -141,14 +142,24 @@ export function MyDay() {
                   {l.recited
                     ? <Check size={13} className="shrink-0 translate-y-0.5 text-brand-700" />
                     : <Minus size={13} className="shrink-0 translate-y-0.5 text-ink-400" />}
-                  <span className={cx(l.recited ? 'text-ink-800' : 'text-ink-500')}>{l.kindAr}</span>
-                  {l.recited && l.errors > 0 && (
-                    <span className="text-cap text-ink-500">
-                      <Num>{l.errors}</Num>{' '}
-                      {l.errors === 1 ? 'خطأ' : l.errors === 2 ? 'خطآن' : 'أخطاء'}
+                  <div className="min-w-0 flex-1">
+                    <span className="flex flex-wrap items-baseline gap-x-2">
+                      <span className={cx(l.recited ? 'text-ink-800' : 'text-ink-500')}>{l.kindAr}</span>
+                      {/* سوره وآياته — فيعرف ماذا سمّع لا أنه سمّع فحسب. */}
+                      {l.passage && (
+                        <span className={cx('text-cap', l.recited ? 'text-ink-600' : 'text-ink-400')}>
+                          {l.passage}
+                        </span>
+                      )}
+                      {l.recited && l.errors > 0 && (
+                        <span className="text-cap text-ink-500">
+                          · <Num>{l.errors}</Num>{' '}
+                          {l.errors === 1 ? 'خطأ' : l.errors === 2 ? 'خطآن' : 'أخطاء'}
+                        </span>
+                      )}
                     </span>
-                  )}
-                  {l.note && <span className="text-cap text-ink-500">«{l.note}»</span>}
+                    {l.note && <span className="block text-cap text-ink-500">«{l.note}»</span>}
+                  </div>
                 </li>
               ))}
             </ul>

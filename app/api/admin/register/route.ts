@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { readSession } from '@/lib/auth';
 import { isoDate } from '@/lib/dates';
 import { weekOf, weekDays, shiftWeek } from '@/lib/week';
+import { passagesFor, passageKey, passageLabel } from '@/lib/passage';
 
 /* كشف الحضور والتسميع — ما سجّله المعلمون، حلقةً حلقة.
  *
@@ -66,6 +67,9 @@ export async function GET(req: Request) {
     }),
   ]);
 
+  /* سور كل مقرّر وآياته — استعلام واحد لكل (مسار، مستوى) لمسته البطاقات. */
+  const passages = await passagesFor(entries);
+
   /* Keyed by the STUDENT, not the halaqa stamped on the row: a boy who moved
      halaqa mid-term keeps his history where it happened (that is why the column
      is denormalised), but this register is «who is in my halaqa now». */
@@ -84,6 +88,9 @@ export async function GET(req: Request) {
           .map((l) => ({
             kind: l.kind, kindAr: KIND_AR[l.kind] ?? l.kind,
             recited: l.recited, errors: l.errors, note: l.note || null,
+            /* «سمّع الدرس» وحدها لا تقول ماذا سمّع. */
+            passage: passageLabel(
+              passages.get(passageKey(e.track, e.level, e.assignmentNo, l.kind))),
           }));
         return {
           day, future: false,

@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { readSession } from '@/lib/auth';
 import { isoDate } from '@/lib/dates';
 import { weekOf, weekDays, shiftWeek } from '@/lib/week';
+import { passagesFor, passageKey, passageLabel } from '@/lib/passage';
 
 /* أسبوع طالب واحد — للمشرف.
  *
@@ -45,6 +46,7 @@ export async function GET(req: Request) {
     db.dayEntry.count({ where: { studentId } }),
   ]);
   const byDay = new Map(entries.map((e) => [e.day, e]));
+  const passages = await passagesFor(entries);
 
   const rows = days.map((day) => {
     const e = byDay.get(day);
@@ -56,6 +58,8 @@ export async function GET(req: Request) {
       .map((l) => ({
         kind: l.kind, kindAr: KIND_AR[l.kind] ?? l.kind,
         recited: l.recited, errors: l.errors, note: l.note || null,
+        passage: passageLabel(
+          passages.get(passageKey(e.track, e.level, e.assignmentNo, l.kind))),
       }));
 
     return {
