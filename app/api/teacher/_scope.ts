@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { readSession, readTeacherSession, type TeacherSession } from '@/lib/auth';
+import { readSession, readTeacherSession, renewTeacherSession, type TeacherSession } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { readWeekdays, weekdaysFor, readDaily, WEEKDAYS_KEY, DAILY_POINTS_KEY,
   type DailyPointsSettings } from '@/lib/settings';
@@ -38,7 +38,11 @@ export const fail = (error: string, status = 400) => NextResponse.json({ error }
 export async function scope(req: Request): Promise<
   { ok: true; who: Who; s: TeacherSession | null } | { ok: false; res: NextResponse }
 > {
-  const t = await readTeacherSession();
+  const read = await readTeacherSession();
+  /* Using it is what keeps him in: his week slides forward, once a day, and
+     the renewal re-reads his account — see `renewTeacherSession`. */
+  const t = read && await renewTeacherSession(read);
+  if (read && !t) return { ok: false, res: fail('غير مصرّح', 401) };
   if (t) {
     if (!t.halaqaId) return { ok: false, res: fail('حسابك لم يُربط بحلقة بعد.', 403) };
     return {

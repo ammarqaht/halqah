@@ -1,7 +1,8 @@
 'use client';
 /* The idle timeout, in the browser.
-   The SERVER is what actually ends the session — the token lasts five minutes
-   and this asks for five more while the supervisor is working. All this does
+   The SERVER is what actually ends the session — the token lasts two hours
+   and this asks for two more while the supervisor is working, up to the
+   twenty-four hours after he signed in (lib/auth `SESSION_HOURS`). All this does
    is two courtesies the server cannot do: warn him before it happens, so he
    does not lose a half-typed exam, and take him to the login screen the moment
    it does rather than on his next click into a wall.
@@ -15,8 +16,8 @@ import { Btn } from '@/components/ui';
 import { Num } from '@/components/Num';
 
 const KEY = 'halqah_last_activity';
-/** Kept a little under the server's five so the warning always precedes it. */
-const IDLE_MS = 30 * 60 * 1000;
+/** The server's two hours (lib/auth `IDLE_MINUTES`); the warning precedes it. */
+const IDLE_MS = 120 * 60 * 1000;
 const WARN_MS = 45 * 1000;
 /** The cookie is only re-issued this often, however busy he is. */
 const TOUCH_EVERY = 60 * 1000;
@@ -31,6 +32,7 @@ export function IdleGuard() {
   const lastTouch = useRef(0);
   const [left, setLeft] = useState<number | null>(null);
   const done = useRef(false);
+  const signOutRef = useRef<(reason?: 'idle' | 'expired') => Promise<void>>(async () => {});
 
   const mark = useCallback(() => {
     const t = now();
@@ -40,16 +42,21 @@ export function IdleGuard() {
        cookie would be a request per click for no extra safety. */
     if (t - lastTouch.current > TOUCH_EVERY) {
       lastTouch.current = t;
-      fetch('/api/auth/touch', { method: 'POST' }).catch(() => { /* offline — the tick still runs */ });
+      fetch('/api/auth/touch', { method: 'POST' })
+        /* 401 while he is working means his twenty-four hours are up — take
+           him to sign in now, not on his next click into a wall. */
+        .then((r) => { if (r.status === 401) void signOutRef.current('expired'); })
+        .catch(() => { /* offline — the tick still runs */ });
     }
   }, []);
 
-  const signOut = useCallback(async () => {
+  const signOut = useCallback(async (reason: 'idle' | 'expired' = 'idle') => {
     if (done.current) return;
     done.current = true;
     try { await fetch('/api/auth/logout', { method: 'POST' }); } catch { /* ignore */ }
-    router.replace('/login?reason=idle');
+    router.replace(`/login?reason=${reason}`);
   }, [router]);
+  signOutRef.current = signOut;
 
   useEffect(() => {
     mark();

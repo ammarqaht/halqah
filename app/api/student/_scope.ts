@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { readStudentSession, type StudentSession } from '@/lib/auth';
+import { readStudentSession, renewStudentSession, type StudentSession } from '@/lib/auth';
 import { earnsPoints } from '@/lib/points';
 import { db } from '@/lib/db';
 
@@ -10,7 +10,10 @@ export async function scope(): Promise<
   { ok: true; s: StudentSession } | { ok: false; res: NextResponse }
 > {
   const s = await readStudentSession();
-  if (!s) return { ok: false, res: NextResponse.json({ error: 'غير مصرّح' }, { status: 401 }) };
+  /* Using it is what keeps him in: his year slides forward, once a day. */
+  if (!s || !(await renewStudentSession(s))) {
+    return { ok: false, res: NextResponse.json({ error: 'غير مصرّح' }, { status: 401 }) };
+  }
   return { ok: true, s };
 }
 

@@ -19,12 +19,21 @@ const COOKIE = 'halqah_session';
  * measures idleness rather than session length: he is never signed out
  * mid-sentence, and a laptop left open on the mosque desk is signed out.
  *
- * It was five. Reading four workbooks' previews before pressing «اعتماد» takes
- * longer than that without touching the keyboard, so the token lapsed mid-task
- * and the upload failed — quietly, because the failure was reported as being
- * offline. Thirty still signs out a laptop left on the desk.
+ * It was five, then thirty. Five lapsed mid-task while he read four workbooks'
+ * previews before «اعتماد». Thirty still signed him out between one circle and
+ * the next, which the client asked to stop: «كل ٢٤ ساعة يسوي تسجيل خروج». Two
+ * hours clears an afternoon's gaps and still closes a laptop left on the desk
+ * overnight.
  */
-export const IDLE_MINUTES = 30;
+export const IDLE_MINUTES = 120;
+
+/**
+ * The longest a session lives however busy he is — the client's twenty-four
+ * hours. Carried in the token as `sat` (signed-at), so re-issuing it on
+ * activity never pushes this back: at most a day after he typed his password,
+ * he types it again.
+ */
+export const SESSION_HOURS = 24;
 
 function secret() {
   const s = process.env.AUTH_SECRET;
@@ -34,18 +43,27 @@ function secret() {
   return new TextEncoder().encode(s);
 }
 
-export type Session = { sub: string; name: string; role: 'SUPERVISOR' };
+export type Session = {
+  sub: string; name: string; role: 'SUPERVISOR';
+  /** When he typed his password, in seconds — the start of his twenty-four hours. */
+  signedInAt: number;
+};
 
 export const hashPassword = (plain: string) => bcrypt.hash(plain, 12);
 export const verifyPassword = (plain: string, hash: string) => bcrypt.compare(plain, hash);
 
-export async function createSession(user: { id: string; fullName: string }) {
-  const token = await new SignJWT({ name: user.fullName, role: 'SUPERVISOR' })
+const nowSec = () => Math.floor(Date.now() / 1000);
+
+/** A fresh sign-in, or — with `signedInAt` — a renewal that keeps the original
+    start, so the idle window slides but the day does not. */
+export async function createSession(user: { id: string; fullName: string }, signedInAt = nowSec()) {
+  const exp = Math.min(nowSec() + IDLE_MINUTES * 60, signedInAt + SESSION_HOURS * 3600);
+  const token = await new SignJWT({ name: user.fullName, role: 'SUPERVISOR', sat: signedInAt })
     .setProtectedHeader({ alg: 'HS256' })
     .setSubject(user.id)
     .setAudience('admin')
     .setIssuedAt()
-    .setExpirationTime(`${IDLE_MINUTES}m`)
+    .setExpirationTime(exp)
     .sign(secret());
 
   (await cookies()).set(COOKIE, token, {
@@ -53,7 +71,7 @@ export async function createSession(user: { id: string; fullName: string }) {
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
-    maxAge: IDLE_MINUTES * 60,
+    maxAge: Math.max(0, exp - nowSec()),
   });
 }
 
@@ -62,7 +80,11 @@ export async function readSession(): Promise<Session | null> {
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, secret(), { audience: 'admin' });
-    return { sub: String(payload.sub), name: String(payload.name), role: 'SUPERVISOR' };
+    return {
+      sub: String(payload.sub), name: String(payload.name), role: 'SUPERVISOR',
+      /* A token from before `sat` existed starts its day at its own issue. */
+      signedInAt: Number(payload.sat ?? payload.iat ?? nowSec()),
+    };
   } catch {
     return null;
   }
@@ -108,16 +130,25 @@ export async function authenticate(username: string, password: string) {
 const STUDENT_COOKIE = 'halqah_student';
 
 /**
- * Half a year, re-issued on every authenticated request — so in practice a boy
- * signs in once and stays in.
+ * A year, renewed at most once a day while he uses it (see `renewStudentSession`)
+ * — so in practice a boy signs in once and stays in: «حساب الطالب ما يحتاج
+ * يسوي تسجيل خروج». A year rather than «never» because browsers cap a cookie
+ * at about four hundred days; renewed, the cap is never reached.
  *
- * The supervisor's thirty minutes protects a laptop left open on a desk in a
- * public mosque. A boy's phone is in his pocket, and asking a nine year old to
+ * The supervisor's hours protect a laptop left open on a desk in a public
+ * mosque. A boy's phone is in his pocket, and asking a nine year old to
  * re-enter his number between one halaqa and the next is how a portal stops
  * being used. What guards a shared phone is the sign-out button, which is
  * always one tap away — not an expiry that punishes everyone for it.
+ *
+ * It said «re-issued on every request» for months while nothing re-issued it,
+ * so a boy using it daily was signed out on day 180 all the same.
  */
-export const STUDENT_IDLE_DAYS = 180;
+export const STUDENT_IDLE_DAYS = 365;
+
+/** Renew a session no more than this often — once a day is plenty for a
+    week- or year-long window, and it keeps a database read off every request. */
+const RENEW_AFTER_SEC = 24 * 3600;
 
 /**
  * Sign-in is a four-digit LOGIN NUMBER and the boy's own national id.
@@ -139,7 +170,11 @@ export const isLoginId = (v: unknown) => /^\d{4}$/.test(String(v ?? ''));
 /** The national id as the roster holds it — digits only, any length it uses. */
 export const isNationalId = (v: unknown) => /^\d{4,}$/.test(String(v ?? '').replace(/\D/g, ''));
 
-export type StudentSession = { sub: string; name: string; username: string };
+export type StudentSession = {
+  sub: string; name: string; username: string;
+  /** When this token was issued, in seconds — what renewal is measured from. */
+  issuedAt: number;
+};
 
 export async function createStudentSession(s: { id: string; fullName: string; username: string }) {
   const token = await new SignJWT({ name: s.fullName, username: s.username })
@@ -168,10 +203,26 @@ export async function readStudentSession(): Promise<StudentSession | null> {
       sub: String(payload.sub),
       name: String(payload.name ?? ''),
       username: String(payload.username ?? ''),
+      issuedAt: Number(payload.iat ?? 0),
     };
   } catch {
     return null;
   }
+}
+
+/**
+ * Slides his year forward while he keeps using it. Called from the student
+ * routes' `scope`, at most once a day. The account is read again first: a
+ * credential the supervisor switched off is not renewed, and he is refused.
+ */
+export async function renewStudentSession(s: StudentSession): Promise<boolean> {
+  if (nowSec() - s.issuedAt < RENEW_AFTER_SEC) return true;
+  const cred = await db.studentCredential.findUnique({
+    where: { studentId: s.sub }, select: { active: true, username: true },
+  });
+  if (!cred?.active) { await destroyStudentSession(); return false; }
+  await createStudentSession({ id: s.sub, fullName: s.name, username: cred.username });
+  return true;
 }
 
 export async function destroyStudentSession() {
@@ -255,18 +306,20 @@ export const loginIdFor = (index: number) => String(LOGIN_ID_FIRST + index);
 const TEACHER_COOKIE = 'halqah_teacher';
 
 /**
- * Thirty days, and it does NOT lapse on idleness.
+ * A week without use — renewed at most once a day while he uses it (see
+ * `renewTeacherSession`), so a teacher who opens it every circle never signs in
+ * again, and a phone left untouched for a week is signed out.
  *
- * «فالمعلم يفتح جواله بين طلابه ولا يحتمل دخولًا كل عصر» — the supervisor's
- * thirty minutes protects a laptop left open on a mosque desk, and applying it
- * here would sign a teacher out in the middle of التسميع, standing in front of
- * twenty-five boys, which is exactly how a portal stops being used.
+ * It was thirty days from sign-in. The client asked for «كل اسبوع»; counted
+ * from sign-in, a week would end mid-التسميع, in front of twenty-five boys,
+ * which is exactly how a portal stops being used. Counted from his last use,
+ * it only ends when he has not been there.
  *
- * Shorter than the student's half-year on purpose: his phone carries his whole
+ * Shorter than the student's year on purpose: his phone carries his whole
  * halaqa's record — every boy's level, attendance and exam results — where a
  * boy's carries only his own.
  */
-export const TEACHER_SESSION_DAYS = 30;
+export const TEACHER_SESSION_DAYS = 7;
 
 /**
  * Sign-in is a four-digit LOGIN NUMBER from 2001, and a password.
@@ -289,7 +342,7 @@ export const isTeacherLoginId = (v: unknown) => /^2\d{3}$/.test(String(v ?? ''))
 /** «٢٠٠١، ٢٠٠٢، …» — in halaqa order, so a column of them reads down a sheet. */
 export const teacherLoginIdFor = (index: number) => String(TEACHER_ID_FIRST + index);
 
-/** Eight characters at least. He types this once a month, not once an afternoon,
+/** Eight characters at least. He types this after a week away, not once an afternoon,
     so it can afford to be a real password — and it guards more than his own row. */
 export const TEACHER_PASSWORD_MIN = 8;
 
@@ -297,6 +350,8 @@ export type TeacherSession = {
   sub: string; name: string; username: string;
   /** His one halaqa, carried in the token so no route has to trust a body. */
   halaqaId: string | null;
+  /** When this token was issued, in seconds — what renewal is measured from. */
+  issuedAt: number;
 };
 
 export async function createTeacherSession(t: {
@@ -329,10 +384,27 @@ export async function readTeacherSession(): Promise<TeacherSession | null> {
       name: String(payload.name ?? ''),
       username: String(payload.username ?? ''),
       halaqaId: payload.halaqaId ? String(payload.halaqaId) : null,
+      issuedAt: Number(payload.iat ?? 0),
     };
   } catch {
     return null;
   }
+}
+
+/**
+ * Slides his week forward while he keeps using it. Called from the teacher
+ * routes' `scope`, at most once a day, and it reads the account again first:
+ * a renewed token could otherwise carry a halaqa he was moved off, or keep a
+ * deactivated teacher in for as long as he kept opening it. Returns the
+ * session as it now stands, or null when he may no longer be in.
+ */
+export async function renewTeacherSession(s: TeacherSession): Promise<TeacherSession | null> {
+  if (nowSec() - s.issuedAt < RENEW_AFTER_SEC) return s;
+  const t = await db.teacher.findUnique({ where: { id: s.sub }, include: { halaqa: true } });
+  if (!t?.active || !t.halaqa) { await destroyTeacherSession(); return null; }
+  const fresh = { id: t.id, fullName: t.fullName, username: t.username, halaqaId: t.halaqa.id };
+  await createTeacherSession(fresh);
+  return { sub: t.id, name: t.fullName, username: t.username, halaqaId: t.halaqa.id, issuedAt: nowSec() };
 }
 
 export async function destroyTeacherSession() {
