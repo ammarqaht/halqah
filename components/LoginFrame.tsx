@@ -120,7 +120,7 @@ export function LoginFrame({ children, foot, curtain }: {
    — which reads as a broken password rather than as a wrong door. Two plain
    rectangles say it before it happens, and they are the same two rectangles on
    all three screens. */
-const DOOR = {
+export const DOOR = {
   admin:   { href: '/login',         label: 'دخول مشرف',  icon: ShieldCheck },
   teacher: { href: '/teacher/login', label: 'دخول معلم',  icon: Users },
   student: { href: '/student/login', label: 'دخول طالب',  icon: GraduationCap },
