@@ -1,20 +1,21 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
+import { SITE } from '@/lib/site';
 
-const TITLE = 'حلقة — حلقات جامع محمد العبدالكريم';
-const DESC = 'نظام إدارة حلقات تحفيظ القرآن الكريم — الدمام، حي أُحد.';
-
-/* الموقع لا يعرف عنوانه، وNext يفترض `localhost:3000` — فبطاقة المشاركة تشير
-   إلى صورة على جهاز المرسِل، وواتساب يطلبها فلا يجدها فيعرض الرابط عاريًا.
-   يُؤخذ من البيئة إن ضُبط، وإلا فمن اسم النطاق الذي نُشر عليه. */
-const SITE = process.env.NEXT_PUBLIC_SITE_URL
-  || (process.env.VERCEL_URL && `https://${process.env.VERCEL_URL}`)
-  || 'https://halqah-n0jqrp.cranl.net';
+const TITLE = 'حلقات العبدالكريم — حلقات تحفيظ القرآن بجامع محمد العبدالكريم';
+const DESC = 'حلقات العبدالكريم لتحفيظ القرآن الكريم في جامع محمد العبدالكريم — الدمام، حي أُحد. منصة الحلقات للمشرف والمعلم والطالب.';
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE),
   title: TITLE,
   description: DESC,
+  applicationName: 'حلقات العبدالكريم',
+  keywords: [
+    'حلقات العبدالكريم', 'حلقة العبدالكريم', 'جامع محمد العبدالكريم', 'جامع العبدالكريم',
+    'حلقات تحفيظ القرآن', 'تحفيظ القرآن الدمام', 'حلقات الدمام', 'حي أحد', 'حلقة',
+  ],
+  alternates: { canonical: '/' },
+  robots: { index: true, follow: true },
   /* شعار الحلقة كاملًا — في التبويب، وفي البطاقة التي تظهر حين يُرسَل الرابط.
      كان الموقع بلا أيقونة ولا بطاقة: التبويب يحمل حرف المتصفّح الافتراضي،
      ورابطٌ يُرسَل في واتساب يظهر عاريًا بلا صورة ولا اسم.
@@ -29,6 +30,7 @@ export const metadata: Metadata = {
   manifest: '/manifest.webmanifest',
   openGraph: {
     type: 'website',
+    url: '/',
     siteName: 'حلقات جامع محمد العبدالكريم',
     title: TITLE,
     description: DESC,
@@ -53,6 +55,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="preload" as="font" type="font/woff2" href="/fonts/sans-Regular.woff2" crossOrigin="anonymous" />
         <link rel="preload" as="font" type="font/woff2" href="/fonts/serif-Medium.woff2" crossOrigin="anonymous" />
         {children}
+        {/* يقول لقوقل مَن صاحبُ الموقع وأين هو، فيُطابق بحثَ «حلقات العبدالكريم» */}
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
+          '@context': 'https://schema.org',
+          '@type': 'EducationalOrganization',
+          name: 'حلقات العبدالكريم',
+          alternateName: ['حلقات جامع محمد العبدالكريم', 'Mosque AlAbdulKarim Halaqat'],
+          description: DESC,
+          url: SITE,
+          logo: `${SITE}/icon-512.png`,
+          image: `${SITE}/share.png`,
+          address: { '@type': 'PostalAddress', addressLocality: 'الدمام', addressRegion: 'المنطقة الشرقية', streetAddress: 'حي أُحد', addressCountry: 'SA' },
+        }) }} />
       </body>
     </html>
   );
