@@ -23,9 +23,11 @@ export const metadata: Metadata = {
      ولمّا جُرِّبت العلامة عند ستة عشر بكسلًا لم يبقَ من سطريها وكتابها إلا
      كتلة، فاقتُصر على «العَبْد» وحدها. والعميل اختار العلامة كاملة — وهي
      شعاره — فهي عليها، صُيِّرت من ألف بكسل حتى يكون التصغير أرفق ما يكون. */
+  /* و`?v=2` يُلزم المتصفّح بطلبها من جديد: من فتح النطاق وهو يعرض صفحةَ
+     خطأ حفظ أيقونتَها، ولا يعيد طلبها ما دام العنوانُ هو هو. */
   icons: {
-    icon: '/icon.png',
-    apple: '/apple-icon.png',
+    icon: [{ url: '/favicon.ico?v=2', sizes: 'any' }, { url: '/icon.png?v=2', type: 'image/png' }],
+    apple: '/apple-icon.png?v=2',
   },
   manifest: '/manifest.webmanifest',
   openGraph: {
