@@ -33,12 +33,20 @@ export type StudentAlert = {
   title: string; body: string; at: string;
 };
 
-const KIND: Record<StudentAlert['kind'], { icon: LucideIcon; tone: string }> = {
+export const KIND: Record<StudentAlert['kind'], { icon: LucideIcon; tone: string }> = {
   NOTE:    { icon: MessageSquare, tone: 'text-brand-800 bg-brand-100' },
   EXAM:    { icon: Award,         tone: 'text-ok-700 bg-ok-100' },
   BOOKED:  { icon: CalendarClock, tone: 'text-info-700 bg-info-100' },
   GIFT:    { icon: Gift,          tone: 'text-warn-700 bg-warn-100' },
   MESSAGE: { icon: Megaphone,     tone: 'text-ink-700 bg-ink-100' },
+};
+
+const READ_EVENT = 'student-alerts-read';
+
+/** What each kind is called above its card in the arrival story. */
+export const KIND_LABEL: Record<StudentAlert['kind'], string> = {
+  NOTE: 'من معلّمك', EXAM: 'نتيجة اختبار', BOOKED: 'موعد اختبار',
+  GIFT: 'هداياك', MESSAGE: 'من الإدارة',
 };
 
 /** How many sit on الرئيسية before «عرض المزيد» takes the rest. */
@@ -56,6 +64,12 @@ export function useStudentAlerts() {
       .catch(() => setAlerts([]));
   }, []);
   useEffect(() => { load(); }, [load]);
+  /* Two readers of this list at once — the story on arrival (in the layout) and
+     the bell and block on الرئيسية. What one ticks off, the other reloads. */
+  useEffect(() => {
+    window.addEventListener(READ_EVENT, load);
+    return () => window.removeEventListener(READ_EVENT, load);
+  }, [load]);
 
   const markRead = useCallback((keys: string[]) => {
     const fresh = keys.filter((k) => k && !read.has(k));
@@ -64,8 +78,9 @@ export function useStudentAlerts() {
     fetch('/api/student/alerts', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ keys: fresh }),
-    }).then(() => load()).catch(() => { /* the dot is back on the next load */ });
-  }, [read, load]);
+    }).then(() => window.dispatchEvent(new Event(READ_EVENT)))
+      .catch(() => { /* the dot is back on the next load */ });
+  }, [read]);
 
   const merged = (alerts ?? []).map(
     (a) => (a.read || read.has(a.key) ? { ...a, read: true } : a));

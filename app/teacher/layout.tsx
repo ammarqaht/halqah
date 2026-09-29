@@ -17,9 +17,11 @@ import { LoadingMark } from '@/components/LoadingMark';
 import { ScrollProgress } from '@/components/ScrollProgress';
 import { MedadFoot } from '@/components/MedadFoot';
 import { DevBand } from '@/components/DevBand';
+import { AlertStory } from '@/components/AlertStory';
+import { KIND } from '@/components/teacher/Alerts';
 
 function Shell({ children }: { children: React.ReactNode }) {
-  const { me } = useMe();
+  const { me, markRead } = useMe();
 
   if (!me) return <LoadingMark show />;
 
@@ -34,6 +36,12 @@ function Shell({ children }: { children: React.ReactNode }) {
         {/* داخل `main` فيقع فوق شريط الجوال السفلي لا تحته. */}
         <MedadFoot />
       </main>
+      {/* «تطلع للشيخ بوجهه حبّة ورا حبّة أول ما يدخل» — see AlertStory. */}
+      <AlertStory ready={!!me} onSeen={markRead}
+        items={me.alerts.filter((a) => !a.read).map((a) => ({
+          key: a.key, icon: KIND[a.kind].icon, label: KIND[a.kind].label,
+          body: a.body, at: a.at, href: a.kind === 'MESSAGE' ? undefined : a.href,
+        }))} />
     </div>
   );
 }
