@@ -174,15 +174,31 @@ export type StudentSession = {
   sub: string; name: string; username: string;
   /** When this token was issued, in seconds — what renewal is measured from. */
   issuedAt: number;
+  /** Set on حساب المطوّر's token — see `PREVIEW_HOURS`. Nothing is saved under it. */
+  preview: string | null;
 };
 
-export async function createStudentSession(s: { id: string; fullName: string; username: string }) {
-  const token = await new SignJWT({ name: s.fullName, username: s.username })
+/**
+ * A token marked `preview` is حساب المطوّر's (see lib/dev): a teacher's or a
+ * boy's own audience, so every screen reads exactly what his would, and the
+ * middleware refuses every write made under it. Every button can be pressed and
+ * nothing lands.
+ *
+ * Twelve hours, never renewed: a working day, and not a standing account.
+ */
+export const PREVIEW_HOURS = 12;
+
+export async function createStudentSession(
+  s: { id: string; fullName: string; username: string },
+  preview: string | null = null,
+) {
+  const life = preview ? PREVIEW_HOURS * 3600 : STUDENT_IDLE_DAYS * 24 * 60 * 60;
+  const token = await new SignJWT({ name: s.fullName, username: s.username, ...(preview ? { preview } : {}) })
     .setProtectedHeader({ alg: 'HS256' })
     .setSubject(s.id)
     .setAudience('student')
     .setIssuedAt()
-    .setExpirationTime(`${STUDENT_IDLE_DAYS}d`)
+    .setExpirationTime(nowSec() + life)
     .sign(secret());
 
   (await cookies()).set(STUDENT_COOKIE, token, {
@@ -190,7 +206,7 @@ export async function createStudentSession(s: { id: string; fullName: string; us
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
-    maxAge: STUDENT_IDLE_DAYS * 24 * 60 * 60,
+    maxAge: life,
   });
 }
 
@@ -204,6 +220,7 @@ export async function readStudentSession(): Promise<StudentSession | null> {
       name: String(payload.name ?? ''),
       username: String(payload.username ?? ''),
       issuedAt: Number(payload.iat ?? 0),
+      preview: payload.preview ? String(payload.preview) : null,
     };
   } catch {
     return null;
@@ -216,7 +233,8 @@ export async function readStudentSession(): Promise<StudentSession | null> {
  * credential the supervisor switched off is not renewed, and he is refused.
  */
 export async function renewStudentSession(s: StudentSession): Promise<boolean> {
-  if (nowSec() - s.issuedAt < RENEW_AFTER_SEC) return true;
+  /* A preview ends when its hours do; renewing would also drop the mark. */
+  if (s.preview || nowSec() - s.issuedAt < RENEW_AFTER_SEC) return true;
   const cred = await db.studentCredential.findUnique({
     where: { studentId: s.sub }, select: { active: true, username: true },
   });
@@ -352,17 +370,22 @@ export type TeacherSession = {
   halaqaId: string | null;
   /** When this token was issued, in seconds — what renewal is measured from. */
   issuedAt: number;
+  /** Set on حساب المطوّر's token — see `PREVIEW_HOURS`. Nothing is saved under it. */
+  preview: string | null;
 };
 
 export async function createTeacherSession(t: {
   id: string; fullName: string; username: string; halaqaId: string | null;
-}) {
-  const token = await new SignJWT({ name: t.fullName, username: t.username, halaqaId: t.halaqaId })
+}, preview: string | null = null) {
+  const life = preview ? PREVIEW_HOURS * 3600 : TEACHER_SESSION_DAYS * 24 * 60 * 60;
+  const token = await new SignJWT({
+    name: t.fullName, username: t.username, halaqaId: t.halaqaId, ...(preview ? { preview } : {}),
+  })
     .setProtectedHeader({ alg: 'HS256' })
     .setSubject(t.id)
     .setAudience('teacher')
     .setIssuedAt()
-    .setExpirationTime(`${TEACHER_SESSION_DAYS}d`)
+    .setExpirationTime(nowSec() + life)
     .sign(secret());
 
   (await cookies()).set(TEACHER_COOKIE, token, {
@@ -370,7 +393,7 @@ export async function createTeacherSession(t: {
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
-    maxAge: TEACHER_SESSION_DAYS * 24 * 60 * 60,
+    maxAge: life,
   });
 }
 
@@ -385,6 +408,7 @@ export async function readTeacherSession(): Promise<TeacherSession | null> {
       username: String(payload.username ?? ''),
       halaqaId: payload.halaqaId ? String(payload.halaqaId) : null,
       issuedAt: Number(payload.iat ?? 0),
+      preview: payload.preview ? String(payload.preview) : null,
     };
   } catch {
     return null;
@@ -399,12 +423,15 @@ export async function readTeacherSession(): Promise<TeacherSession | null> {
  * session as it now stands, or null when he may no longer be in.
  */
 export async function renewTeacherSession(s: TeacherSession): Promise<TeacherSession | null> {
-  if (nowSec() - s.issuedAt < RENEW_AFTER_SEC) return s;
+  if (s.preview || nowSec() - s.issuedAt < RENEW_AFTER_SEC) return s;
   const t = await db.teacher.findUnique({ where: { id: s.sub }, include: { halaqa: true } });
   if (!t?.active || !t.halaqa) { await destroyTeacherSession(); return null; }
   const fresh = { id: t.id, fullName: t.fullName, username: t.username, halaqaId: t.halaqa.id };
   await createTeacherSession(fresh);
-  return { sub: t.id, name: t.fullName, username: t.username, halaqaId: t.halaqa.id, issuedAt: nowSec() };
+  return {
+    sub: t.id, name: t.fullName, username: t.username, halaqaId: t.halaqa.id,
+    issuedAt: nowSec(), preview: null,
+  };
 }
 
 export async function destroyTeacherSession() {

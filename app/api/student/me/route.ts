@@ -6,6 +6,7 @@ import { ajzaExact, ajzaForLevel } from '@/lib/exams';
 import { TRACK_AR, LEVEL_MAX, type Track } from '@/lib/types';
 import { halaqaLabel, shortName } from '@/lib/normalise';
 import { levelsFor } from '@/lib/types';
+import { applyAutoAbsence } from '@/lib/absence-run';
 
 /* Who is asking, and the handful of facts every screen needs about him.
    The balance is recomputed from the ledger on every request — §3.5: it is
@@ -13,6 +14,8 @@ import { levelsFor } from '@/lib/types';
 export async function GET() {
   const g = await scope();
   if (!g.ok) return g.res;
+  /* الغياب التلقائي — the days that have passed are settled before they are read. */
+  await applyAutoAbsence();
 
   const student = await db.student.findUnique({
     where: { id: g.s.sub },
@@ -64,6 +67,8 @@ export async function GET() {
   )) : null;
 
   return NextResponse.json({
+    /* Set for حساب المطوّر — see lib/dev. */
+    preview: g.s.preview,
     id: student.id,
     fullName: student.fullName,
     username: student.credential?.username ?? '',

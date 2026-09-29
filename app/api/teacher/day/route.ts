@@ -7,6 +7,7 @@ import {
 import { dayHeading, dayState, inFuture, opensItself } from '@/lib/teacher';
 import { isoDate } from '@/lib/dates';
 import { PLAN_KIND_ORDER } from '@/lib/types';
+import { applyAutoAbsence } from '@/lib/absence-run';
 
 /* مع-٣ — صفحة التسجيل. «قلب البوابة كلها».
 
@@ -21,6 +22,8 @@ import { PLAN_KIND_ORDER } from '@/lib/types';
 export async function GET(req: Request) {
   const g = await scope(req);
   if (!g.ok) return g.res;
+  /* الغياب التلقائي — the days that have passed are settled before they are read. */
+  await applyAutoAbsence();
   const { who } = g;
 
   const url = new URL(req.url);

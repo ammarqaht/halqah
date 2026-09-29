@@ -4,10 +4,23 @@ import {
   authenticateStudent, createStudentSession, destroyStudentSession,
   BAD_CREDENTIALS, STUDENT_LOCKED, isLoginId, isNationalId,
 } from '@/lib/auth';
+import { isDevLogin, DEV_NAME } from '@/lib/dev';
 
 /** Sign in with a four-digit login number and the boy's own national id. */
 export async function POST(req: Request) {
   const { username, pin } = await req.json().catch(() => ({}));
+
+  /* حساب المطوّر — see lib/dev. Opens as the first boy; the band switches. */
+  if (isDevLogin(username, pin, 'student')) {
+    const st = await db.student.findFirst({
+      where: { status: 'ACTIVE' }, orderBy: { fullName: 'asc' },
+      include: { credential: { select: { username: true } } },
+    });
+    if (!st) return NextResponse.json({ error: 'لا طلاب في النظام بعد.' }, { status: 404 });
+    await createStudentSession(
+      { id: st.id, fullName: st.fullName, username: st.credential?.username ?? '' }, DEV_NAME);
+    return NextResponse.json({ ok: true, mustChangePin: false });
+  }
 
   /* Rejected before the database is touched — a malformed entry is not a wrong
      one, and must not spend an attempt. */

@@ -14,6 +14,8 @@ export type Me = {
   levelTotal: number; progressPct: number;
   eligibleForPoints: boolean; balance: number;
   mustChangePin: boolean; attendedDays: number | null;
+  /** Set for حساب المطوّر (lib/dev). Nothing saves. */
+  preview: string | null;
   /** «يحتاج مراجعة قبل الاختبار» — ما رفعه معلّمه عنه، إن رفعه. */
   examHold: { at: string; by: string; note: string } | null;
   nextExam: {

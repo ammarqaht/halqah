@@ -16,6 +16,7 @@ import { TeacherNav } from '@/components/teacher/Nav';
 import { LoadingMark } from '@/components/LoadingMark';
 import { ScrollProgress } from '@/components/ScrollProgress';
 import { MedadFoot } from '@/components/MedadFoot';
+import { DevBand } from '@/components/DevBand';
 
 function Shell({ children }: { children: React.ReactNode }) {
   const { me } = useMe();
@@ -26,6 +27,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     <div className="portal min-h-screen bg-page">
       {/* «من يمينها إلى يسارها» across the top — see components/ScrollProgress. */}
       <ScrollProgress />
+      {me.preview && <DevBand portal="teacher" />}
       <TeacherNav />
       <main className="mx-auto max-w-column px-5 pb-28 pt-4 md:px-6 md:pb-16 md:pt-8">
         {children}

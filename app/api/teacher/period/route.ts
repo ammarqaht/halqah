@@ -4,6 +4,7 @@ import { assertMine, fail, scope, teacherSettings } from '../_scope';
 import { cardsFor } from '@/lib/day';
 import { dayHeading, daysInPeriod, inFuture } from '@/lib/teacher';
 import { isoDate } from '@/lib/dates';
+import { applyAutoAbsence } from '@/lib/absence-run';
 
 /* مع-٣-و، الوضع الثاني — «فترة لطالب».
    «يختار طالبًا وفترة من تاريخ إلى تاريخ، فيسجّل حضوره وتسميعه فيها كلها من
@@ -21,6 +22,8 @@ const MAX_DAYS = 120;
 export async function GET(req: Request) {
   const g = await scope(req);
   if (!g.ok) return g.res;
+  /* الغياب التلقائي — the days that have passed are settled before they are read. */
+  await applyAutoAbsence();
   const { who } = g;
 
   const url = new URL(req.url);

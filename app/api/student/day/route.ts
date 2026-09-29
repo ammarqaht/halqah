@@ -4,6 +4,7 @@ import { scope } from '../_scope';
 import { isoDate } from '@/lib/dates';
 import { weekOf, weekDays, shiftWeek } from '@/lib/week';
 import { passagesFor, passageKey, passageLabel } from '@/lib/passage';
+import { applyAutoAbsence } from '@/lib/absence-run';
 
 /* حضوري وتسميعي — what his teacher wrote about him, read back to him.
  *
@@ -39,6 +40,8 @@ const KIND_ORDER = ['MURAJAA_KUBRA', 'MURAJAA_SUGHRA', 'DARS'];
 export async function GET(req: Request) {
   const g = await scope();
   if (!g.ok) return g.res;
+  /* الغياب التلقائي — the days that have passed are settled before they are read. */
+  await applyAutoAbsence();
 
   const today = isoDate(new Date());
   const asked = new URL(req.url).searchParams.get('week');

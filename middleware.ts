@@ -13,15 +13,34 @@ import { jwtVerify } from 'jose';
    audience: they are different people, not different permissions on one
    account. */
 
-async function valid(token: string | undefined, audience: 'admin' | 'student' | 'teacher') {
+async function claims(token: string | undefined, audience: 'admin' | 'student' | 'teacher') {
   const secret = process.env.AUTH_SECRET;
-  if (!token || !secret) return false;
+  if (!token || !secret) return null;
   try {
-    await jwtVerify(token, new TextEncoder().encode(secret), { audience });
-    return true;
+    return (await jwtVerify(token, new TextEncoder().encode(secret), { audience })).payload;
   } catch {
-    return false;
+    return null;
   }
+}
+
+async function valid(token: string | undefined, audience: 'admin' | 'student' | 'teacher') {
+  return (await claims(token, audience)) !== null;
+}
+
+/* حساب المطوّر (see lib/dev): a teacher's or a boy's own token, marked
+   `preview`. Reading passes; every write is refused HERE, before any route runs,
+   so no handler has to remember the rule — one written next year is covered the
+   day it lands. The screen shows the refusal as it shows any error: the button
+   works and nothing is saved. The two portals' /auth paths are let through
+   above, which is how its halaqa or boy is switched and how it signs out. */
+const PREVIEW_REFUSED = 'وضع المعاينة — لا يُحفظ شيء.';
+
+async function pass(req: NextRequest, token: string | undefined, audience: 'student' | 'teacher') {
+  const c = await claims(token, audience);
+  if (!c) return null;
+  const reads = req.method === 'GET' || req.method === 'HEAD';
+  if (c.preview && !reads) return NextResponse.json({ error: PREVIEW_REFUSED }, { status: 403 });
+  return NextResponse.next();
 }
 
 export async function middleware(req: NextRequest) {
@@ -34,7 +53,8 @@ export async function middleware(req: NextRequest) {
       return NextResponse.next();
     }
     const token = req.cookies.get('halqah_student')?.value;
-    if (await valid(token, 'student')) return NextResponse.next();
+    const ok = await pass(req, token, 'student');
+    if (ok) return ok;
 
     /* An API answers 401 in JSON. A redirect there would hand fetch() an HTML
        login page and the caller would parse it as data. */
@@ -56,7 +76,8 @@ export async function middleware(req: NextRequest) {
       return NextResponse.next();
     }
     const tt = req.cookies.get('halqah_teacher')?.value;
-    if (await valid(tt, 'teacher')) return NextResponse.next();
+    const ok = await pass(req, tt, 'teacher');
+    if (ok) return ok;
 
     if (pathname.startsWith('/api/')) {
       return NextResponse.json({ error: 'غير مصرّح' }, { status: 401 });

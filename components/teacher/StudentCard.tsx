@@ -202,7 +202,7 @@ export function StudentCard({
         </div>
 
         <SaveMark state={state} savedAt={card.savedAt}
-          by={card.savedByRole === 'SUPERVISOR' ? card.savedByName : ''} />
+          by={card.savedByRole === 'SUPERVISOR' || card.savedByRole === 'SYSTEM' ? card.savedByName : ''} />
       </div>
 
       {/* ── التحضير — one row, and الثوب behind a hairline ────────────────── */}

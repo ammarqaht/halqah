@@ -4,6 +4,7 @@ import { readSession } from '@/lib/auth';
 import { isoDate } from '@/lib/dates';
 import { weekOf, weekDays, shiftWeek } from '@/lib/week';
 import { passagesFor, passageKey, passageLabel } from '@/lib/passage';
+import { applyAutoAbsence } from '@/lib/absence-run';
 
 /* أسبوع طالب واحد — للمشرف.
  *
@@ -26,6 +27,8 @@ const KIND_ORDER = ['MURAJAA_KUBRA', 'MURAJAA_SUGHRA', 'DARS'];
 export async function GET(req: Request) {
   const s = await readSession();
   if (!s) return NextResponse.json({ error: 'غير مصرّح' }, { status: 401 });
+  /* الغياب التلقائي — the days that have passed are settled before they are read. */
+  await applyAutoAbsence();
 
   const q = new URL(req.url).searchParams;
   const studentId = q.get('student');

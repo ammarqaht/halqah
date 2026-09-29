@@ -5,6 +5,7 @@ import { isoDate } from '@/lib/dates';
 import { PAGES_KEY } from '@/lib/settings';
 import { pagesFor, readPages } from '@/lib/pages';
 import { type Track } from '@/lib/types';
+import { applyAutoAbsence } from '@/lib/absence-run';
 
 /* تقدّم الحلقات — اليوم وحده.
    «في تقدّم الحلقات في رئيسية المشرف أبيك تعرض إحصائيات اليوم فقط، ولا تعرض
@@ -27,6 +28,8 @@ import { type Track } from '@/lib/types';
 export async function GET(req: Request) {
   const s = await readSession();
   if (!s) return NextResponse.json({ error: 'غير مصرّح' }, { status: 401 });
+  /* الغياب التلقائي — the days that have passed are settled before they are read. */
+  await applyAutoAbsence();
 
   const url = new URL(req.url);
   const day = (url.searchParams.get('day') || isoDate(new Date())).slice(0, 10);

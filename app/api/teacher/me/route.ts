@@ -5,6 +5,7 @@ import { absence, dayState, opensItself, type DayRecord } from '@/lib/teacher';
 import { badgeAr } from '@/lib/day';
 import { isoDate } from '@/lib/dates';
 import { halaqaLabel, shortName } from '@/lib/normalise';
+import { applyAutoAbsence } from '@/lib/absence-run';
 
 /* مع-٢ — who is signed in, the state of today, and what the system can tell him.
    «أن يعرف المعلم في خمس ثوانٍ ما المطلوب منه الآن، ويصل إلى عمله بنقرة واحدة». */
@@ -44,6 +45,8 @@ const alertKey = (kind: Alert['kind'], ...parts: (string | number | null)[]) =>
 export async function GET(req: Request) {
   const g = await scope(req);
   if (!g.ok) return g.res;
+  /* الغياب التلقائي — the days that have passed are settled before they are read. */
+  await applyAutoAbsence();
   const { who } = g;
 
   const halaqa = await db.halaqa.findUnique({ where: { id: who.halaqaId } });
@@ -201,6 +204,9 @@ export async function GET(req: Request) {
 
   return NextResponse.json({
     who: { id: who.id, name: who.name, role: who.role },
+    /* Set for حساب المطوّر — the portal shows its band, and the middleware
+       refuses every save. */
+    preview: g.s?.preview ?? null,
     halaqa: {
       id: halaqa.id,
       name: halaqaLabel(halaqa.name || halaqa.teacher),

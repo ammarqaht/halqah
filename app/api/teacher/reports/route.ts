@@ -10,6 +10,7 @@ import {
 import { daysSince, isLate } from '@/lib/exams';
 import { isoDate } from '@/lib/dates';
 import { PLAN_KIND_AR, TRACK_AR, type PlanKind, type Track } from '@/lib/types';
+import { applyAutoAbsence } from '@/lib/absence-run';
 
 /* §١٤ — تقارير المعلم. The four LIST reports of the first release are served
    here; خطة الطالب and تقرير الطالب الشامل are one student each and read from
@@ -27,6 +28,8 @@ export type ReportKind =
 export async function GET(req: Request) {
   const g = await scope(req);
   if (!g.ok) return g.res;
+  /* الغياب التلقائي — the days that have passed are settled before they are read. */
+  await applyAutoAbsence();
   const { who } = g;
 
   const url = new URL(req.url);

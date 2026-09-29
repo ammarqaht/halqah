@@ -443,6 +443,7 @@ export default function StudentFile() {
                     {r.assignmentNo != null && <span>المقرّر <Num>{r.assignmentNo}</Num></span>}
                     {r.incomplete && <Chip tone="warn">ناقص</Chip>}
                     {r.savedByRole === 'SUPERVISOR' && <span>· سجّله {r.savedByName}</span>}
+                    {r.savedByRole === 'SYSTEM' && <span>· {r.savedByName}</span>}
                   </p>
                 </div>
 

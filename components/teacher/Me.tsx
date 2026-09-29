@@ -36,6 +36,8 @@ export const sortAlerts = (list: Alert[]) => [...list].sort((a, b) => {
 
 export type TeacherMe = {
   who: { id: string; name: string; role: 'TEACHER' | 'SUPERVISOR' };
+  /** Set for حساب المطوّر (lib/dev). Nothing saves. */
+  preview: string | null;
   halaqa: { id: string; name: string; teacher: string; timeSlot: string; mosque: string };
   today: string;
   /** Whether today is one of the days this halaqa's own days open by themselves.

@@ -4,6 +4,7 @@ import { readSession } from '@/lib/auth';
 import { isoDate } from '@/lib/dates';
 import { weekOf, weekDays, shiftWeek } from '@/lib/week';
 import { passagesFor, passageKey, passageLabel } from '@/lib/passage';
+import { applyAutoAbsence } from '@/lib/absence-run';
 
 /* كشف الحضور والتسميع — ما سجّله المعلمون، حلقةً حلقة.
  *
@@ -34,6 +35,8 @@ const KIND_AR: Record<string, string> = {
 export async function GET(req: Request) {
   const s = await readSession();
   if (!s) return NextResponse.json({ error: 'غير مصرّح' }, { status: 401 });
+  /* الغياب التلقائي — the days that have passed are settled before they are read. */
+  await applyAutoAbsence();
 
   const q = new URL(req.url).searchParams;
   const today = isoDate(new Date());
@@ -45,6 +48,7 @@ export async function GET(req: Request) {
 
   const days = weekDays(week);
   const first = days[0], last = days[days.length - 1];
+  const weekOver = last < today;
 
   const [halaqat, students, entries] = await Promise.all([
     db.halaqa.findMany({
@@ -145,8 +149,9 @@ export async function GET(req: Request) {
         absent: seen.filter((c) => c.status === 'ABSENT').length,
         recitedDays: cells.filter((c) => (c.recited ?? 0) > 0).length,
         errors: cells.reduce((n, c) => n + (c.errors ?? 0), 0),
-        /* غاب كل يوم سُجِّل له في هذا الأسبوع — وهو ما يستحق نظر المشرف. */
-        allAbsent: seen.length > 0 && seen.every((c) => c.status === 'ABSENT'),
+        /* غاب كل يوم سُجِّل له في أسبوع انقضى — وهو ما يستحق نظر المشرف. قبل
+           انقضائه لا يقال «الأسبوع كلّه»: غياب الأحد وحده يُقرأ هكذا يوم الأحد. */
+        allAbsent: weekOver && seen.length > 0 && seen.every((c) => c.status === 'ABSENT'),
       };
     });
 
