@@ -1,0 +1,27 @@
+# «ما الجديد» — every change users can see ships with an announcement.
+# See CLAUDE.md. Fails (a red ✗ on the commit) when screens change without an
+# entry in content/releases.ts and no commit says [no-release].
+name: release-note
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Announced in «ما الجديد»?
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            node scripts/check-release-note.mjs "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}"
+          else
+            node scripts/check-release-note.mjs "${{ github.event.before }}" "${{ github.sha }}"
+          fi
