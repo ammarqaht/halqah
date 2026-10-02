@@ -1096,6 +1096,19 @@ export const store = {
     return plan;
   },
 
+  /** After /api/admin/level has moved him on the server: take the same plan row
+      (same id) and the same level, so the next save carries them rather than
+      replacing the server's with this browser's older copy. */
+  adoptLevel(studentId: string, plan: StudentPlan) {
+    const cur = load();
+    commit({
+      ...cur,
+      plans: [...cur.plans.filter((p) => p.id !== plan.id
+        && !(p.studentId === plan.studentId && p.track === plan.track && p.level === plan.level)), plan],
+      students: cur.students.map((s) => (s.id === studentId ? { ...s, currentLevel: plan.level } : s)),
+    });
+  },
+
   /** Set a student's level directly, without issuing a sheet — the supervisor
       knows where a student stands before the system does. */
   setLevel(studentId: string, level: number | null) {

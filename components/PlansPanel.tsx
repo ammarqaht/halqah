@@ -17,6 +17,7 @@ export function PlansPanel({ onClose }: { onClose: () => void }) {
   const sp = useSearchParams();
 
   const onPrint = path === '/admin/plans';
+  const onLevel = path.startsWith('/admin/plans/level');
   const onEdit = path.startsWith('/admin/plans/edit');
   const onCurriculum = path.startsWith('/admin/plans/curriculum');
 
@@ -38,6 +39,10 @@ export function PlansPanel({ onClose }: { onClose: () => void }) {
     <PanelShell title="الخطط" meta="عرضها، وطباعتها، وتعديلها" onClose={onClose}>
       <PanelGroup label="الشاشات">
         <PanelItem active={onPrint} onClick={() => router.push('/admin/plans')}>طباعة خطة لطالب</PanelItem>
+        {/* The ONE place a boy's level is changed — it moves him on the roster,
+            on his sheet and on his teacher's card together (api/admin/level). */}
+        <PanelItem active={onLevel} tour="nav-level"
+          onClick={() => router.push('/admin/plans/level')}>تعديل مستوى طالب</PanelItem>
         <PanelItem active={onEdit} onClick={() => router.push('/admin/plans/edit')}>تعديل الخطة</PanelItem>
         <PanelItem active={onCurriculum} onClick={() => router.push('/admin/plans/curriculum')}>منهج الحفظ</PanelItem>
       </PanelGroup>

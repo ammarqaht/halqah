@@ -8,6 +8,8 @@ import { NAV, NAV_FOOT, SIGN_OUT, type NavItem } from '@/components/nav';
 import { Num } from '@/components/Num';
 import { useDB } from '@/lib/store';
 import { cx } from '@/lib/cx';
+import { Sparkles } from 'lucide-react';
+import { OPEN_WHATSNEW } from '@/components/whatsnew/WhatsNew';
 
 function RailBtn({ item, active, onNavigate }: { item: NavItem; active: boolean; onNavigate?: () => void }) {
   return (
@@ -66,6 +68,18 @@ export function Rail({ onNavigate }: { onNavigate?: (href: string) => void }) {
       </div>
       <div className="my-3 h-px w-7 bg-white/15" />
       <div className="flex flex-col items-center gap-1.5">
+        {/* «ما الجديد» — every update, any time, after it has been dismissed. */}
+        <div className="group relative">
+          <button type="button" aria-label="ما الجديد"
+            onClick={() => window.dispatchEvent(new Event(OPEN_WHATSNEW))}
+            className="flex h-11 w-11 items-center justify-center rounded-lg text-[#E7D3A5]/80 transition-[background-color,color] duration-150 ease-brand hover:bg-white/[.09] hover:text-[#E7D3A5]">
+            <Sparkles size={20} strokeWidth={1.85} />
+          </button>
+          <span role="tooltip"
+            className="pointer-events-none absolute top-1/2 right-full z-[70] me-2 hidden -translate-y-1/2 whitespace-nowrap rounded-md bg-brand-900 px-2.5 py-1.5 text-micro text-white opacity-0 shadow-pop transition-opacity duration-150 group-hover:opacity-100 md:block">
+            ما الجديد
+          </span>
+        </div>
         {NAV_FOOT.map((it) => (
           <RailBtn key={it.id} item={it} active={isActive(it)} onNavigate={() => onNavigate?.(it.href)} />
         ))}

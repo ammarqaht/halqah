@@ -1,5 +1,5 @@
 'use client';
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import { Rail } from '@/components/Rail';
 import { RouteVeil } from '@/components/RouteVeil';
 import { IdleGuard } from '@/components/IdleGuard';
@@ -7,6 +7,8 @@ import { SyncGuard } from '@/components/SyncGuard';
 import { PanelContext } from '@/components/PanelContext';
 import { PanelState } from '@/components/PanelState';
 import { MedadFoot } from '@/components/MedadFoot';
+import { WhatsNew } from '@/components/whatsnew/WhatsNew';
+import { Tour } from '@/components/whatsnew/Tour';
 
 const panelSkeleton = <div className="flex-1 p-4"><div className="skel h-5 w-32" /></div>;
 
@@ -30,6 +32,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
      `/admin/students`, `/admin/points` and `/admin/store`. */
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+  /* A tour step pointing into the panel needs the panel open to point at. */
+  const openPanel = useCallback(() => setPanelOpen(true), []);
 
   return (
     <PanelState.Provider value={{ panelOpen, setPanelOpen }}>
@@ -59,6 +63,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <MedadFoot />
           <IdleGuard />
           <SyncGuard />
+          {/* «ما الجديد» — every update he has not seen, then its tour. */}
+          {mounted && <WhatsNew audience="admin" />}
+          {mounted && <Tour onNeedPanel={openPanel} />}
         </main>
       </div>
     </PanelState.Provider>

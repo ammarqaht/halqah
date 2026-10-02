@@ -9,6 +9,8 @@ import { StudentNav } from '@/components/student/Nav';
 import { LoadingMark } from '@/components/LoadingMark';
 import { ScrollProgress } from '@/components/ScrollProgress';
 import { MedadFoot } from '@/components/MedadFoot';
+import { WhatsNew } from '@/components/whatsnew/WhatsNew';
+import { Tour } from '@/components/whatsnew/Tour';
 import { DevBand } from '@/components/DevBand';
 import { AlertStory } from '@/components/AlertStory';
 import { KIND, KIND_LABEL, useStudentAlerts } from '@/components/student/Alerts';
@@ -37,6 +39,10 @@ function Shell({ children }: { children: React.ReactNode }) {
           title: a.kind === 'MESSAGE' ? undefined : a.title,
           body: a.body, at: a.at, href: a.href,
         }))} />
+      {/* «ما الجديد» sits above the alerts (z-90 over z-80): what changed in
+          the portal first, then what happened to him. */}
+      <WhatsNew audience="student" />
+      <Tour />
     </div>
   );
 }

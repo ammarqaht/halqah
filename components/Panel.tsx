@@ -35,14 +35,16 @@ export function PanelGroup({ label, children }: { label?: string; children: Reac
   );
 }
 
-export function PanelItem({ children, sub, count, tone, active, onClick }:
+export function PanelItem({ children, sub, count, tone, active, onClick, tour }:
   { children: React.ReactNode; sub?: string; count?: number;
-    tone?: 'risk' | 'warn' | 'info' | 'ok'; active?: boolean; onClick?: () => void }) {
+    tone?: 'risk' | 'warn' | 'info' | 'ok'; active?: boolean; onClick?: () => void;
+    /** A `data-tour` anchor for «ما الجديد» to point at — see components/Tour. */
+    tour?: string }) {
   const dot = tone && {
     risk: 'bg-risk-500', warn: 'bg-warn-500', info: 'bg-info-500', ok: 'bg-ok-500',
   }[tone];
   return (
-    <button onClick={onClick}
+    <button onClick={onClick} data-tour={tour}
       className={cx('mb-0.5 flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-right',
         'transition-colors duration-150',
         active ? 'bg-brand-100 text-brand-800' : 'text-ink-700 hover:bg-ink-100')}>

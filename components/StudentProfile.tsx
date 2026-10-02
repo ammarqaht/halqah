@@ -21,6 +21,7 @@ import Link from 'next/link';
 import {
   X, Pencil, Check, Trophy, ClipboardCheck, Coins, CalendarCheck,
   ArrowLeft, AlertTriangle, FileText,
+  Layers3,
 } from 'lucide-react';
 import { Sheet, SheetHead } from '@/components/Sheet';
 import { Num, pointWord } from '@/components/Num';
@@ -153,21 +154,10 @@ export function StudentProfile({
         <Sheet>
           <SheetHead title="بياناته" meta="اضغط أيّ سطر لتعديله" />
           <dl>
-            <Row label="المستوى"
-              edit={talqeen ? undefined : () => (
-                <select className={cx(INPUT, 'h-9 py-0')} value={d.currentLevel ?? ''}
-                  onChange={(e) => put({ currentLevel: e.target.value ? Number(e.target.value) : null })}>
-                  <option value="">—</option>
-                  {levelsFor(d.track).map((l) => (
-                    <option key={l} value={l}>{l}</option>
-                  ))}
-                </select>
-              )}>
-              {talqeen ? <span className="text-ink-400">مسار التلقين بلا مستوى</span>
-                : d.currentLevel != null ? <Num className="font-medium">{d.currentLevel}</Num>
-                : <span className="text-ink-400">لم يُحدَّد</span>}
-            </Row>
-
+            {/* No «المستوى» row here any more. It was editable in two places on
+                this one screen and moved only the roster — not his sheet, not
+                his teacher's card. «تعديل مستوى طالب» in الخطط is the one door
+                now; «مستواه وخطته» beside this shows it and links there. */}
             <Row label="الحلقة"
               edit={() => (
                 <select className={cx(INPUT, 'h-9 py-0')} value={d.halaqaId ?? ''}
@@ -260,16 +250,7 @@ export function StudentProfile({
               </p>
             ) : (
               <dl>
-                <Row label="المستوى"
-                  edit={() => (
-                    <select className={cx(INPUT, 'h-9 py-0')} value={d.currentLevel ?? ''}
-                      onChange={(e) => put({ currentLevel: e.target.value ? Number(e.target.value) : null })}>
-                      <option value="">—</option>
-                      {levelsFor(d.track).map((l) => (
-                        <option key={l} value={l}>{l}</option>
-                      ))}
-                    </select>
-                  )}>
+                <Row label="المستوى">
                   {d.currentLevel != null
                     ? <span className="flex items-baseline gap-2">
                         <Num className="font-medium">{d.currentLevel}</Num>
@@ -317,6 +298,9 @@ export function StudentProfile({
                   <Btn size="sm" variant={plan ? undefined : 'primary'} icon={FileText}>
                     {plan ? 'الخطط وطباعتها' : 'إصدار خطة'}
                   </Btn>
+                </Link>
+                <Link href={`/admin/plans/level?student=${d.id}`}>
+                  <Btn size="sm" icon={Layers3}>تعديل المستوى</Btn>
                 </Link>
               </div>
             )}

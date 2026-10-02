@@ -16,6 +16,8 @@ import { TeacherNav } from '@/components/teacher/Nav';
 import { LoadingMark } from '@/components/LoadingMark';
 import { ScrollProgress } from '@/components/ScrollProgress';
 import { MedadFoot } from '@/components/MedadFoot';
+import { WhatsNew } from '@/components/whatsnew/WhatsNew';
+import { Tour } from '@/components/whatsnew/Tour';
 import { DevBand } from '@/components/DevBand';
 import { AlertStory } from '@/components/AlertStory';
 import { KIND } from '@/components/teacher/Alerts';
@@ -42,6 +44,10 @@ function Shell({ children }: { children: React.ReactNode }) {
           key: a.key, icon: KIND[a.kind].icon, label: KIND[a.kind].label,
           body: a.body, at: a.at, href: a.kind === 'MESSAGE' ? undefined : a.href,
         }))} />
+      {/* «ما الجديد» sits above the alerts (z-90 over z-80): what changed in
+          the portal first, then what happened to him. */}
+      <WhatsNew audience="teacher" />
+      <Tour />
     </div>
   );
 }

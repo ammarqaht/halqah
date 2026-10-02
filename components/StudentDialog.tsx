@@ -236,7 +236,11 @@ export function StudentDialog({ open, student, defaultHalaqa, onClose }:
             options={grades} placeholder="اختر الصف" />
         </Field>
 
-        {track && track !== 'TALQEEN' && (
+        {/* Only for a NEW student — his starting level is part of adding him.
+            After that the level moves from «تعديل مستوى طالب» in الخطط and
+            nowhere else, because that is the one path that moves his sheet
+            and his teacher's card with it. */}
+        {!student && track && track !== 'TALQEEN' && (
           <div className="sm:col-span-2">
             <Field label="المستوى الحالي"
               hint={`المسار ${TRACK_AR[track]} — المستويات تنزل من ${levelsFor(track)[0]} إلى ١`}>

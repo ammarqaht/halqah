@@ -960,3 +960,20 @@ model AssignmentRequest {
   @@index([halaqaId, status])
   @@map("assignment_requests")
 }
+
+/**
+ * ما الجديد — who has seen which update. The updates themselves live in code
+ * (content/releases.ts), written alongside the feature they describe; a row
+ * here only says «this person has seen it». Missing means unseen, so updates
+ * pile up for whoever has been away until they next sign in.
+ */
+model ReleaseView {
+  /** 'admin' | 'teacher' | 'student' — three kinds of account, three id spaces. */
+  audience  String
+  userId    String   @map("user_id")
+  releaseId String   @map("release_id")
+  seenAt    DateTime @default(now()) @map("seen_at")
+
+  @@id([audience, userId, releaseId])
+  @@map("release_views")
+}
