@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { levelOf, planOf as sheetOf, pointerOf } from '@/lib/level';
 import { assertMine, fail, scope } from '../../_scope';
 import { absence, hijri, type DayRecord } from '@/lib/teacher';
 import { balanceOf, earnsPoints, EXAM_TYPE_AR, type ExamType } from '@/lib/points';
@@ -53,8 +54,10 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     db.halaqaTransfer.findMany({ where: { studentId: id }, orderBy: { movedAt: 'desc' } }),
   ]);
 
-  const plan = plans[0] ?? null;
-  const level = student.progress?.level ?? plan?.level ?? student.currentLevel ?? null;
+  /* lib/level — his level, the sheet for it, and the pointer while it is on it. */
+  const plan = sheetOf(student, plans);
+  const level = levelOf(student, plans);
+  const ptr = pointerOf(student, plans);
   const eligible = earnsPoints({ track });
 
   /* مواضع تكرار الخطأ — «السور التي كثرت فيها أخطاؤه في التسميع، تُجمع من خانة
@@ -91,9 +94,9 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       stage: student.stage || null,
       level,
       ajza: ajzaExact(track, level),
-      assignmentNo: student.progress?.assignmentNo ?? null,
+      assignmentNo: ptr?.assignmentNo ?? null,
       assignmentOf: plan?.dayCount ?? 0,
-      awaitingExam: student.progress?.awaitingExam ?? null,
+      awaitingExam: ptr?.awaitingExam ?? null,
       /** «يحتاج مراجعة قبل الاختبار» — ما رفعه معلّمه، إن رفعه. */
       examHold: student.progress?.examHoldAt
         ? {

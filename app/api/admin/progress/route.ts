@@ -6,6 +6,7 @@ import { badgeAt } from '@/lib/teacher';
 import { badgeAr } from '@/lib/day';
 import type { CurriculumDay, ExamDayMap, Track } from '@/lib/types';
 import { TRACK_AR } from '@/lib/types';
+import { levelOf, planOf, pointerOf } from '@/lib/level';
 
 /* مؤشّر المقرّر — عند المشرف وحده.
    «المعلم لا يمكن أن يحدد مقرر الطالب، فيظهر له أن الطالب لم يسجل له مقرر عليه
@@ -30,7 +31,7 @@ export async function GET(req: Request) {
     db.student.findMany({
       where: { status: 'ACTIVE', ...(halaqaId ? { halaqaId } : {}) },
       orderBy: [{ halaqaId: 'asc' }, { fullName: 'asc' }],
-      include: { progress: true, plans: { orderBy: { issuedAt: 'desc' }, take: 1 } },
+      include: { progress: true, plans: true },
     }),
     db.halaqa.findMany({ orderBy: { name: 'asc' },
       select: { id: true, name: true, teacher: true } }),
@@ -38,7 +39,7 @@ export async function GET(req: Request) {
 
   /* Only the levels these students are actually on — never the whole table. */
   const wanted = [...new Set(students
-    .map((st) => st.plans[0])
+    .map((st) => planOf(st, st.plans))
     .filter(Boolean)
     .map((p) => `${p!.track}:${p!.level}`))];
   const curriculum = wanted.length
@@ -53,7 +54,9 @@ export async function GET(req: Request) {
   return NextResponse.json({
     halaqat,
     students: students.map((st) => {
-      const plan = st.plans[0] ?? null;
+      /* lib/level — the same level, sheet and pointer every screen reads. */
+      const plan = planOf(st, st.plans);
+      const ptr = pointerOf(st, st.plans);
       const track = (st.track as Track | null) ?? null;
       const dayCount = plan
         ? dayCountFor(plan.track as Track, plan.level,
@@ -68,11 +71,11 @@ export async function GET(req: Request) {
            ولا نقاط ولا خطة». The screen says so rather than offering a field
            that would be refused. */
         eligible: !!track && track !== 'TALQEEN' && !!plan,
-        level: st.progress?.level ?? plan?.level ?? st.currentLevel ?? null,
-        assignmentNo: st.progress?.assignmentNo ?? null,
+        level: levelOf(st, st.plans),
+        assignmentNo: ptr?.assignmentNo ?? null,
         assignmentOf: dayCount,
-        awaitingExam: st.progress?.awaitingExam ?? null,
-        awaitingExamAr: badgeAr(st.progress?.awaitingExam ?? null),
+        awaitingExam: ptr?.awaitingExam ?? null,
+        awaitingExamAr: badgeAr(ptr?.awaitingExam ?? null),
         setByName: st.progress?.setByName ?? '',
         updatedAt: st.progress?.updatedAt?.toISOString() ?? null,
       };
@@ -91,11 +94,14 @@ export async function POST(req: Request) {
 
   const student = await db.student.findUnique({
     where: { id: studentId },
-    include: { plans: { orderBy: { issuedAt: 'desc' }, take: 1 } },
+    include: { plans: true },
   });
   if (!student) return NextResponse.json({ error: 'لم يُعثر على الطالب.' }, { status: 404 });
 
-  const plan = student.plans[0] ?? null;
+  /* The sheet for his CURRENT level — the newest plan was a different level
+     whenever the level had moved without a new sheet, and the pointer was then
+     written onto the old one. */
+  const plan = planOf(student, student.plans);
   if (!plan) {
     return NextResponse.json(
       { error: 'لم تُصدر خطته بعد — أصدر خطة مستواه أولًا.' }, { status: 422 });

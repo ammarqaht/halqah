@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { planOf, pointerOf } from '@/lib/level';
 import { assertMine, fail, scope } from '../../../_scope';
 import { resolvePlan, dailyAmountFor, TAJWEED_FOOTER } from '@/lib/curriculum';
 import { ajzaForLevel } from '@/lib/exams';
@@ -30,7 +31,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   }
 
   const student = await db.student.findUniqueOrThrow({
-    where: { id }, include: { progress: true } });
+    where: { id }, include: { progress: true, plans: true } });
   const track = student.track as Track | null;
 
   /* «مسار التلقين بلا مستوى ولا خطة» — a 200 with a reason, not an error: the
@@ -41,8 +42,9 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       id: student.id, fullName: student.fullName } });
   }
 
-  const row = await db.studentPlan.findFirst({
-    where: { studentId: id }, orderBy: { issuedAt: 'desc' } });
+  /* The sheet for his current level (lib/level) — not merely the newest. */
+  const row = planOf(student, student.plans);
+  const ptr = pointerOf(student, student.plans);
   if (!row) {
     return NextResponse.json({ plan: null, reason: 'NO_PLAN', student: {
       id: student.id, fullName: student.fullName } });
@@ -78,8 +80,8 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     },
     /** Where he stands on it — the one thing the supervisor's copy of this sheet
         cannot show, because the pointer did not exist until this portal. */
-    currentAssignment: student.progress?.assignmentNo ?? null,
-    awaitingExam: student.progress?.awaitingExam ?? null,
+    currentAssignment: ptr?.assignmentNo ?? null,
+    awaitingExam: ptr?.awaitingExam ?? null,
     kindAr: PLAN_KIND_AR as Record<PlanKind, string>,
     days,
     /** «بترويسته ومرجع التجويد في ذيله، في صفحة واحدة» — printed, not decoration:

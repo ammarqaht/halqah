@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { levelOf, planOf as sheetOf, pointerOf } from '@/lib/level';
 import { scope } from '../_scope';
 import { absence, type DayRecord } from '@/lib/teacher';
 import { balances, earnsPoints } from '@/lib/points';
@@ -52,8 +53,8 @@ export async function GET(req: Request) {
   const bal = balances(txns.map((t) => ({ ...t, createdAt: t.createdAt.toISOString() })) as never);
   const recitedOn = new Map<string, string>();
   for (const r of lastRecited) if (!recitedOn.has(r.studentId)) recitedOn.set(r.studentId, r.day);
-  const planOf = new Map<string, (typeof plans)[number]>();
-  for (const p of plans) planOf.set(p.studentId, p);
+  const plansOf = new Map<string, (typeof plans)>();
+  for (const p of plans) plansOf.set(p.studentId, [...(plansOf.get(p.studentId) ?? []), p]);
   const bookingOf = new Map<string, (typeof bookings)[number]>();
   for (const b of bookings) if (!bookingOf.has(b.studentId)) bookingOf.set(b.studentId, b);
 
@@ -67,7 +68,11 @@ export async function GET(req: Request) {
   return NextResponse.json({
     students: students.map((s) => {
       const track = (s.track as Track | null) ?? null;
-      const plan = planOf.get(s.id) ?? null;
+      /* lib/level — his level, his sheet for it, and the pointer only while it
+         is on that level. */
+      const mine = plansOf.get(s.id) ?? [];
+      const plan = sheetOf(s, mine);
+      const ptr = pointerOf(s, mine);
       const a = absence(byStudent.get(s.id) ?? [], today);
       const eligible = earnsPoints({ track });
       return {
@@ -75,16 +80,16 @@ export async function GET(req: Request) {
         fullName: s.fullName,
         track,
         trackAr: track ? TRACK_AR[track] : null,
-        level: s.progress?.level ?? plan?.level ?? s.currentLevel ?? null,
-        assignmentNo: s.progress?.assignmentNo ?? null,
+        level: levelOf(s, mine),
+        assignmentNo: ptr?.assignmentNo ?? null,
         assignmentOf: plan?.dayCount ?? 0,
-        awaitingExam: s.progress?.awaitingExam ?? null,
+        awaitingExam: ptr?.awaitingExam ?? null,
         lastRecitedOn: recitedOn.get(s.id) ?? null,
         balance: eligible ? (bal.get(s.id)?.balance ?? 0) : null,
         /** The small alert column: «بلغ مقرّر الاختبار · اختباره محجوز · تأخّر
             على مستواه · غياب متكرر». */
         flags: {
-          dueForExam: !!s.progress?.awaitingExam,
+          dueForExam: !!ptr?.awaitingExam,
           /** «يحتاج مراجعة» — رأي المعلّم نفسه، يراه حيث يرى بقية طلابه. */
           needsReview: !!s.progress?.examHoldAt,
           booked: bookingOf.get(s.id)?.scheduledOn ?? null,

@@ -1,5 +1,6 @@
 import 'server-only';
 import { db } from '@/lib/db';
+import { levelOf } from '@/lib/level';
 import { knightOfWeek, type KnightDay } from '@/lib/teacher';
 import { isoDate } from '@/lib/dates';
 import { TRACK_AR, type PlanKind, type Track } from '@/lib/types';
@@ -126,7 +127,7 @@ export async function knightsOfWeek(
       halaqaId: s.halaqaId,
       halaqaName: halaqaName.get(s.halaqaId ?? '') ?? '—',
       trackAr: track ? TRACK_AR[track] : '—',
-      level: s.progress?.level ?? s.currentLevel ?? null,
+      level: levelOf(s),
       met: v.met,
       of: v.of,
     });

@@ -1101,6 +1101,11 @@ export const store = {
       replacing the server's with this browser's older copy. */
   adoptLevel(studentId: string, plan: StudentPlan) {
     const cur = load();
+    /* A sheet this browser already printed keeps its print count — the server
+       may have minted its own row for the same level before the save reached it. */
+    const local = cur.plans.find((p) => p.studentId === plan.studentId
+      && p.track === plan.track && p.level === plan.level);
+    if (local) plan = { ...plan, printedCount: Math.max(plan.printedCount, local.printedCount) };
     commit({
       ...cur,
       plans: [...cur.plans.filter((p) => p.id !== plan.id

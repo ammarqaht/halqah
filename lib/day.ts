@@ -1,5 +1,6 @@
 import 'server-only';
 import type { Prisma } from '@prisma/client';
+import { levelOf, planOf as sheetOf, pointerOf } from '@/lib/level';
 import { db } from '@/lib/db';
 import { resolvePlan, dayCountFor, DEFAULT_EXAM_DAYS } from '@/lib/curriculum';
 import { findSurah } from '@/lib/surahs';
@@ -131,14 +132,18 @@ export async function cardsFor(args: {
   ]);
 
   const entryOf = new Map(entries.map((e) => [e.studentId, e]));
-  const planOf = new Map<string, (typeof plans)[number]>();
-  for (const p of plans) planOf.set(p.studentId, p);   // ascending, so the last wins
+  const plansOf = new Map<string, (typeof plans)>();
+  for (const p of plans) plansOf.set(p.studentId, [...(plansOf.get(p.studentId) ?? []), p]);
 
   return students.map((st) => {
     const entry = entryOf.get(st.id) ?? null;
     const track = (st.track as Track | null) ?? null;
     const prog = st.progress;
-    const plan = planOf.get(st.id) ?? null;
+    /* lib/level — his level, the sheet FOR it, and the pointer only while it is
+       on that level. A pointer left on the previous level is not «where he is». */
+    const mine = plansOf.get(st.id) ?? [];
+    const plan = sheetOf(st, mine);
+    const ptr = pointerOf(st, mine);
 
     /* ── A SAVED DAY IS A RECORD, NOT A PROPOSAL ──────────────────────────
        The pointer says what he must recite TODAY, and saving a day MOVES it. So
@@ -154,16 +159,16 @@ export async function cardsFor(args: {
        pointer is only consulted for a day that has nothing saved on it — which
        is also what makes clearing a day put its مقرّر back on the card, since the
        row that anchored it is gone. */
-    const level = entry?.level ?? prog?.level ?? plan?.level ?? st.currentLevel ?? null;
-    const planTrack = (entry?.track ?? prog?.track ?? plan?.track ?? track) as Track | null;
+    const level = entry?.level ?? levelOf(st, mine);
+    const planTrack = (entry?.track ?? plan?.track ?? track) as Track | null;
 
     const dayCount = planTrack && level != null
       ? dayCountFor(planTrack, level, curriculum as unknown as CurriculumDay[]) : 0;
 
     const examDays = (plan?.examDays as unknown as ExamDayMap | null) ?? DEFAULT_EXAM_DAYS;
 
-    const at = entry?.assignmentNo ?? prog?.assignmentNo ?? null;
-    const awaiting = (prog?.awaitingExam as Card['awaitingExam']) ?? null;
+    const at = entry?.assignmentNo ?? ptr?.assignmentNo ?? null;
+    const awaiting = (ptr?.awaitingExam as Card['awaitingExam']) ?? null;
     /* A day already written keeps its lines even if the pointer has since
        stopped at a badge: the boy who reached ١٢ by reciting on Thursday must
        still see Thursday's recitation when he opens Thursday. */
@@ -291,12 +296,13 @@ export async function saveCard(args: {
   return db.$transaction(async (tx) => {
     const st = await tx.student.findFirstOrThrow({
       where: { id: card.studentId, halaqaId },
-      include: { progress: true },
+      include: { progress: true, plans: true },
     });
     const track = (st.track as Track | null) ?? null;
 
-    const plan = await tx.studentPlan.findFirst({
-      where: { studentId: st.id }, orderBy: { issuedAt: 'desc' } });
+    /* The sheet for his CURRENT level (lib/level) — not merely the newest. */
+    const plan = sheetOf(st, st.plans);
+    const level = levelOf(st, st.plans);
     const curriculum = plan
       ? await tx.curriculumDay.findMany({ where: { track: plan.track, level: plan.level } })
       : [];
@@ -347,7 +353,8 @@ export async function saveCard(args: {
        takes حضور and ثوب only, and the supervisor sets the pointer from بوابة
        الإدارة. Anything else would let a teacher invent a starting point for a
        boy already halfway through a level. */
-    const prog = st.progress;
+    /* The pointer only while it is on his current level (lib/level). */
+    const prog = pointerOf(st, st.plans);
     const at = existing?.assignmentNo ?? prog?.assignmentNo ?? null;
 
     /* And whether he was stopped for an exam BEFORE this day: on a re-save that
@@ -375,7 +382,7 @@ export async function saveCard(args: {
       assignmentNo: at,
       talqeenSurah: talqeen?.surah ?? null,
       talqeenAyah: talqeen?.ayah ?? null,
-      level: plan?.level ?? st.currentLevel ?? null,
+      level: plan?.level ?? level,
       track: track ?? null,
       incomplete: moved.incomplete,
       note: String(card.note ?? '').slice(0, 280),
@@ -444,14 +451,14 @@ export async function saveCard(args: {
         create: {
           studentId: st.id,
           track: plan?.track ?? track ?? null,
-          level: plan?.level ?? st.currentLevel ?? null,
+          level: plan?.level ?? level,
           assignmentNo: moved.assignmentNo,
           awaitingExam: moved.awaitingExam,
           setById: by.id, setByRole: by.role, setByName: by.name,
         },
         update: {
           track: plan?.track ?? track ?? null,
-          level: plan?.level ?? st.currentLevel ?? null,
+          level: plan?.level ?? level,
           assignmentNo: moved.assignmentNo,
           awaitingExam: moved.awaitingExam,
           setById: by.id, setByRole: by.role, setByName: by.name,

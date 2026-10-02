@@ -283,7 +283,11 @@ function ProgressCard() {
                   r.trackAr === 'تلقين' ? (
                     <span className="text-panel text-ink-400">التلقين بلا خطة</span>
                   ) : (
-                    <Link href={`/admin/plans?student=${r.id}`} className="shrink-0">
+                    /* To «تعديل مستوى طالب», not to printing: printing proposes
+                       the NEXT level, and a boy whose level was moved without a
+                       sheet needs one for the level he is on. That screen issues
+                       it and puts him at مقرّر 1 in one step. */
+                    <Link href={`/admin/plans/level?student=${r.id}`} className="shrink-0">
                       <Btn size="sm" icon={FileText}>صدّر خطته</Btn>
                     </Link>
                   )

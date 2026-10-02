@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { levelOf, planOf, pointerOf } from '@/lib/level';
 import { readSession } from '@/lib/auth';
 import { dayCountFor, DEFAULT_EXAM_DAYS } from '@/lib/curriculum';
 import { badgeAt } from '@/lib/teacher';
@@ -85,9 +86,10 @@ export async function POST(req: Request) {
      هي المرجع، وعدد أيامها هو الحدّ. */
   const student = await db.student.findUnique({
     where: { id: r.studentId },
-    include: { plans: { orderBy: { issuedAt: 'desc' }, take: 1 } },
+    include: { plans: true },
   });
-  const plan = student?.plans[0] ?? null;
+  /* The sheet for his current level (lib/level), not merely the newest. */
+  const plan = student ? planOf(student, student.plans) : null;
   if (!student || !plan) {
     return NextResponse.json(
       { error: 'لم تُصدر خطته بعد — أصدر خطة مستواه أولًا.' }, { status: 422 });

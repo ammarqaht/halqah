@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { planOf, pointerOf } from '@/lib/level';
 import { scope } from '../_scope';
 import { resolvePlan, dailyAmountFor } from '@/lib/curriculum';
 import { ajzaForLevel, nextLevel } from '@/lib/exams';
@@ -35,14 +36,15 @@ export async function GET() {
   const g = await scope();
   if (!g.ok) return g.res;
 
-  const student = await db.student.findUnique({ where: { id: g.s.sub } });
+  const student = await db.student.findUnique({
+    where: { id: g.s.sub }, include: { progress: true, plans: true } });
   if (!student) return NextResponse.json({ error: 'لم يُعثر على الطالب.' }, { status: 404 });
 
   const track = student.track as Track | null;
   if (!track || track === 'TALQEEN') return NextResponse.json({ plan: null, reason: 'TALQEEN' });
 
-  const row = await db.studentPlan.findFirst({
-    where: { studentId: student.id }, orderBy: { issuedAt: 'desc' } });
+  /* The sheet for his current level (lib/level) — not merely the newest. */
+  const row = planOf(student, student.plans);
   if (!row) return NextResponse.json({ plan: null, reason: 'NO_PLAN' });
 
   /* Only this track and level — never the whole curriculum table. */
@@ -63,8 +65,9 @@ export async function GET() {
      the calendar. A day with no DARS recited did not move him and does not get a
      tick: «الانتقال إلى المقرّر التالي» is the درس, and that is what `advances`
      says on the teacher's side too. */
-  const [progress, entries] = await Promise.all([
-    db.studentProgress.findUnique({ where: { studentId: student.id } }),
+  /* The pointer only while it is on this level (lib/level). */
+  const progress = pointerOf(student, student.plans);
+  const [entries] = await Promise.all([
     db.dayEntry.findMany({
       where: {
         studentId: student.id,

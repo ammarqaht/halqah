@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { levelOf, planOf as sheetOf, pointerOf } from '@/lib/level';
 import { fail, scope, teacherSettings } from '../_scope';
 import { absence, daysInPeriod, type DayRecord } from '@/lib/teacher';
 import { knightsOfWeek } from '@/lib/knights';
@@ -87,8 +88,8 @@ export async function GET(req: Request) {
     const bal = balances(txns.map((t) => ({ ...t, createdAt: t.createdAt.toISOString() })) as never);
     const recitedOn = new Map<string, string>();
     for (const r of lastRecited) if (!recitedOn.has(r.studentId)) recitedOn.set(r.studentId, r.day);
-    const planOf = new Map<string, (typeof plans)[number]>();
-    for (const p of plans) planOf.set(p.studentId, p);
+    const plansOf = new Map<string, (typeof plans)>();
+    for (const p of plans) plansOf.set(p.studentId, [...(plansOf.get(p.studentId) ?? []), p]);
     const examOf = new Map<string, (typeof exams)[number]>();
     for (const e of exams) if (!examOf.has(e.studentId)) examOf.set(e.studentId, e);
 
@@ -96,14 +97,16 @@ export async function GET(req: Request) {
       kind, ...head,
       rows: students.map((s) => {
         const track = s.track as Track | null;
-        const plan = planOf.get(s.id) ?? null;
+        /* lib/level — the same level, sheet and pointer as his card. */
+        const mine = plansOf.get(s.id) ?? [];
+        const plan = sheetOf(s, mine);
         const exam = examOf.get(s.id) ?? null;
         return {
           id: s.id,
           fullName: s.fullName,
           trackAr: track ? TRACK_AR[track] : '—',
-          level: s.progress?.level ?? plan?.level ?? s.currentLevel ?? null,
-          assignmentNo: s.progress?.assignmentNo ?? null,
+          level: levelOf(s, mine),
+          assignmentNo: pointerOf(s, mine)?.assignmentNo ?? null,
           assignmentOf: plan?.dayCount ?? 0,
           lastRecitedOn: recitedOn.get(s.id) ?? null,
           balance: earnsPoints({ track }) ? (bal.get(s.id)?.balance ?? 0) : null,
@@ -198,7 +201,8 @@ export async function GET(req: Request) {
   /* ── المستحقون للاختبار — «مَن بلغ المقرّر ١٢ أو ٢٤ من طلابه، بمستوياتهم وتاريخ
      استحقاقهم، ومواعيد المحجوز منها». The sheet he sends to the supervisor. */
   if (kind === 'DUE') {
-    const due = students.filter((s) => s.progress?.awaitingExam);
+    /* A badge left on a level he has since left is not due — lib/level. */
+    const due = students.filter((s) => pointerOf(s)?.awaitingExam);
     const dueIds = due.map((s) => s.id);
     const bookings = dueIds.length
       ? await db.examBooking.findMany({
@@ -216,7 +220,7 @@ export async function GET(req: Request) {
           id: s.id,
           fullName: s.fullName,
           trackAr: track ? TRACK_AR[track] : '—',
-          level: s.progress?.level ?? null,
+          level: levelOf(s),
           assignmentNo: s.progress?.assignmentNo ?? null,
           badge: s.progress?.awaitingExam ?? null,
           badgeAr: badgeAr(s.progress?.awaitingExam ?? null),

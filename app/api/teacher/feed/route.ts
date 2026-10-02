@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { levelOf, pointerOf } from '@/lib/level';
 import { scope } from '../_scope';
 import { earnsPoints, EXAM_TYPE_AR, type ExamType } from '@/lib/points';
 import { TXN_KIND_AR, type Track, type TxnKind } from '@/lib/types';
@@ -27,7 +28,7 @@ export async function GET(req: Request) {
   const students = await db.student.findMany({
     where: { halaqaId: g.who.halaqaId, status: 'ACTIVE' },
     orderBy: { fullName: 'asc' },
-    select: { id: true, fullName: true, track: true, progress: true },
+    select: { id: true, fullName: true, track: true, currentLevel: true, progress: true },
   });
   const ids = students.map((s) => s.id);
   const nameOf = new Map(students.map((s) => [s.id, s.fullName]));
@@ -54,13 +55,14 @@ export async function GET(req: Request) {
   for (const b of open) if (!bookedOn.has(b.studentId)) bookedOn.set(b.studentId, b.scheduledOn);
 
   const due = students
-    .filter((s) => s.progress?.awaitingExam)
+    /* Only a badge on the level he is on now — lib/level. */
+    .filter((s) => pointerOf(s)?.awaitingExam)
     .map((s) => ({
       id: s.id,
       fullName: shortName(s.fullName),
       badge: s.progress!.awaitingExam,
       badgeAr: badgeAr(s.progress!.awaitingExam),
-      level: s.progress!.level,
+      level: levelOf(s),
       assignmentNo: s.progress!.assignmentNo,
       /** منذ متى وهو ينتظر — اليوم الذي وقف فيه مؤشّره على مقرّر الاختبار. */
       since: isoDate(s.progress!.updatedAt),

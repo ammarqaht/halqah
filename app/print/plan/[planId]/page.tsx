@@ -115,7 +115,23 @@ function PlanSheetInner({ params }: { params: Promise<{ planId: string }> }) {
   useEffect(() => {
     if (!plan || blank || stamped.current) return;
     stamped.current = true;
+    /* A sheet for a level he is not on yet is a promotion — and a promotion
+       must reach his teacher's card too, not only this browser's roster. So it
+       goes through the same door as «تعديل مستوى طالب» (api/admin/level): the
+       roster, the plan and the pointer at مقرّر 1, together. A reprint of his
+       own level moves nothing. */
+    const promotes = !!student && student.currentLevel !== plan.level;
     store.markPrinted(plan.id);
+    if (promotes) {
+      fetch('/api/admin/level', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studentId: plan.studentId, level: plan.level }),
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j) => { if (j?.plan) store.adoptLevel(plan.studentId, j.plan); })
+        .catch(() => { /* the roster still moved; the level screen can finish it */ });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plan, blank]);
 
   if (!plan || (!blank && !student)) {

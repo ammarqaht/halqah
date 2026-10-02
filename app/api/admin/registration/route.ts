@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { levelOf, planOf, pointerOf } from '@/lib/level';
 import { readSession } from '@/lib/auth';
 import { knightOfWeek, type KnightDay } from '@/lib/teacher';
 import { weekFrom } from '@/lib/knights';
@@ -55,7 +56,7 @@ export async function GET(req: Request) {
   const students = await db.student.findMany({
     where: { status: 'ACTIVE', ...(halaqaId ? { halaqaId } : {}) },
     orderBy: { fullName: 'asc' },
-    include: { progress: true, plans: { orderBy: { issuedAt: 'desc' }, take: 1 } },
+    include: { progress: true, plans: true },
   });
   const ids = students.map((x) => x.id);
   if (!ids.length) {
@@ -108,12 +109,11 @@ export async function GET(req: Request) {
     }
     const v = knightOfWeek(days, forRule, passedOn.get(st.id) ?? {});
 
-    /* The pointer first, then the plan he was issued, then the level on his
-       own record: the same order `lib/day.ts` resolves them in, so the sheet
-       cannot disagree with the card his teacher was looking at. */
-    const plan = st.plans[0] ?? null;
+    /* lib/level — the same level and pointer the teacher's card reads, so the
+       sheet cannot disagree with it. */
     const track = (st.track as Track | null) ?? null;
-    const level = st.progress?.level ?? plan?.level ?? st.currentLevel ?? null;
+    const level = levelOf(st, st.plans);
+    const ptr = pointerOf(st, st.plans);
 
     return {
       id: st.id,
@@ -122,7 +122,7 @@ export async function GET(req: Request) {
       /* تلقين has no level and no مقرّر at all — «لا مستوى له ولا منهج» — and
          the sheet says so with a dash rather than with a nought. */
       level: track === 'TALQEEN' ? null : level,
-      assignmentNo: track === 'TALQEEN' ? null : (st.progress?.assignmentNo ?? null),
+      assignmentNo: track === 'TALQEEN' ? null : (ptr?.assignmentNo ?? null),
       /* One cell per day: the four marks, and the status that colours it. */
       cells: days.map((day) => {
         const e = mine.get(day);

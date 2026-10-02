@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { levelOf, planOf, pointerOf } from '@/lib/level';
 import { dayCountFor, DEFAULT_EXAM_DAYS } from '@/lib/curriculum';
 import { badgeAt } from '@/lib/teacher';
 import type { CurriculumDay, ExamDayMap, Track } from '@/lib/types';
@@ -45,13 +46,14 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
 
   const student = await db.student.findUnique({
     where: { id },
-    include: { progress: true, plans: { orderBy: { issuedAt: 'desc' }, take: 1 } },
+    include: { progress: true, plans: true },
   });
   if (!student) return fail('لم يُعثر على الطالب.', 404);
 
   /* التلقين لا مقرّر له أصلًا — «لا مستوى له ولا منهج» — ومن لم تُصدر خطته
      ليس له عددُ أيام يُقاس عليه الطلب. */
-  const plan = student.plans[0] ?? null;
+  /* The sheet for his current level (lib/level). */
+  const plan = planOf(student, student.plans);
   if (student.track === 'TALQEEN' || !plan) {
     return fail('هذا الطالب بلا خطة — راجع المشرف لإصدارها أولًا.', 422);
   }
@@ -68,7 +70,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     return fail(`المقرّر رقم بين ١ و${dayCount || 24}.`, 422);
   }
 
-  const from = student.progress?.assignmentNo ?? null;
+  const from = pointerOf(student, student.plans)?.assignmentNo ?? null;
   if (from === to) return fail('هذا مقرّره الآن — لا شيء يُطلب.', 422);
 
   /* طلبٌ واحد معلّق لكل طالب. والثاني يستبدل الأول ولا يصطفّ خلفه: المعلّم
@@ -90,7 +92,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       askedByRole: who.role,
       askedByName: who.name,
       track: plan.track,
-      level: student.progress?.level ?? plan.level,
+      level: levelOf(student, student.plans) ?? plan.level,
       fromAssignmentNo: from,
       toAssignmentNo: to,
       /* ١٢ و٢٤ مقرّرا وسام، فالطلب يقول وسامًا أيضًا بلا خانة ثانية يملؤها. */
