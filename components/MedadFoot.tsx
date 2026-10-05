@@ -1,10 +1,13 @@
 'use client';
 /* تم تطوير هذا النظام بواسطة مـــداد.
  *
- * At the foot of every screen in the three portals, and on the two sign-in
- * pages. The mark is the supplied wordmark — never redrawn and never
- * recoloured, the same rule the mosque's and the association's marks follow in
- * components/Logo.tsx.
+ * At the foot of every screen in the three portals, and on the sign-in pages.
+ *
+ * The name is SET IN THMANYAH, not drawn from the wordmark image: «هنا وفي كل
+ * مكان استعمل نفس خط ثمانية» (client, 5 Oct 2026) — the same line, in the same
+ * face, that closes Medad's other systems (Binaa_3taa's MedadCredit): the
+ * sentence light, «مـــداد» bold and a step larger, in the brand's deep teal
+ * on paper and in sand on the green field.
  *
  * It sits INSIDE the scrolling area rather than fixed to the viewport. Fixed,
  * it would cover the supervisor's work area (whose `main` is the only thing
@@ -19,39 +22,21 @@
  * printed sheets carry the association's and the mosque's marks, which is
  * whose paper it is.
  */
-import { useState } from 'react';
 import { cx } from '@/lib/cx';
 
 export function MedadFoot({
   white = false,
   className = '',
 }: { white?: boolean; className?: string }) {
-  const [failed, setFailed] = useState(false);
-
   return (
     <footer
-      className={cx('no-print flex items-center justify-center gap-2 py-7 text-center', className)}>
-      <span className={cx('text-cap', white ? 'text-white/55' : 'text-ink-400')}>
+      className={cx('no-print flex items-baseline justify-center gap-1.5 py-7 text-center font-sans', className)}>
+      <span className={cx('text-xs2', white ? 'text-white/60' : 'text-ink-400')}>
         تم تطوير هذا النظام بواسطة
       </span>
-
-      {failed ? (
-        /* The wordmark IS the name, so when the image cannot load the name is
-           what replaces it — never an empty box where a brand should be. */
-        <span className={cx('font-display text-panel', white ? 'text-white/75' : 'text-brand-700')}>
-          مــداد
-        </span>
-      ) : (
-        <img
-          src={white ? '/assets/medad-cream.png' : '/assets/medad-teal.png'}
-          alt="مداد"
-          onError={() => setFailed(true)}
-          /* 785×244 native; 14px tall sets it beside the line of text at the
-             weight of the words rather than above them. */
-          style={{ height: 14, width: 'auto' }}
-          className={cx('shrink-0', white ? 'opacity-75' : 'opacity-90')}
-        />
-      )}
+      <b className={cx('text-[15px] font-bold tracking-normal', white ? 'text-[#D9BE83]' : 'text-brand-900')}>
+        مـــداد
+      </b>
     </footer>
   );
 }
