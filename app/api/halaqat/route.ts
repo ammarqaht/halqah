@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { bumpRev } from '@/lib/rev';
 import { readSession } from '@/lib/auth';
 import { toHalaqa } from '@/lib/serialize';
 
@@ -34,6 +35,8 @@ export async function POST(req: Request) {
       data: { actorId: session.sub, action: 'UPSERT_HALAQA', entity: 'halaqa',
               entityId: saved.id, after: JSON.parse(JSON.stringify(saved)) as object },
     });
+    /* A write the supervisor's open pages have not seen — lib/rev. */
+    await bumpRev(db);
     return NextResponse.json(toHalaqa(saved));
   } catch (e) {
     return NextResponse.json(
@@ -60,6 +63,8 @@ export async function DELETE(req: Request) {
       data: { actorId: session.sub, action: 'DELETE_HALAQA', entity: 'halaqa', entityId: id,
               before: { detachedStudents: n } },
     });
+    /* A write the supervisor's open pages have not seen — lib/rev. */
+    await bumpRev(db);
     return NextResponse.json({ ok: true, detached: n });
   } catch (e) {
     return NextResponse.json(

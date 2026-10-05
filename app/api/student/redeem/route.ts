@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { bumpRev } from '@/lib/rev';
 import { pointsScope, fail } from '../_scope';
 import { normaliseCode, CODE_STATE_AR, earnsPoints } from '@/lib/points';
 import type { Track } from '@/lib/types';
@@ -90,6 +91,9 @@ export async function POST(req: Request) {
     });
 
     if ('error' in result && result.error) { noteFailure(student.id); return fail(result.error); }
+    /* The supervisor's open pages hold the ledger without this code's points;
+       an old one saving would delete them — lib/rev. */
+    await bumpRev(db);
     return NextResponse.json({ ok: true, ...result });
   } catch {
     noteFailure(student.id);

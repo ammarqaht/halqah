@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { bumpRev } from '@/lib/rev';
 import { readSession } from '@/lib/auth';
 
 /* TRUNCATE, not DELETE. DELETE leaves dead tuples behind that only a later
@@ -97,6 +98,8 @@ export async function POST(req: Request) {
       },
     });
 
+    /* Every open page's copy predates the reset — lib/rev. */
+    await bumpRev(db);
     return NextResponse.json({ ok: true, before, ms: Date.now() - started });
   } catch (e) {
     return NextResponse.json(

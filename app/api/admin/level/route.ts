@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'node:crypto';
+import { bumpRev } from '@/lib/rev';
 import { db } from '@/lib/db';
 import { readSession } from '@/lib/auth';
 import { dailyAmountFor, dayCountFor, DEFAULT_EXAM_DAYS } from '@/lib/curriculum';
@@ -40,8 +41,18 @@ export async function POST(req: Request) {
   const student = await db.student.findUnique({ where: { id: studentId } });
   if (!student) return NextResponse.json({ error: 'لم يُعثر على الطالب.' }, { status: 404 });
 
-  const track = student.track as Track | null;
-  if (!track || track === 'TALQEEN') {
+  /* The track the supervisor is looking at. His page may hold a track this
+     database has not received yet — set a minute ago, still in the save queue —
+     and refusing him «تلقين» while his screen says «فضي» is the error he got
+     (client, 5 Oct 2026). A silver or golden track sent with the request is
+     taken, and written, since the level only means something on it. */
+  const sent = body.track === 'SILVER' || body.track === 'GOLDEN' ? body.track as Track : null;
+  const track = sent ?? (student.track as Track | null);
+  if (!track) {
+    return NextResponse.json(
+      { error: 'هذا الطالب بلا مسار — حدّد مساره (فضي أو ذهبي) من ملفه أولًا.' }, { status: 422 });
+  }
+  if (track === 'TALQEEN') {
     return NextResponse.json(
       { error: 'مسار التلقين بلا مستوى — المستوى للمسارين الفضي والذهبي.' }, { status: 422 });
   }
@@ -65,7 +76,7 @@ export async function POST(req: Request) {
   };
 
   const plan = await db.$transaction(async (tx) => {
-    await tx.student.update({ where: { id: studentId }, data: { currentLevel: level } });
+    await tx.student.update({ where: { id: studentId }, data: { currentLevel: level, track } });
 
     const existing = await tx.studentPlan.findUnique({
       where: { studentId_track_level: { studentId, track, level } } });
@@ -96,6 +107,10 @@ export async function POST(req: Request) {
       before: JSON.parse(JSON.stringify(before)) as object,
       after: { currentLevel: level, planId: plan.id, assignmentNo: 1 } as object,
     } });
+
+    /* The supervisor's other open pages still hold the old level and no plan;
+       one of them saving would undo all of this — lib/rev. */
+    await bumpRev(tx);
 
     return plan;
   });

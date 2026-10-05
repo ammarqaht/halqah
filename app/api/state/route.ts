@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { bumpRev, lockRev, readRev } from '@/lib/rev';
 import { issueMissingAccounts, type IssuedAccount } from '@/lib/credentials';
 import { readSession } from '@/lib/auth';
 import { toStudent, toHalaqa } from '@/lib/serialize';
@@ -55,9 +56,13 @@ export async function GET(req: Request) {
   /* The stamp a reset leaves. A browser holding a copy from before it must
      empty itself rather than upload it back. */
   const resetAt = (await db.setting.findUnique({ where: { key: 'reset_at' } }))?.value ?? null;
+  /* Which version of the data this page is built on — it hands it back with
+     every save, and a save built on an older one is refused (lib/rev). */
+  const rev = await readRev(db);
 
   return json({
     resetAt,
+    rev,
     /* The roster comes DOWN too. It only ever went up — through /api/import —
        so every browser showed its own copy of the students and disagreed with
        the server about who they were and what رتل last said about them. That
@@ -195,9 +200,21 @@ export async function PUT(req: Request) {
 
   let newAccounts: IssuedAccount[] = [];
   let accountsWithoutId: string[] = [];
+  let rev = 0;
+
+  /* A save from a page built on an older copy would put that copy back over
+     everything written since — on this machine or another one (lib/rev). It
+     is refused, and the page rebuilds on the newer data and saves again. A
+     page from before this guard sends no number at all, and is refused too:
+     it is exactly the page that does not know what has changed. */
+  const base = typeof s.rev === 'number' ? s.rev : null;
+  class Stale extends Error { constructor(public current: number) { super('stale'); } }
 
   try {
     await db.$transaction(async (tx) => {
+      const current = await lockRev(tx);
+      if (base === null || base !== current) throw new Stale(current);
+
       /* The whole row, not just the key: the roster is written now, and writing
          it back unconditionally meant a hundred and seventeen sequential
          UPDATEs inside the transaction — against a database across a network,
@@ -445,8 +462,15 @@ export async function PUT(req: Request) {
        which is the worst of both — the supervisor's work is neither saved nor
        explained. The transaction is the only writer, and last write wins here
        anyway, so waiting is cheap and losing the save is not. */
+      rev = await bumpRev(tx);
     }, { timeout: 120_000, maxWait: 20_000 });
   } catch (e) {
+    if (e instanceof Stale) {
+      return NextResponse.json({
+        error: 'تغيّرت البيانات من صفحة أو جهاز آخر — حُدِّثت هذه الصفحة وسيُعاد الحفظ.',
+        stale: true, rev: e.current,
+      }, { status: 409 });
+    }
     return NextResponse.json(
       { error: 'تعذّر الحفظ على الخادم.', detail: e instanceof Error ? e.message : '' },
       { status: 500 });
@@ -455,7 +479,7 @@ export async function PUT(req: Request) {
   /* Named, not swallowed. A save that quietly kept two thirds of what it was
      given is the failure this whole endpoint exists to avoid. */
   return NextResponse.json({
-    ok: true, ms: Date.now() - started, orphaned: dropped,
+    ok: true, rev, ms: Date.now() - started, orphaned: dropped,
     /* So the screen can tell the supervisor the number to write on the card,
        and name the boy who could not be given one. */
     newAccounts, accountsWithoutId,

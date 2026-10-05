@@ -24,7 +24,7 @@ import { Combobox } from '@/components/Combobox';
 import { TrackPicker } from '@/components/TrackPicker';
 import { Num, juzPhrase } from '@/components/Num';
 import { usePanel } from '@/components/PanelState';
-import { store, useDB, ensureCurriculum } from '@/lib/store';
+import { store, useDB, ensureCurriculum, flushToServer } from '@/lib/store';
 import { resolvePlan, levelAvailable, dailyAmountFor, draftPlan, dayCountFor } from '@/lib/curriculum';
 import { nextLevel, ajzaForLevel } from '@/lib/exams';
 import { PLAN_KIND_AR, TRACK_AR, type Track } from '@/lib/types';
@@ -150,7 +150,13 @@ function PlansScreen() {
               /* Printing is the act that commits — §9: «الحفظ يقع تلقائيًا مع
                  الطباعة». The draft on screen has no stored id, so it is issued
                  here and the print route opens on the row that now exists. */
-              <Btn variant="primary" icon={Printer} onClick={() => {
+              <Btn variant="primary" icon={Printer} onClick={async () => {
+                /* The tab first, while the click still counts — a window opened
+                   after an `await` is a popup the browser blocks. It shows the
+                   sheet only once the plan is ON THE SERVER: the new tab loads
+                   from there, and opening it before the save landed is what
+                   printed «لا توجد خطة بهذا الرقم» (client, 5 Oct 2026). */
+                const tab = window.open('about:blank', '_blank');
                 const issued = store.issuePlan({
                   /* Whose signature goes on the sheet. Left out, every plan
                      ever issued read «المشرف» — which said nothing once there
@@ -161,7 +167,14 @@ function PlansScreen() {
                   level: plan.level,
                   dailyAmount: plan.dailyAmount,
                 });
-                window.open(`/print/plan/${issued.id}`, '_blank', 'noopener');
+                if (tab) {
+                  tab.document.title = 'جارٍ تجهيز الورقة…';
+                  tab.document.body.innerHTML = '<p dir="rtl" style="font:16px system-ui;padding:40px;color:#525C58">جارٍ حفظ الخطة وتجهيز الورقة…</p>';
+                }
+                await flushToServer().catch(() => { /* the tab still opens on what this browser holds */ });
+                const url = `/print/plan/${issued.id}`;
+                if (tab) { tab.opener = null; tab.location.href = url; }
+                else window.open(url, '_blank', 'noopener');
               }}>طباعة وحفظ التاريخ</Btn>
             )}
           </div>} />

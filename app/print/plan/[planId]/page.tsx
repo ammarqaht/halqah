@@ -27,13 +27,13 @@
    Printing is also what records the issue date — the screen calls
    `store.markPrinted` when it opens this route, because §9 is explicit that
    «الحفظ يقع تلقائيًا مع الطباعة — لا تحتاج زر حفظ منفصلًا». */
-import { Fragment, Suspense, use, useEffect, useMemo, useRef } from 'react';
+import { Fragment, Suspense, use, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Printer } from 'lucide-react';
 import { LogoMark, LogoJamiyah } from '@/components/Logo';
 import { Num } from '@/components/Num';
 import { Btn } from '@/components/ui';
-import { store, useDB, ensureCurriculum } from '@/lib/store';
+import { store, useDB, ensureCurriculum, hydrateFromServer } from '@/lib/store';
 import {
   resolvePlan, dailyAmountFor, DEFAULT_DAY_COUNT, DEFAULT_EXAM_DAYS,
   TAJWEED_FOOTER, type PlanRow,
@@ -103,6 +103,17 @@ function PlanSheetInner({ params }: { params: Promise<{ planId: string }> }) {
 
   const student = blank ? null
     : (plan ? db.students.find((s) => s.id === plan.studentId) ?? null : null);
+
+  /* Print pages read this browser's cache, and nothing else — so a plan the
+     cache did not hold (a full cache, another machine, a tab opened before the
+     save) printed «لا توجد خطة بهذا الرقم» for a plan the server had (client,
+     5 Oct 2026). Before saying so, ask the server once. */
+  const [fetched, setFetched] = useState(false);
+  const missing = !blank && (!plan || !student);
+  useEffect(() => {
+    if (!missing || fetched) return;
+    hydrateFromServer().finally(() => setFetched(true));
+  }, [missing, fetched]);
   const halaqa = student?.halaqaId ? db.halaqat.find((h) => h.id === student.halaqaId) ?? null : null;
 
   const days = useMemo(
@@ -125,7 +136,7 @@ function PlanSheetInner({ params }: { params: Promise<{ planId: string }> }) {
     if (promotes) {
       fetch('/api/admin/level', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studentId: plan.studentId, level: plan.level }),
+        body: JSON.stringify({ studentId: plan.studentId, level: plan.level, track: plan.track }),
       })
         .then((r) => (r.ok ? r.json() : null))
         .then((j) => { if (j?.plan) store.adoptLevel(plan.studentId, j.plan); })
@@ -133,6 +144,14 @@ function PlanSheetInner({ params }: { params: Promise<{ planId: string }> }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plan, blank]);
+
+  if (missing && !fetched) {
+    return (
+      <div className="sheet-a4 font-sans" dir="rtl">
+        <p className="text-lg2 text-ink-500">جارٍ تحميل الخطة…</p>
+      </div>
+    );
+  }
 
   if (!plan || (!blank && !student)) {
     return (

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { bumpRev } from '@/lib/rev';
 import { readSession } from '@/lib/auth';
 import { toStudent } from '@/lib/serialize';
 import type { Prisma } from '@prisma/client';
@@ -46,6 +47,8 @@ export async function POST(req: Request) {
         after: JSON.parse(JSON.stringify(saved)) as object,
       },
     });
+    /* A write the supervisor's open pages have not seen — lib/rev. */
+    await bumpRev(db);
     return NextResponse.json(toStudent(saved));
   } catch (e) {
     return NextResponse.json(
@@ -79,6 +82,8 @@ export async function PATCH(req: Request) {
       }),
     ]);
 
+    /* A write the supervisor's open pages have not seen — lib/rev. */
+    await bumpRev(db);
     return NextResponse.json({ ok: true, moved: ids.length });
   } catch (e) {
     return NextResponse.json(

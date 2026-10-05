@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { bumpRev } from '@/lib/rev';
 import { pointsScope, fail } from '../_scope';
 import { purchaseBlock, PURCHASE_BLOCK_AR } from '@/lib/points';
 import { ORDER_STATUS_AR, type GiftStatus, type OrderStatus, type Track } from '@/lib/types';
@@ -84,6 +85,9 @@ export async function POST(req: Request) {
     });
 
     if ('error' in result && result.error) return fail(result.error);
+    /* The supervisor's open pages hold the orders without this one; an old
+       one saving would delete it — lib/rev. */
+    await bumpRev(db);
     return NextResponse.json({ ok: true, ...result });
   } catch {
     return fail('تعذّر إتمام الطلب. أعد المحاولة.', 500);

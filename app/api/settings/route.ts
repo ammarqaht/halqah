@@ -8,7 +8,9 @@ import { readSession } from '@/lib/auth';
    a redeploy can change. */
 export async function GET() {
   if (!await readSession()) return NextResponse.json({ error: 'غير مصرّح' }, { status: 401 });
-  const rows = await db.setting.findMany();
+  /* `state_rev` is the data's version number (lib/rev), not a setting — kept
+     out of here so a screen that saves the whole object back cannot rewind it. */
+  const rows = await db.setting.findMany({ where: { key: { not: 'state_rev' } } });
   return NextResponse.json(Object.fromEntries(rows.map((r) => [r.key, r.value])));
 }
 
@@ -17,6 +19,7 @@ export async function PUT(req: Request) {
   if (!s) return NextResponse.json({ error: 'غير مصرّح' }, { status: 401 });
 
   const patch = await req.json() as Record<string, unknown>;
+  delete patch.state_rev;   // lib/rev owns it
   await db.$transaction(Object.entries(patch).map(([key, value]) =>
     db.setting.upsert({
       where: { key },

@@ -214,14 +214,102 @@ export function setActor(name: string | null) { if (name) actor = name; }
 let newAccounts: IssuedAccount[] = [];
 let accountsWithoutId: string[] = [];
 
+/* ── رقم النسخة، وما كانت عليه البيانات ─────────────────────────────────
+   «ما يقدر يطبع الخطة … ولا يغير مستواه» (client, 5 Oct 2026) — two machines
+   open, and the older page's save put its morning copy back over everything.
+
+   The server now numbers its data (lib/rev) and refuses a save built on an
+   older number. When it does, this page fetches the newer data and REBASES:
+   for every list, row by row, against `base` — what the server held the last
+   time this page was in step with it:
+     · a row this page changed (not the same object as in `base`) keeps this
+       page's version;
+     · a row this page deleted (in `base`, gone here) stays deleted;
+     · everything else takes the server's version — including rows added or
+       deleted from the other machine.
+   Then it saves again, now on the current number. */
+let serverRev: number | null = null;
+type Rowed = { id?: string };
+const MERGED = [...SYNCED, 'students', 'halaqat'] as const;
+let base: Record<string, Map<string, Rowed>> | null = null;
+
+/** `base` := the rows of `d` that the server holds (`onServer`, default `d`).
+    Taken from what this page actually holds — after `migrate`, which may hand
+    back new objects — so an untouched row compares as untouched; but only for
+    ids the server has, so a row carried up unsent is never mistaken for one
+    the server deleted. */
+function snapshot(d: Record<string, unknown>, onServer: Record<string, unknown> = d) {
+  base = {};
+  for (const k of MERGED) {
+    const ids = new Set(((onServer[k] ?? []) as Rowed[]).filter((r) => r.id).map((r) => String(r.id)));
+    const rows = (d[k] ?? []) as Rowed[];
+    base[k] = new Map(rows.filter((r) => r.id && ids.has(String(r.id))).map((r) => [String(r.id), r]));
+  }
+}
+
+/** Server rows, with this page's own edits and deletions laid on top. */
+export function rebaseList<T extends Rowed>(server: T[], local: T[], was: Map<string, Rowed>): T[] {
+  const mine = new Map(local.filter((r) => r.id).map((r) => [String(r.id), r]));
+  const out: T[] = [];
+  const seen = new Set<string>();
+  for (const r of server) {
+    const id = r.id == null ? null : String(r.id);
+    if (id == null) { out.push(r); continue; }
+    seen.add(id);
+    const l = mine.get(id);
+    if (l && l !== was.get(id)) out.push(l);           // changed here — ours
+    else if (!l && was.has(id)) continue;              // deleted here — stays deleted
+    else out.push(r);                                  // untouched here — theirs
+  }
+  for (const [id, l] of mine) {
+    if (seen.has(id)) continue;
+    if (was.has(id) && was.get(id) === l) continue;    // deleted THERE, untouched here
+    out.push(l);                                       // new here, or changed here
+  }
+  return out;
+}
+
+let rebasing = 0;
+async function rebaseOnServer(): Promise<boolean> {
+  if (!base || rebasing >= 3) return false;
+  rebasing++;
+  const res = await fetch('/api/state', { cache: 'no-store' });
+  if (!res.ok) return false;
+  const remote = await res.json();
+  const cur = db as unknown as Record<string, unknown>;
+  const merged: Record<string, unknown> = { ...cur };
+  for (const k of MERGED) {
+    if (!Array.isArray(remote[k])) continue;
+    merged[k] = rebaseList(remote[k] as Rowed[], (cur[k] ?? []) as Rowed[], base[k] ?? new Map());
+  }
+  db = migrate(merged as unknown as DB);
+  serverRev = typeof remote.rev === 'number' ? remote.rev : null;
+  snapshot(db as unknown as Record<string, unknown>, remote);
+  try { localStorage.setItem(KEY, JSON.stringify(db)); } catch { /* quota — surfaced on next commit */ }
+  subs.forEach((f) => f());
+  return true;
+}
+
 async function pushNow(): Promise<void> {
   setSync('saving');
   try {
+    const sent = db;
     const res = await fetch('/api/state', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(slice(db)),
+      body: JSON.stringify({ ...slice(sent), rev: serverRev }),
     });
+    /* Built on an older copy — another page or machine saved since. Take the
+       newer data, keep this page's own changes on top, and save again. */
+    if (res.status === 409) {
+      const body = await res.clone().json().catch(() => ({}));
+      if (body?.stale) {
+        if (await rebaseOnServer()) { await pushNow(); return; }
+        setSync('offline');
+        return;
+      }
+    }
+    if (res.ok) { rebasing = 0; snapshot(sent as unknown as Record<string, unknown>); }
     /* A lapsed session is NOT «offline». Reported as one, the supervisor is
        told his work is safe and will send itself later — and it never does,
        because nothing is wrong with the connection and nobody signs back in.
@@ -249,6 +337,8 @@ async function pushNow(): Promise<void> {
       try {
         const body = await res.json();
         lastOrphaned = body?.orphaned ?? 0;
+        /* The number this page is now in step with — sent with the next save. */
+        if (typeof body?.rev === 'number') serverRev = body.rev;
         /* A new boy's account is created by the save itself. The supervisor
            has to be TOLD his number — it is what goes on the card — so it is
            held here until a screen has shown it. */
@@ -301,6 +391,8 @@ export async function hydrateFromServer(): Promise<void> {
           localStorage.setItem(KEY, JSON.stringify(db));
           localStorage.setItem(RESET_KEY, String(remote.resetAt));
         } catch { /* private mode */ }
+        serverRev = typeof remote.rev === 'number' ? remote.rev : null;
+        snapshot(db as unknown as Record<string, unknown>, remote);
         hydrated = true;
         subs.forEach((f) => f());
         setSync('saved');
@@ -357,6 +449,9 @@ export async function hydrateFromServer(): Promise<void> {
                         ...cur.halaqat.filter((h) => !names.has(h.name))];
     }
     db = migrate(merged);
+    /* In step with the server as of this load (lib/rev). */
+    serverRev = typeof remote.rev === 'number' ? remote.rev : null;
+    snapshot(db as unknown as Record<string, unknown>, remote);
     hydrated = true;
     try { localStorage.setItem(KEY, JSON.stringify(db)); } catch { /* private mode */ }
     subs.forEach((f) => f());

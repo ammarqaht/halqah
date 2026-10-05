@@ -81,7 +81,8 @@ function LevelScreen() {
     try {
       const res = await fetch('/api/admin/level', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studentId: student.id, level }),
+        /* His track as this screen shows it — the server may not have it yet. */
+        body: JSON.stringify({ studentId: student.id, level, track }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setErr(data.error ?? 'تعذّر الحفظ. حاول مرة أخرى.'); return; }

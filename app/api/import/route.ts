@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { bumpRev } from '@/lib/rev';
 import { readSession } from '@/lib/auth';
 import type { Prisma } from '@prisma/client';
 
@@ -150,6 +151,8 @@ export async function POST(req: Request) {
       return { created, updated, flagged, halaqat: idByIncoming.size, idMap };
     }, { timeout: 120_000 });
 
+    /* A write the supervisor's open pages have not seen — lib/rev. */
+    await bumpRev(db);
     return NextResponse.json({ ok: true, ...result, ms: Date.now() - started });
   } catch (e) {
     return NextResponse.json(
