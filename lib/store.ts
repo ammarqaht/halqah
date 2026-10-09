@@ -355,9 +355,16 @@ async function pushNow(): Promise<void> {
   }
 }
 
+/* حساب المطوّر (lib/dev): every write is refused by the middleware, so this
+   page does not try — edits stay on this screen, and nothing reports a failed
+   save that was never going to land. */
+let previewMode = false;
+export function setPreviewMode(on: boolean) { previewMode = on; }
+
 /** Coalesce a burst of edits into one save. */
 function schedulePush() {
   if (!hydrated) return;              // never overwrite the server with a blank
+  if (previewMode) return;
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     saveTimer = null;
@@ -464,6 +471,7 @@ export async function hydrateFromServer(): Promise<void> {
 
 /** Flush anything pending — the page is closing, or the user asked. */
 export async function flushToServer(): Promise<void> {
+  if (previewMode) return;
   if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
   if (inFlight) await inFlight;
   if (hydrated) await pushNow();

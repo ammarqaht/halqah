@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { authenticate, createSession, BAD_CREDENTIALS } from '@/lib/auth';
+import { isDevLogin, DEV_NAME, DEV_SUB } from '@/lib/dev';
 
 /* Crude but effective while there is one account: a short lockout after
    repeated failures, keyed by identifier + IP. Replaced by a real store when
@@ -28,6 +29,14 @@ export async function POST(req: Request) {
 
   if (!username || !password) {
     return NextResponse.json({ error: BAD_CREDENTIALS }, { status: 401 });
+  }
+
+  /* حساب المطوّر — 3999 and the developer's PIN (lib/dev). No database row:
+     a token marked `preview`, which sees every screen and whose every write the
+     middleware refuses. */
+  if (isDevLogin(username, password, 'admin')) {
+    await createSession({ id: DEV_SUB, fullName: DEV_NAME }, undefined, DEV_NAME);
+    return NextResponse.json({ ok: true, name: DEV_NAME, preview: true });
   }
 
   let user;

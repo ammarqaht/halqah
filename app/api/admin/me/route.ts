@@ -18,6 +18,8 @@ export async function GET() {
   return NextResponse.json({
     me: s.sub,
     name: s.name,
+    /** حساب المطوّر — the screen shows its band and stops trying to save. */
+    preview: !!s.preview,
     supervisors: all.map((u) => ({
       ...u,
       lastLoginAt: u.lastLoginAt ? u.lastLoginAt.toISOString() : null,

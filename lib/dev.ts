@@ -14,6 +14,9 @@ import { timingSafeEqual } from 'node:crypto';
 
 export const DEV_TEACHER_ID = '2999';
 export const DEV_STUDENT_ID = '1999';
+/** On the supervisor's sign-in: «اسم المستخدم» 3999. Read-only like the other
+    two — it sees the whole system and the middleware refuses every write. */
+export const DEV_ADMIN_ID = '3999';
 /** What the token's `preview` carries, and the name the teacher portal shows. */
 export const DEV_NAME = 'حساب المطوّر';
 /** The teacher token's subject. No teacher has this id, so nothing reads as his. */
@@ -26,9 +29,9 @@ function pin() {
   return /^\d{8,}$/.test(p) ? p : null;
 }
 
-export function isDevLogin(username: unknown, password: unknown, portal: 'teacher' | 'student') {
+export function isDevLogin(username: unknown, password: unknown, portal: 'teacher' | 'student' | 'admin') {
   const p = pin();
-  const id = portal === 'teacher' ? DEV_TEACHER_ID : DEV_STUDENT_ID;
+  const id = portal === 'teacher' ? DEV_TEACHER_ID : portal === 'admin' ? DEV_ADMIN_ID : DEV_STUDENT_ID;
   if (!p || String(username ?? '').trim() !== id) return false;
   const a = Buffer.from(String(password ?? '').replace(/\D/g, ''));
   const b = Buffer.from(p);

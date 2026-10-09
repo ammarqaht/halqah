@@ -43,11 +43,16 @@ async function pass(req: NextRequest, token: string | undefined, audience: 'stud
   return NextResponse.next();
 }
 
+/* Under a path SEGMENT, not a string prefix: `startsWith('/api/student')` also
+   matches `/api/students` — the supervisor's own route — and once the matcher
+   reached every API, that sent his student edits to the boys' door and a 401. */
+const under = (path: string, prefix: string) => path === prefix || path.startsWith(`${prefix}/`);
+
 export async function middleware(req: NextRequest) {
   const { pathname, search } = req.nextUrl;
 
   /* ── the student surface ─────────────────────────────────────────────── */
-  if (pathname.startsWith('/student') || pathname.startsWith('/api/student')) {
+  if (under(pathname, '/student') || under(pathname, '/api/student')) {
     /* Signing in cannot require being signed in. */
     if (pathname === '/student/login' || pathname.startsWith('/api/student/auth')) {
       return NextResponse.next();
@@ -71,7 +76,7 @@ export async function middleware(req: NextRequest) {
   }
 
   /* ── the teacher's surface ───────────────────────────────────────────── */
-  if (pathname.startsWith('/teacher') || pathname.startsWith('/api/teacher')) {
+  if (under(pathname, '/teacher') || under(pathname, '/api/teacher')) {
     if (pathname === '/teacher/login' || pathname.startsWith('/api/teacher/auth')) {
       return NextResponse.next();
     }
@@ -91,6 +96,21 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  /* ── every other API: the supervisor's ─────────────────────────────────
+     Each of these routes checks its own session, so nothing changes for them
+     — except under حساب المطوّر (3999, lib/dev): its token is marked `preview`,
+     and a write from it is refused here, before any route runs. Signing out
+     and the idle timer's touch are let through; they write only the cookie. */
+  if (pathname.startsWith('/api/')) {
+    const reads = req.method === 'GET' || req.method === 'HEAD';
+    if (!reads && pathname !== '/api/auth/logout' && pathname !== '/api/auth/touch'
+        && pathname !== '/api/auth/login') {
+      const c = await claims(req.cookies.get('halqah_session')?.value, 'admin');
+      if (c?.preview) return NextResponse.json({ error: PREVIEW_REFUSED }, { status: 403 });
+    }
+    return NextResponse.next();
+  }
+
   /* ── the supervisor's surface ────────────────────────────────────────── */
   const token = req.cookies.get('halqah_session')?.value;
   if (await valid(token, 'admin')) return NextResponse.next();
@@ -108,5 +128,7 @@ export const config = {
     '/admin/:path*', '/print/:path*',
     '/student/:path*', '/api/student/:path*',
     '/teacher/:path*', '/api/teacher/:path*',
+    /* The supervisor's APIs — only so حساب المطوّر's writes can be refused. */
+    '/api/:path*',
   ],
 };

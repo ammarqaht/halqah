@@ -8,6 +8,8 @@
 @font-face{font-family:'BrandArabic';src:url('/fonts/sans-Bold.woff2')format('woff2');font-weight:700;font-style:normal;font-display:swap}
 @font-face{font-family:'BrandDisplay';src:url('/fonts/serif-Regular.woff2')format('woff2');font-weight:400;font-style:normal;font-display:swap}
 @font-face{font-family:'BrandDisplay';src:url('/fonts/serif-Medium.woff2')format('woff2');font-weight:500;font-style:normal;font-display:swap}
+/* Bold — the weight «مـــــداد» is set in on the brand's own wordmark (components/MedadFoot). */
+@font-face{font-family:'BrandDisplay';src:url('/fonts/serif-Bold.woff2')format('woff2');font-weight:700;font-style:normal;font-display:swap}
 
 @layer base{
   html,body,#__next{height:100%}

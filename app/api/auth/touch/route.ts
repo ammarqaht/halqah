@@ -12,6 +12,7 @@ import { readSession, createSession } from '@/lib/auth';
 export async function POST() {
   const s = await readSession();
   if (!s) return NextResponse.json({ ok: false }, { status: 401 });
-  await createSession({ id: s.sub, fullName: s.name }, s.signedInAt);
+  /* حساب المطوّر stays one — renewing must not drop the mark. */
+  await createSession({ id: s.sub, fullName: s.name }, s.signedInAt, s.preview);
   return NextResponse.json({ ok: true });
 }

@@ -9,6 +9,7 @@ import { PanelState } from '@/components/PanelState';
 import { MedadFoot } from '@/components/MedadFoot';
 import { WhatsNew } from '@/components/whatsnew/WhatsNew';
 import { Tour } from '@/components/whatsnew/Tour';
+import { AdminDevBand } from '@/components/AdminDevBand';
 
 const panelSkeleton = <div className="flex-1 p-4"><div className="skel h-5 w-32" /></div>;
 
@@ -57,6 +58,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* tier 3 — work area */}
         <main className="thin-scroll flex-1 overflow-y-auto">
+          {/* حساب المطوّر — says nothing here is kept (components/AdminDevBand). */}
+          {mounted && <AdminDevBand />}
           <RouteVeil>{children}</RouteVeil>
           {/* داخل المنطقة التي تمرّ، لا مثبّتًا فوقها: `main` هنا هو الشيء
               الوحيد الذي يمرّر، وتثبيته يعني تغطية مساحة العمل. */}

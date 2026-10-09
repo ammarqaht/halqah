@@ -47,6 +47,8 @@ export type Session = {
   sub: string; name: string; role: 'SUPERVISOR';
   /** When he typed his password, in seconds — the start of his twenty-four hours. */
   signedInAt: number;
+  /** حساب المطوّر (lib/dev): reads everything, and the middleware refuses its writes. */
+  preview: string | null;
 };
 
 export const hashPassword = (plain: string) => bcrypt.hash(plain, 12);
@@ -56,9 +58,12 @@ const nowSec = () => Math.floor(Date.now() / 1000);
 
 /** A fresh sign-in, or — with `signedInAt` — a renewal that keeps the original
     start, so the idle window slides but the day does not. */
-export async function createSession(user: { id: string; fullName: string }, signedInAt = nowSec()) {
+export async function createSession(
+  user: { id: string; fullName: string }, signedInAt = nowSec(), preview: string | null = null,
+) {
   const exp = Math.min(nowSec() + IDLE_MINUTES * 60, signedInAt + SESSION_HOURS * 3600);
-  const token = await new SignJWT({ name: user.fullName, role: 'SUPERVISOR', sat: signedInAt })
+  const token = await new SignJWT({
+    name: user.fullName, role: 'SUPERVISOR', sat: signedInAt, ...(preview ? { preview } : {}) })
     .setProtectedHeader({ alg: 'HS256' })
     .setSubject(user.id)
     .setAudience('admin')
@@ -84,6 +89,7 @@ export async function readSession(): Promise<Session | null> {
       sub: String(payload.sub), name: String(payload.name), role: 'SUPERVISOR',
       /* A token from before `sat` existed starts its day at its own issue. */
       signedInAt: Number(payload.sat ?? payload.iat ?? nowSec()),
+      preview: payload.preview ? String(payload.preview) : null,
     };
   } catch {
     return null;
