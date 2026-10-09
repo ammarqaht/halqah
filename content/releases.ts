@@ -19,7 +19,9 @@
        supervisor is not handed a backlog of «new» things that predate him.
    ───────────────────────────────────────────────────────────────────────── */
 import type { LucideIcon } from 'lucide-react';
-import { GraduationCap, Layers3, ShieldCheck, Users } from 'lucide-react';
+import {
+  Calculator, ClipboardList, GraduationCap, Layers3, MessageSquareText, ShieldCheck, Users,
+} from 'lucide-react';
 
 export type Audience = 'admin' | 'teacher' | 'student';
 
@@ -49,6 +51,45 @@ export type Release = {
 };
 
 export const RELEASES: Release[] = [
+  {
+    id: '2026-10-09-exam-detail-student',
+    date: '2026-10-09',
+    audience: ['student'],
+    title: 'نتيجة اختبارك بالتفصيل',
+    summary:
+      'اضغط أي اختبار في «آخر اختباراتي» لترى درجتك، والأسئلة التي سُئلتها، وأخطاءك في كل سؤال، وملاحظات المختبِر.',
+    points: [
+      { icon: ClipboardList, title: 'كل سؤال وحده',
+        body: 'السورة والآيات، وكم خطأً وتنبيهًا وخطأً تجويديًا فيه.' },
+      { icon: Calculator, title: 'كيف جاءت الدرجة',
+        body: 'كم نقص من درجتك بسبب الأخطاء والتنبيهات والتجويد.' },
+      { icon: MessageSquareText, title: 'ملاحظات المختبِر',
+        body: 'ما كُتب عنك في الاختبار، لتعرف ما تراجعه.' },
+    ],
+    tour: {
+      href: '/student',
+      steps: [
+        { target: 'student-exams', title: 'آخر اختباراتي',
+          body: 'اضغط أي بطاقة اختبار هنا، فتفتح لك نتيجته كاملة بأسئلتها وأخطائها.' },
+      ],
+    },
+  },
+  {
+    id: '2026-10-09-exam-detail-teacher',
+    date: '2026-10-09',
+    audience: ['teacher'],
+    title: 'اختبارات طلابك بالتفصيل',
+    summary:
+      'في صفحة أي طالب، اضغط اختبارًا من «اختباراته» فترى ما يراه المشرف: الدرجة، والأسئلة، وأخطاء كل سؤال، والملاحظات.',
+    points: [
+      { icon: ClipboardList, title: 'أين أخطأ بالضبط',
+        body: 'كل سؤال بسورته وآياته، وأخطاؤه وتنبيهاته وتجويده.' },
+      { icon: Calculator, title: 'كيف جاءت الدرجة',
+        body: 'ما نقص من الدرجة بسبب كل نوع من الأخطاء.' },
+      { icon: MessageSquareText, title: 'ملاحظات المختبِر',
+        body: 'لتعرف ما يحتاج الطالب مراجعته في الحلقة.' },
+    ],
+  },
   {
     id: '2026-10-05-many-devices',
     date: '2026-10-05',

@@ -30,6 +30,7 @@ import {
 } from '@/content/teacher';
 import { formatDate, relativeDay } from '@/lib/dates';
 import { cx } from '@/lib/cx';
+import { ExamSheet, type ExamView } from '@/components/ExamSheet';
 
 type Payload = {
   student: {
@@ -53,12 +54,8 @@ type Payload = {
     lines: { kind: string; kindAr: string; recited: boolean; errors: number; note: string }[];
   }[];
   levels: { level: number; track: string; issuedAt: string; daysHeld: number | null; dayCount: number }[];
-  exams: {
-    id: string; type: string; typeAr: string; takenOn: string; level: number | null;
-    ajza: number | null; errors: number | null; warnings: number | null;
-    tajweedErrors: number | null; score: number | null; passed: boolean | null;
-    pointsAwarded: number; examiner: string; note: string;
-  }[];
+  /** Each sitting in full — the same shape the student portal reads. */
+  exams: ExamView[];
   bookings: { id: string; scheduledOn: string; badge: string; level: number | null; daysAway: number }[];
   errorSpots: { surah: string; errors: number }[];
   ledger: { id: string; delta: number; kind: string; reason: string; on: string }[];
@@ -195,6 +192,8 @@ export default function StudentFile() {
   const { id } = useParams<{ id: string }>();
   const [d, setD] = useState<Payload | null>(null);
   const [err, setErr] = useState('');
+  /* The sitting he tapped, open in full (components/ExamSheet). */
+  const [openExam, setOpenExam] = useState<string | null>(null);
 
   useEffect(() => {
     fetch(`/api/teacher/students/${id}`)
@@ -545,7 +544,7 @@ export default function StudentFile() {
       <section className={cx(CARD, 'rise overflow-hidden')}>
         <div className="px-[18px] pb-2 pt-4">
           <SheetHead title="اختباراته"
-            meta="عرضًا لا تعديلًا — الاختبار عند المشرف، وتصلك نتيجته بتفاصيلها" />
+            meta="اضغط أيّ اختبار لترى أسئلته وأخطاءه — عرضًا لا تعديلًا" />
         </div>
 
         {d.exams.length === 0 ? (
@@ -555,7 +554,9 @@ export default function StudentFile() {
         ) : (
           <ul>
             {d.exams.slice(0, SHOWN).map((e) => (
-              <li key={e.id} className="border-t border-ink-150 px-[18px] py-3">
+              <li key={e.id} className="border-t border-ink-150">
+                <button type="button" onClick={() => setOpenExam(e.id)}
+                  className="block w-full px-[18px] py-3 text-start transition-colors hover:bg-page">
                 <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                   <p className="text-sm2 font-medium text-ink-900">
                     {e.typeAr}
@@ -580,11 +581,20 @@ export default function StudentFile() {
                   {e.examiner && <span>· المختبِر {e.examiner}</span>}
                 </p>
                 {e.note && <p className="mt-1 text-xs2 text-ink-600">{e.note}</p>}
+                <p className="mt-1 text-micro font-medium text-brand-800">
+                  {e.questions.length > 0
+                    ? <>الأسئلة والأخطاء (<Num>{e.questions.length}</Num>) ←</>
+                    : 'التفاصيل ←'}
+                </p>
+                </button>
               </li>
             ))}
           </ul>
         )}
       </section>
+
+      <ExamSheet exam={d.exams.find((e) => e.id === openExam) ?? null}
+        onClose={() => setOpenExam(null)} />
 
       {/* ── حركة نقاطه ───────────────────────────────────────────────────── */}
       {s.eligibleForPoints && d.ledger.length > 0 && (

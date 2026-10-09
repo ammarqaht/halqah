@@ -29,13 +29,16 @@ import {
 } from '@/components/student/Alerts';
 import { COPY, LEDGER_ON_HOME } from '@/content/student';
 import { formatDate } from '@/lib/dates';
+import { ExamSheet, type ExamView } from '@/components/ExamSheet';
 
 type Move = { id: string; delta: number; kindAr: string; reason: string; createdAt: string };
 type Standing = { rank: number; total: number } | null;
 
 export default function StudentHome() {
   const { me } = useMe();
-  const [exams, setExams] = useState<ExamRow[] | null>(null);
+  const [exams, setExams] = useState<(ExamRow & ExamView)[] | null>(null);
+  /* The sitting he tapped, open in full — its questions and errors. */
+  const [openExam, setOpenExam] = useState<string | null>(null);
   const [moves, setMoves] = useState<Move[] | null>(null);
   const [inHalaqa, setInHalaqa] = useState<Standing>(null);
   const [overall, setOverall] = useState<Standing>(null);
@@ -118,8 +121,11 @@ export default function StudentHome() {
           <Empty icon={ClipboardCheck} title="لا اختبارات بعد" body={COPY.noExams} />
         </Sheet>
       ) : (
-        <ExamRail exams={exams.slice(0, 8)} passed={passed} formatDate={formatDate} />
+        <ExamRail exams={exams.slice(0, 8)} passed={passed} formatDate={formatDate}
+          onOpen={setOpenExam} />
       )}
+      <ExamSheet self exam={exams?.find((e) => e.id === openExam) ?? null}
+        onClose={() => setOpenExam(null)} />
 
       {/* «وبلوك التنبيهات كذلك أسفل بلوك الاختبارات» — his exams are the thing
           he opens this screen for, and what his teacher wrote about today comes

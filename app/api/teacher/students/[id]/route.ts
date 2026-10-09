@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { examView } from '@/lib/examView';
 import { levelOf, planOf as sheetOf, pointerOf } from '@/lib/level';
 import { assertMine, fail, scope } from '../../_scope';
 import { absence, hijri, type DayRecord } from '@/lib/teacher';
@@ -41,7 +42,8 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const [txns, plans, exams, bookings, entries, transfers] = await Promise.all([
     db.pointTxn.findMany({ where: { studentId: id }, orderBy: { createdAt: 'desc' }, take: 60 }),
     db.studentPlan.findMany({ where: { studentId: id }, orderBy: { issuedAt: 'desc' } }),
-    db.exam.findMany({ where: { studentId: id }, orderBy: { takenOn: 'desc' } }),
+    db.exam.findMany({ where: { studentId: id }, orderBy: { takenOn: 'desc' },
+      include: { questions: true } }),
     db.examBooking.findMany({
       where: { studentId: id, status: 'BOOKED', scheduledOn: { gte: today } },
       orderBy: { scheduledOn: 'asc' } }),
@@ -162,22 +164,9 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     })),
 
     /** اختباراته — «عرضًا لا تعديلًا»، ومواعيد المحجوز منها. */
-    exams: exams.map((e) => ({
-      id: e.id,
-      type: e.type,
-      typeAr: EXAM_TYPE_AR[e.type as ExamType] ?? e.type,
-      takenOn: e.takenOn,
-      level: e.level,
-      ajza: e.ajza,
-      errors: e.errors,
-      warnings: e.warnings,
-      tajweedErrors: e.tajweedErrors,
-      score: e.score,
-      passed: e.passed,
-      pointsAwarded: e.pointsAwarded,
-      examiner: e.examiner,
-      note: e.note,
-    })),
+    /* «وكذلك لمعلمه» (client, 9 Oct 2026) — each sitting in full, as the
+       supervisor sees it: the questions, their errors, and the notes. */
+    exams: exams.map(examView),
     bookings: bookings.map((b) => ({
       id: b.id, scheduledOn: b.scheduledOn, badge: b.badge, level: b.level,
       daysAway: Math.max(0, Math.round(

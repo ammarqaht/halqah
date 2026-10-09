@@ -108,11 +108,13 @@ export type ExamRow = {
  * of the mark he took. Pass and fail still carry a WORD as well as a colour,
  * so the card survives a colour-blind reader.
  */
-export function ExamRail({ exams, passed, formatDate }: {
+export function ExamRail({ exams, passed, formatDate, onOpen }: {
   exams: ExamRow[]; passed: number; formatDate: (iso: string) => string;
+  /** Opens the sitting in full — its questions and errors (components/ExamSheet). */
+  onOpen?: (id: string) => void;
 }) {
   return (
-    <section className="rise">
+    <section className="rise" data-tour="student-exams">
       <div className="flex items-baseline justify-between gap-3 px-0.5 pb-2.5">
         <h2 className="text-base2 font-bold text-ink-900">آخر اختباراتي</h2>
         <span className="shrink-0 text-cap text-ink-500">
@@ -126,8 +128,10 @@ export function ExamRail({ exams, passed, formatDate }: {
           const ok = e.passed === true;
           const bad = e.passed === false;
           return (
-            <li key={e.id}
-              className={cx(CARD, 'w-[156px] shrink-0 snap-start p-3.5')}>
+            <li key={e.id} className="w-[156px] shrink-0 snap-start">
+              <button type="button" onClick={() => onOpen?.(e.id)}
+                aria-label={`${e.typeAr} — عرض الأسئلة والأخطاء`}
+                className={cx(CARD, 'press block w-full p-3.5 text-start transition-shadow hover:shadow-soft')}>
               <div className="flex items-center justify-between gap-2">
                 <Ring size={48} stroke={5}
                   pct={e.score != null && e.scoreMax ? (e.score / e.scoreMax) * 100 : 0}
@@ -149,6 +153,8 @@ export function ExamRail({ exams, passed, formatDate }: {
                 <Num>{formatDate(e.takenOn)}</Num>
                 {e.scoreMax ? <> · من <Num>{e.scoreMax}</Num></> : null}
               </p>
+              <p className="mt-2 text-micro font-medium text-brand-800">التفاصيل ←</p>
+              </button>
             </li>
           );
         })}
