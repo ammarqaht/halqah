@@ -110,10 +110,7 @@ export default function PickList() {
           ))
         )}
 
-        <footer className="mt-8 flex items-center justify-between border-t border-ink-150 pt-3 text-micro text-ink-500">
-          <span>يُعلَّم على المسلَّم، ثم يُدخل في شاشة المتجر</span>
-          <span>حلقات جامع محمد العبدالكريم — الدمام، حي أُحد</span>
-        </footer>
+
       </div>
     </>
   );

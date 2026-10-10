@@ -10,7 +10,7 @@
    same green as one who passed, and the sheet was being read at a glance by
    someone who could not tell them apart. A pass is «✓ ٣» — the mark and how
    many ajza it covered; a failure is «✗ ٣» on an unshaded row. */
-import { use, useMemo } from 'react';
+import { Suspense, use, useMemo } from 'react';
 import { Printer } from 'lucide-react';
 import { PrintHead, PrintFoot, PCELL } from '@/components/PrintHead';
 import { Num, toArabicDigits, plural } from '@/components/Num';
@@ -22,10 +22,21 @@ import { TRACK_AR } from '@/lib/types';
 import { formatDate } from '@/lib/dates';
 import { cx } from '@/lib/cx';
 import { useAttendance } from '@/components/useAttendance';
+import { useParts } from '@/lib/reportParts';
 
-export default function HalaqaReport({ params }: { params: Promise<{ halaqaId: string }> }) {
+/* Each column with the part that switches it (lib/reportParts → `halaqa`);
+   # and the name are always printed. */
+const COLS: [string, string | null][] = [
+  ['#', null], ['الطالب', null], ['الصف', 'grade'], ['الحضور', 'attendance'],
+  ['المستوى', 'level'], ['استلم الخطة', 'issued'], ['آخر درس', 'lesson'],
+  ['الجمعية', 'assoc'], ['الجزء', 'assoc'], ['آخر اختبار', 'lastExam'],
+  ['مستواه', 'lastExam'], ['الدرجة', 'lastExam'], ['ملاحظة', 'note'],
+];
+
+function HalaqaReport({ params }: { params: Promise<{ halaqaId: string }> }) {
   const { halaqaId } = use(params);
   const db = useDB();
+  const show = useParts('halaqa');
   const att = useAttendance({ halaqa: halaqaId });
 
   const halaqa = db.halaqat.find((h) => h.id === halaqaId) ?? null;
@@ -81,8 +92,7 @@ export default function HalaqaReport({ params }: { params: Promise<{ halaqaId: s
                     is the outward milestone and reads on its own, and «آخر
                     اختبار» beside it is whatever he sat last, with the level he
                     sat it on, his mark, and the examiner's note. */}
-                {['#', 'الطالب', 'الصف', 'الحضور', 'المستوى', 'استلم الخطة', 'آخر درس',
-                  'الجمعية', 'الجزء', 'آخر اختبار', 'مستواه', 'الدرجة', 'ملاحظة'].map((h) => (
+                {COLS.filter(([, part]) => !part || show(part)).map(([h]) => (
                   <th key={h} className={PCELL}>{h}</th>))}
               </tr>
             </thead>
@@ -101,8 +111,10 @@ export default function HalaqaReport({ params }: { params: Promise<{ halaqaId: s
                   <tr key={s.id} className={cx('keep h-[26px]', assocPassed && 'bg-ok-100')}>
                     <td className={PCELL}><Num>{toArabicDigits(i + 1)}</Num></td>
                     <td className={`${PCELL} whitespace-nowrap text-start`}>{s.fullName}</td>
-                    <td className={PCELL}>{s.grade || '—'}</td>
-                    <td className={PCELL}>
+                    {show('grade') && (
+<td className={PCELL}>{s.grade || '—'}</td>)}
+                    {show('attendance') && (
+<td className={PCELL}>
                       {(() => {
                         const a = att?.students[s.id];
                         if (!a || a.recorded === 0) return '—';
@@ -111,24 +123,27 @@ export default function HalaqaReport({ params }: { params: Promise<{ halaqaId: s
                           <span className="text-ink-500">/<Num>{toArabicDigits(a.recorded)}</Num></span>
                         </>);
                       })()}
-                    </td>
+                    </td>)}
                     {/* المسار والمستوى في خلية واحدة: «ذهبي ١٥». */}
-                    <td className={`${PCELL} whitespace-nowrap`}>
+                    {show('level') && (
+<td className={`${PCELL} whitespace-nowrap`}>
                       {!s.track ? '—' : (<>
                         {TRACK_AR[s.track]}
                         {s.track !== 'TALQEEN' && s.currentLevel != null && (
                           <> <Num>{toArabicDigits(s.currentLevel)}</Num></>
                         )}
                       </>)}
-                    </td>
+                    </td>)}
                     {/* متى أخذ ورقته — الجواب عن «كم صار له على هذا المستوى؟»
                         بلا حساب، وهو أوّل ما يُسأل عن المتأخّر. */}
-                    <td className={`${PCELL} whitespace-nowrap`}>
+                    {show('issued') && (
+<td className={`${PCELL} whitespace-nowrap`}>
                       {r.plan?.issuedAt
                         ? <Num>{toArabicDigits(formatDate(r.plan.issuedAt))}</Num>
                         : '—'}
-                    </td>
-                    <td className={`${PCELL} whitespace-nowrap`}>
+                    </td>)}
+                    {show('lesson') && (
+<td className={`${PCELL} whitespace-nowrap`}>
                       {(() => {
                         const l = att?.lastLesson?.[s.id];
                         if (!l) return '—';
@@ -136,34 +151,39 @@ export default function HalaqaReport({ params }: { params: Promise<{ halaqaId: s
                           {l.surah}{l.ayah && <> <Num>{toArabicDigits(l.ayah)}</Num></>}
                         </>);
                       })()}
-                    </td>
+                    </td>)}
                     {/* اختبار الجمعية بتاريخه، ثم أجزاؤه ونتيجته. والراسب
                         يُعلَّم ✗ ولا يُظلَّل. */}
-                    <td className={`${PCELL} whitespace-nowrap`}>
+                    {show('assoc') && (
+<td className={`${PCELL} whitespace-nowrap`}>
                       {assoc
                         ? <Num>{toArabicDigits(formatDate(assoc.takenOn))}</Num>
                         : '—'}
-                    </td>
-                    <td className={`${PCELL} whitespace-nowrap`}>
+                    </td>)}
+                    {show('assoc') && (
+<td className={`${PCELL} whitespace-nowrap`}>
                       {!assoc ? '' : (
                         <span className={cx('font-bold', assocPassed ? 'text-ok-700' : 'text-risk-700')}>
                           {assocPassed ? '✓' : '✗'}
                           {assoc.ajza != null && <> <Num>{toArabicDigits(assoc.ajza)}</Num></>}
                         </span>
                       )}
-                    </td>
+                    </td>)}
                     {/* وآخر اختبار من أيّ نوع: اسمه وتاريخه، والمستوى الذي
                         جلس له عليه — لا مستواه اليوم، فقد تقدّم منذ ذلك. */}
-                    <td className={`${PCELL} whitespace-nowrap`}>
+                    {show('lastExam') && (
+<td className={`${PCELL} whitespace-nowrap`}>
                       {last
                         ? <>{EXAM_TYPE_SHORT_AR[last.type as ExamType] ?? last.type}{' '}
                             <Num className="text-ink-500">{toArabicDigits(formatDate(last.takenOn))}</Num></>
                         : '—'}
-                    </td>
-                    <td className={PCELL}>
+                    </td>)}
+                    {show('lastExam') && (
+<td className={PCELL}>
                       {last?.level != null ? <Num>{toArabicDigits(last.level)}</Num> : ''}
-                    </td>
-                    <td className={PCELL}>
+                    </td>)}
+                    {show('lastExam') && (
+<td className={PCELL}>
                       {!last || last.score == null ? '' : (
                         <span className={cx('font-medium',
                           last.passed === true ? 'text-ok-700'
@@ -171,10 +191,11 @@ export default function HalaqaReport({ params }: { params: Promise<{ halaqaId: s
                           <Num>{toArabicDigits(last.score)}</Num>
                         </span>
                       )}
-                    </td>
+                    </td>)}
                     {/* ما كتبه المختبِر، إن كتب. وتُترك فارغة لا بشرطة: الشرطة
                         في عمود ملاحظات تُقرأ ملاحظةً. */}
-                    <td className={`${PCELL} text-start`}>{last?.note || ''}</td>
+                    {show('note') && (
+<td className={`${PCELL} text-start`}>{last?.note || ''}</td>)}
                   </tr>
                 );
               })}
@@ -183,14 +204,13 @@ export default function HalaqaReport({ params }: { params: Promise<{ halaqaId: s
         )}
 
         <PrintFoot>
-          الصف المظلَّل مع ✓: اجتاز اختبار الجمعية، والرقم بعده عدد أجزائه. و✗: اختُبر ولم يجتز
-          {(passed > 0 || failed > 0) && (
-            <> — اجتاز <Num>{toArabicDigits(passed)}</Num> من <Num>{toArabicDigits(rows.length)}</Num>
-              {failed > 0 && <>، ولم يجتز <Num>{toArabicDigits(failed)}</Num></>}</>
-          )}.
-          العلامة تبقى مقروءة في النسخ الرمادي.
+          {show('assoc') && <>✓ اجتاز اختبار الجمعية (والرقم أجزاؤه) · ✗ لم يجتز</>}
         </PrintFoot>
       </div>
     </>
   );
+}
+
+export default function Page(props: { params: Promise<{ halaqaId: string }> }) {
+  return <Suspense><HalaqaReport {...props} /></Suspense>;
 }

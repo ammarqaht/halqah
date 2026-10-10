@@ -133,15 +133,7 @@ function KnightsSheet() {
           </ul>
         )}
 
-        <footer className="mt-10 flex items-center justify-between gap-4 border-t border-ink-150 pt-3 text-micro leading-relaxed text-ink-500">
-          <span>
-            الأيام المحسوبة هي أيام الحلقة المسجَّلة في المدة — والمتأخر حاضر تُحسب
-            له نقاطه ولا يُعدّ فارسًا
-          </span>
-          <span className="shrink-0">
-            <Num>{toArabicDigits(formatDate(new Date().toISOString()))}</Num>
-          </span>
-        </footer>
+
       </div>
     </>
   );

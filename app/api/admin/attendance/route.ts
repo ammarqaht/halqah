@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { readSession } from '@/lib/auth';
 import { summariseAll, totalFor, type DayRow } from '@/lib/attendance';
-import { passagesFor, passageKey } from '@/lib/passage';
+import { passagesFor, passageKey, passageLabel } from '@/lib/passage';
+import { PLAN_KIND_AR, PLAN_KIND_ORDER } from '@/lib/types';
 
 /* حصيلة الحضور والتسميع للتقارير.
  *
@@ -40,7 +41,7 @@ export async function GET(req: Request) {
         : {}),
     },
     select: {
-      studentId: true, day: true, status: true, thobe: true, incomplete: true,
+      studentId: true, day: true, status: true, thobe: true, incomplete: true, note: true,
       track: true, level: true, assignmentNo: true, talqeenSurah: true, talqeenAyah: true,
       lines: { select: { kind: true, recited: true, errors: true } },
     },
@@ -75,7 +76,33 @@ export async function GET(req: Request) {
     }
   }
 
+  /* «تفصيل بحضوره وش الأيام الي حضرها ووش سمع فيها» (client, 10 Oct 2026) —
+     for ONE boy, every afternoon his teacher recorded: the status, the ثوب,
+     and each of the three lines with whether it was recited, its errors and
+     the passage it was, newest first. Only for a single student: it is a
+     page of his file, not a register of the mosque. */
+  let days: unknown[] | undefined;
+  if (studentId) {
+    const passages = await passagesFor(entries);
+    days = [...entries].sort((a, b) => (a.day < b.day ? 1 : -1)).map((e) => ({
+      day: e.day, status: e.status, thobe: e.thobe, incomplete: e.incomplete, note: e.note,
+      level: e.level, assignmentNo: e.assignmentNo,
+      talqeen: e.talqeenSurah
+        ? { surah: e.talqeenSurah, ayah: e.talqeenAyah != null ? String(e.talqeenAyah) : '' } : null,
+      lines: PLAN_KIND_ORDER.map((kind) => {
+        const l = e.lines.find((x) => x.kind === kind);
+        return {
+          kind, kindAr: PLAN_KIND_AR[kind],
+          recited: !!l?.recited, errors: l?.errors ?? 0,
+          passage: passageLabel(passages.get(passageKey(e.track, e.level, e.assignmentNo, kind))),
+        };
+      }),
+    }));
+  }
+
   return NextResponse.json({
+    /** يوم بيوم — لطالب واحد فقط (انظر أعلاه). */
+    ...(days ? { days } : {}),
     /** كم يومًا سُجِّل في النظام كلّه — الشاشة تصمت قبل أول حفظ. */
     ever: await db.dayEntry.count(),
     from: ok(from) ? from : null,

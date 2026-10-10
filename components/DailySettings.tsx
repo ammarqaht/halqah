@@ -21,7 +21,7 @@
    holidays list here: a day nobody registered is not a halaqa day. */
 import { useEffect, useMemo, useState } from 'react';
 import {
-  CalendarDays, CheckCircle2, Loader2, RotateCcw, Save, Wand2,
+  CalendarDays, CheckCircle2, Loader2, RotateCcw, Save,
 } from 'lucide-react';
 import { Sheet, SheetHead } from '@/components/Sheet';
 import { Btn, Chip, INPUT_BARE } from '@/components/ui';
@@ -31,7 +31,7 @@ import {
   readWeekdays, WEEKDAYS_KEY,
   type DailyPointsSettings, type WeekdaysSettings,
 } from '@/lib/settings';
-import { DAILY_ITEM_AR, WEEKDAY_AR, applyFactor, type DailyPointItems } from '@/lib/teacher';
+import { DAILY_ITEM_AR, WEEKDAY_AR, type DailyPointItems } from '@/lib/teacher';
 import { cx } from '@/lib/cx';
 
 const ITEMS: (keyof DailyPointItems)[] =
@@ -47,7 +47,6 @@ export function DailySettingsCard() {
   const [draft, setDraft] = useState<DailyPointsSettings>(DEFAULT_DAILY);
   const [days, setDays] = useState<WeekdaysSettings | null>(null);
   const [daysDraft, setDaysDraft] = useState<number[]>([0, 1, 2, 3, 4]);
-  const [factor, setFactor] = useState('2');
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [err, setErr] = useState('');
@@ -148,25 +147,6 @@ export function DailySettingsCard() {
             </tr>
           </tbody>
         </table>
-      </div>
-
-      {/* ── المضاعفة: أداة تملأ العمود، لا قاعدة تحسب عند الدفع ──────────── */}
-      <div className="mt-4 flex flex-wrap items-end gap-3 rounded-xl border border-ink-150 bg-page/40 p-4">
-        <label className="block">
-          <span className="mb-1 block text-xs2 text-ink-600">املأ الذهبي بمضاعفة الفضي</span>
-          <input inputMode="numeric" value={factor} aria-label="المضاعفة"
-            onChange={(e) => setFactor(e.target.value.replace(/\D/g, '').slice(0, 2))}
-            className={cx(INPUT_BARE, 'h-10 w-20 text-center tabular-nums')} />
-        </label>
-        <Btn icon={Wand2} className="h-10"
-          onClick={() => setDraft((p) => ({
-            ...p, golden: applyFactor(p.items, Number(factor) || 1) }))}>
-          طبّقها
-        </Btn>
-        <p className="min-w-[14rem] flex-1 text-panel leading-relaxed text-ink-600">
-          تشمل البنود الخمسة كلها — الحضور والثوب معها. وهي زرّ يكتب الأرقام مرة
-          واحدة، لا قاعدة تُحسب عند الدفع: ما تراه في عمود الذهبي هو ما يُصرف.
-        </p>
       </div>
 
       {/* ── أيام الحلقة ──────────────────────────────────────────────────── */}

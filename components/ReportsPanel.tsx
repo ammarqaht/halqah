@@ -14,19 +14,12 @@ import { DateRangeField } from '@/components/DateField';
 import { Num } from '@/components/Num';
 import { useDB } from '@/lib/store';
 import { shortName } from '@/lib/normalise';
+import { REPORT_PARTS, defaultsOf, partsFrom } from '@/lib/reportParts';
 
 export type ReportId =
   | 'halaqa' | 'student' | 'association' | 'ready' | 'points' | 'honour'
   | 'knights' | 'registration' | 'pick-list' | 'bookings' | 'period' | 'progress';
 
-/** The association sheet's five tables, each printable on its own. */
-export const ASSOC_SECTIONS: { id: string; label: string }[] = [
-  { id: 'tracks',        label: 'المسارات' },
-  { id: 'stages',        label: 'المراحل الدراسية' },
-  { id: 'nationalities', label: 'الجنسيات' },
-  { id: 'exams',         label: 'حصيلة الاختبارات' },
-  { id: 'halaqat',       label: 'الحلقات' },
-];
 
 /** `YYYY-MM-DD` in local time — the same shape every date in this product has. */
 const iso = (d: Date) =>
@@ -122,33 +115,48 @@ export function ReportsPanel({ onClose }: { onClose: () => void }) {
         </PanelGroup>
       )}
 
-      {/* «إحصاءات الجمعية» carries five tables, and the association asks for
-          different cuts at different times. Nothing chosen means all of them,
-          which is what the report has always meant. */}
-      {current === 'association' && (
-        <PanelGroup label="أقسام التقرير">
-          {(() => {
-            const picked = (sp.get('sections') ?? '').split(',').filter(Boolean);
-            const all = picked.length === 0;
-            const toggle = (id: string) => {
-              const now = all ? ASSOC_SECTIONS.map((x) => x.id) : picked;
-              const next = now.includes(id) ? now.filter((x) => x !== id) : [...now, id];
-              /* Everything ticked is the same as nothing ticked — keep the URL
-                 clean so a shared link stays the plain report. */
-              set('sections', next.length === ASSOC_SECTIONS.length ? '' : next.join(','));
-            };
-            return (
-              <>
-                <PanelItem active={all} onClick={() => set('sections', '')}>الكل</PanelItem>
-                {ASSOC_SECTIONS.map((sec) => (
-                  <PanelItem key={sec.id} active={all || picked.includes(sec.id)}
-                    onClick={() => toggle(sec.id)}>{sec.label}</PanelItem>
-                ))}
-              </>
-            );
-          })()}
-        </PanelGroup>
-      )}
+      {/* «خلني اقدر اختار وش اطبع» (client, 10 Oct 2026) — every report that has
+          parts lists them here: its sections, or its columns. The choice rides
+          in the URL (lib/reportParts), so the preview beside this panel and
+          the printed sheet are the same. */}
+      {REPORT_PARTS[current] && (() => {
+        const spec = REPORT_PARTS[current];
+        const on = partsFrom(current, sp.get('parts') ?? sp.get('sections'));
+        const write = (next: Set<string>) => {
+          const p = new URLSearchParams(sp.toString());
+          p.delete('sections');
+          const ids = spec.parts.map((x) => x.id).filter((x) => next.has(x));
+          const isDefault = ids.join(',') === defaultsOf(current).join(',');
+          if (isDefault) p.delete('parts');
+          else p.set('parts', ids.length ? ids.join(',') : 'none');
+          router.replace(`/admin/reports?${p}`, { scroll: false });
+        };
+        const toggle = (id: string) => {
+          const next = new Set(on);
+          if (next.has(id)) next.delete(id); else next.add(id);
+          write(next);
+        };
+        return (
+          <div data-tour="report-parts">
+          <PanelGroup label={spec.kind === 'columns' ? 'الأعمدة المطبوعة' : 'أقسام التقرير'}>
+            {spec.parts.map((x) => (
+              <label key={x.id}
+                className="mb-0.5 flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 text-panel text-ink-700 transition-colors hover:bg-ink-100">
+                <input type="checkbox" checked={on.has(x.id)} onChange={() => toggle(x.id)}
+                  className="h-4 w-4 shrink-0 accent-[#0B5F59]" />
+                <span className="min-w-0 flex-1 truncate">{x.label}</span>
+              </label>
+            ))}
+            <div className="mt-1 flex gap-3 px-2 text-micro">
+              <button type="button" className="text-brand-800 hover:underline"
+                onClick={() => write(new Set(spec.parts.map((x) => x.id)))}>الكل</button>
+              <button type="button" className="text-ink-500 hover:underline"
+                onClick={() => write(new Set(defaultsOf(current)))}>الافتراضي</button>
+            </div>
+          </PanelGroup>
+          </div>
+        );
+      })()}
 
       {/* بيانات فترة — the only report whose subject is a span of time. */}
       {report.needs === 'period' && (

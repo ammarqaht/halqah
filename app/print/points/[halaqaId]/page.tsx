@@ -4,7 +4,7 @@
    desk. The figures are the same ledger every screen reads — nothing here is a
    stored number. Talqeen students are absent, not zero — §4.11 keeps them
    outside the points system entirely. */
-import { use, useMemo } from 'react';
+import { Suspense, use, useMemo } from 'react';
 import { Printer } from 'lucide-react';
 import { PrintHead, PrintFoot, PCELL } from '@/components/PrintHead';
 import { Num, toArabicDigits, plural } from '@/components/Num';
@@ -12,8 +12,10 @@ import { Btn } from '@/components/ui';
 import { useDB } from '@/lib/store';
 import { balances, earnsPoints, EMPTY_BALANCE } from '@/lib/points';
 import { formatDate } from '@/lib/dates';
+import { useParts } from '@/lib/reportParts';
 
-export default function PointsSheet({ params }: { params: Promise<{ halaqaId: string }> }) {
+function PointsSheet({ params }: { params: Promise<{ halaqaId: string }> }) {
+  const show = useParts('points');
   const { halaqaId } = use(params);
   const db = useDB();
 
@@ -58,7 +60,8 @@ export default function PointsSheet({ params }: { params: Promise<{ halaqaId: st
           <table className="w-full border-collapse text-sm2">
             <thead>
               <tr className="bg-page/60 text-[10px] text-ink-700">
-                {['#', 'الطالب', 'الرصيد', 'آخر حركة'].map((h) => (
+                {['#', 'الطالب', ...(show('balance') ? ['الرصيد'] : []),
+                  ...(show('lastMove') ? ['آخر حركة'] : [])].map((h) => (
                   <th key={h} className={PCELL}>{h}</th>))}
               </tr>
             </thead>
@@ -67,24 +70,28 @@ export default function PointsSheet({ params }: { params: Promise<{ halaqaId: st
                 <tr key={s.id} className="keep h-[30px]">
                   <td className={`${PCELL} w-8`}><Num>{toArabicDigits(i + 1)}</Num></td>
                   <td className={`${PCELL} text-start`}>{s.fullName}</td>
-                  <td className={`${PCELL} w-24`}>
-                    <Num className="text-lg2 font-bold text-brand-800">{toArabicDigits(b.balance)}</Num>
-                  </td>
-                  <td className={`${PCELL} w-28 text-ink-500`}>
-                    {b.lastAt ? <Num>{toArabicDigits(formatDate(b.lastAt))}</Num> : '—'}
-                  </td>
+                  {show('balance') && (
+                    <td className={`${PCELL} w-24`}>
+                      <Num className="text-lg2 font-bold text-brand-800">{toArabicDigits(b.balance)}</Num>
+                    </td>
+                  )}
+                  {show('lastMove') && (
+                    <td className={`${PCELL} w-28 text-ink-500`}>
+                      {b.lastAt ? <Num>{toArabicDigits(formatDate(b.lastAt))}</Num> : '—'}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
           </table>
         )}
 
-        <PrintFoot>
-          الترتيب بالرصيد نزولًا — القائمة نفسها التي تُبنى منها لوحة الشرف.
-          {talqeenCount > 0 && <> طلاب التلقين ({toArabicDigits(talqeenCount)}) خارج نظام النقاط.</>}
-          {noTrackCount > 0 && <> {toArabicDigits(noTrackCount)} بلا مسار مسجَّل — صحّح مسارهم ليدخلوا النظام.</>}
-        </PrintFoot>
+        <PrintFoot />
       </div>
     </>
   );
+}
+
+export default function Page(props: { params: Promise<{ halaqaId: string }> }) {
+  return <Suspense><PointsSheet {...props} /></Suspense>;
 }

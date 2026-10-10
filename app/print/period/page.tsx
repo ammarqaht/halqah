@@ -19,10 +19,12 @@ import { EXAM_TYPE_AR, type ExamType } from '@/lib/points';
 import { halaqaLabel, shortName } from '@/lib/normalise';
 import { formatDate } from '@/lib/dates';
 import { useAttendance } from '@/components/useAttendance';
+import { useParts } from '@/lib/reportParts';
 
 const EXAM_ORDER: ExamType[] = ['BADGE_GOLDEN', 'BADGE_DIAMOND', 'ASSOCIATION', 'TAJWEED', 'MOCK'];
 
 function PeriodSheet() {
+  const show = useParts('period');
   const db = useDB();
   const sp = useSearchParams();
   const from = sp.get('from') || '';
@@ -104,7 +106,7 @@ function PeriodSheet() {
           </p>
         ) : (
           <>
-            <div className="keep mb-4 grid grid-cols-4 gap-3">
+            {show('summary') && <div className="keep mb-4 grid grid-cols-4 gap-3">
               {([
                 ['اختبارات', exams.length],
                 ['اجتازوا', exams.filter((e) => e.passed === true).length],
@@ -116,8 +118,9 @@ function PeriodSheet() {
                   <p className="font-display text-h3 text-ink-900"><Num>{toArabicDigits(v)}</Num></p>
                 </div>
               ))}
-            </div>
+            </div>}
 
+            {show('exams') && <>
             <PrintSec>حصيلة الاختبارات في الفترة</PrintSec>
             <table className="keep w-full border-collapse text-[11px]">
               <thead>
@@ -139,11 +142,12 @@ function PeriodSheet() {
                 ))}
               </tbody>
             </table>
+            </>}
 
             {/* الحضور والتسميع في الفترة — من سجلّ المعلمين. A period report
                 that counted exams and points but not a single afternoon was
                 missing the thing the period is actually made of. */}
-            {att && att.total.recorded > 0 && (
+            {show('attendance') && att && att.total.recorded > 0 && (
               <>
                 <PrintSec>الحضور والتسميع في الفترة</PrintSec>
                 <table className="keep w-full border-collapse text-[11px]">
@@ -162,19 +166,15 @@ function PeriodSheet() {
                     <tr>
                       <th className={`${PCELL} bg-page/60 font-medium`}>متأخر</th>
                       <td className={PCELL}><Num>{toArabicDigits(att.total.late)}</Num></td>
-                      <th className={`${PCELL} bg-page/60 font-medium`}>أسطر سُمّعت</th>
-                      <td className={PCELL}><Num>{toArabicDigits(att.total.lines)}</Num></td>
                       <th className={`${PCELL} bg-page/60 font-medium`}>أخطاء</th>
-                      <td className={PCELL}><Num>{toArabicDigits(att.total.errors)}</Num></td>
+                      <td className={PCELL} colSpan={3}><Num>{toArabicDigits(att.total.errors)}</Num></td>
                     </tr>
                   </tbody>
                 </table>
-                <p className="mb-3 text-[10px] text-ink-600">
-                  من سجلّ المعلمين في بوابتهم. واليوم الذي لم يُسجَّل لا يُحسب حضورًا ولا غيابًا.
-                </p>
               </>
             )}
 
+            {show('points') && <>
             <PrintSec>النقاط في الفترة</PrintSec>
             <table className="keep w-full border-collapse text-[11px]">
               <tbody>
@@ -188,8 +188,9 @@ function PeriodSheet() {
                 </tr>
               </tbody>
             </table>
+            </>}
 
-            {byHalaqa.length > 0 && (
+            {show('halaqat') && byHalaqa.length > 0 && (
               <>
                 <PrintSec>الحلقات في الفترة</PrintSec>
                 <table className="w-full border-collapse text-[11px]">
@@ -213,7 +214,7 @@ function PeriodSheet() {
               </>
             )}
 
-            {exams.length > 0 && (
+            {show('list') && exams.length > 0 && (
               <>
                 <PrintSec>الاختبارات، واحدًا واحدًا</PrintSec>
                 <table className="w-full border-collapse text-[10px]">
@@ -244,10 +245,7 @@ function PeriodSheet() {
           </>
         )}
 
-        <PrintFoot>
-          الأرقام محسوبة من تواريخ الاختبارات والتسليم والحركات — لا من قائمة الطلاب،
-          فهي تصف ما حدث في الفترة لا من كان مقيَّدًا فيها.
-        </PrintFoot>
+        <PrintFoot />
       </div>
     </>
   );

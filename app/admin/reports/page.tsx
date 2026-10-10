@@ -17,18 +17,13 @@ import { shortName } from '@/lib/normalise';
 import { cx } from '@/lib/cx';
 
 /** Where each report actually lives, once its choices are filled in. */
-function printHref(id: ReportId, halaqa: string, student: string, sections = '',
-                   from = '', to = ''): string | null {
+function baseHref(id: ReportId, halaqa: string, student: string,
+                  from = '', to = ''): string | null {
   switch (id) {
     case 'halaqa':      return halaqa ? `/print/halaqa/${halaqa}` : null;
     case 'student':     return student ? `/print/student/${student}` : null;
     case 'points':      return halaqa ? `/print/points/${halaqa}` : null;
-    case 'association': {
-      /* The chosen tables ride along, so the preview and the print are the
-         same sheet — which is the whole promise of this screen. */
-      const q = sections ? `?sections=${encodeURIComponent(sections)}` : '';
-      return `/print/association${q}`;
-    }
+    case 'association': return '/print/association';
     case 'ready':       return halaqa ? `/print/ready?halaqa=${halaqa}` : '/print/ready';
     case 'honour':      return halaqa ? `/print/honour?halaqa=${halaqa}` : '/print/honour';
     case 'knights':     return halaqa ? `/print/knights?halaqa=${halaqa}` : '/print/knights';
@@ -44,6 +39,15 @@ function printHref(id: ReportId, halaqa: string, student: string, sections = '',
   }
 }
 
+/** …and with the parts the supervisor chose riding along (lib/reportParts),
+    so the preview and the print are the same sheet. */
+function printHref(id: ReportId, halaqa: string, student: string, parts: string,
+                   from = '', to = ''): string | null {
+  const base = baseHref(id, halaqa, student, from, to);
+  if (!base || !parts) return base;
+  return `${base}${base.includes('?') ? '&' : '?'}parts=${encodeURIComponent(parts)}`;
+}
+
 function ReportsScreen() {
   const { panelOpen, setPanelOpen } = usePanel();
   const db = useDB();
@@ -55,7 +59,7 @@ function ReportsScreen() {
   const student = sp.get('student') ?? '';
   /* The sheets that print sideways get a frame that is sideways too. */
   const landscape = id === 'halaqa' || id === 'registration';
-  const href = printHref(id, halaqa, student, sp.get('sections') ?? '',
+  const href = printHref(id, halaqa, student, sp.get('parts') ?? sp.get('sections') ?? '',
     sp.get('from') ?? '', sp.get('to') ?? '');
 
   const subject = useMemo(() => {

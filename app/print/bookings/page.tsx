@@ -104,10 +104,7 @@ export default function BookingSheet() {
           </section>
         ))}
 
-        <footer className="mt-8 flex items-center justify-between border-t border-ink-150 pt-3 text-micro text-ink-500">
-          <span>الدرجة تُحسب في الشاشة — هذه الورقة للمناداة والترتيب</span>
-          <span>حلقات جامع محمد العبدالكريم — الدمام، حي أُحد</span>
-        </footer>
+
       </div>
     </>
   );

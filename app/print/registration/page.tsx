@@ -23,6 +23,7 @@
    marks are read twenty times, and a tick that has to be aimed at is a tick
    that gets misread. */
 import { Suspense, useEffect, useState } from 'react';
+import { shortName } from '@/lib/normalise';
 import { useSearchParams } from 'next/navigation';
 import { Printer } from 'lucide-react';
 import { LogoMark, LogoJamiyah } from '@/components/Logo';
@@ -136,7 +137,7 @@ function RegistrationSheet() {
             <thead>
               <tr>
                 <th rowSpan={2}
-                  className="w-[112px] border border-ink-200 bg-brand-50 px-1.5 py-1.5 text-start align-bottom font-medium">
+                  className="w-[150px] border border-ink-200 bg-brand-50 px-1.5 py-1 text-start align-bottom font-medium">
                   الطالب
                 </th>
                 {/* من هو، قبل ما صنع */}
@@ -175,16 +176,20 @@ function RegistrationSheet() {
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id}>
-                  <td className="border border-ink-200 px-1.5 py-1 text-start leading-tight">
-                    {r.fullName}
+                  {/* One line per boy: a name that wrapped made its row twice as
+                      tall, and two rows of them pushed the last boys onto a
+                      second sheet (10 Oct 2026). */}
+                  <td className="truncate whitespace-nowrap border border-ink-200 px-1.5 py-0.5 text-start text-[10.5px] leading-tight"
+                    title={r.fullName}>
+                    {shortName(r.fullName)}
                   </td>
-                  <td className="border border-ink-200 px-1 py-1 text-center text-ink-600">
+                  <td className="border border-ink-200 px-1 py-0.5 text-center text-ink-600">
                     {r.trackAr ?? '—'}
                   </td>
-                  <td className="border border-ink-200 px-1 py-1 text-center text-ink-600">
+                  <td className="border border-ink-200 px-1 py-0.5 text-center text-ink-600">
                     {r.level == null ? '—' : <Num>{toArabicDigits(String(r.level))}</Num>}
                   </td>
-                  <td className="border border-ink-200 px-1 py-1 text-center text-ink-600">
+                  <td className="border border-ink-200 px-1 py-0.5 text-center text-ink-600">
                     {r.assignmentNo == null ? '—'
                       : <Num>{toArabicDigits(String(r.assignmentNo))}</Num>}
                   </td>
@@ -195,7 +200,7 @@ function RegistrationSheet() {
                     const absent = c.status === 'ABSENT';
                     return MARKS.map((m, i) => (
                       <td key={`${c.day}-${m.key}`}
-                        className={cx('border border-ink-200 px-0 py-1.5 text-center text-[11px]',
+                        className={cx('border border-ink-200 px-0 py-0.5 text-center text-[11px] leading-[18px]',
                           tone?.bg ?? 'bg-white')}>
                         {i === 0 && tone && (
                           <span className="me-px text-[8px] text-ink-500">{tone.mark}</span>
@@ -207,7 +212,7 @@ function RegistrationSheet() {
                     ));
                   })}
                   {/* «صح إذا كان الطالب فارسًا، أو رقمًا لتحديد كم يوم أنجز» */}
-                  <td className={cx('border border-ink-200 px-1 py-1 text-center font-medium',
+                  <td className={cx('border border-ink-200 px-1 py-0.5 text-center font-medium',
                     r.knight ? 'bg-brand-100 text-brand-800' : 'text-ink-600')}>
                     {r.knight ? '✓' : <Num>{toArabicDigits(r.met)}</Num>}
                   </td>
@@ -217,7 +222,7 @@ function RegistrationSheet() {
           </table>
         )}
 
-        <footer className="mt-5 flex flex-wrap items-center justify-between gap-x-6 gap-y-1 border-t border-ink-150 pt-2.5 text-micro text-ink-500">
+        <footer className="keep mt-2 flex flex-wrap items-center gap-x-6 gap-y-1 border-t border-ink-150 pt-1.5 text-[10px] text-ink-500">
           <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
             <span>ث الثوب · ك المراجعة الكبرى · ص المراجعة الصغرى · د الدرس</span>
             <span className="flex items-center gap-1">
@@ -230,10 +235,6 @@ function RegistrationSheet() {
               <i className="inline-block h-2.5 w-2.5 border border-ink-200 bg-risk-100" />✕ غائب — يومه «—»
             </span>
             <span>★ اختبار اجتازه</span>
-          </span>
-          <span>
-            الفارس: أتمّ كل أيام الأسبوع المسجَّلة حاضرًا في وقته بثوبه ومسمّعًا الثلاثة —
-            والرقم عدد ما أتمّ منها
           </span>
         </footer>
       </div>

@@ -11,6 +11,15 @@ export type AttendancePayload = {
   lastDay: string | null;
   /** Only when asked for a halaqa or a student. */
   lastLesson?: Record<string, { day: string; surah: string; ayah: string }>;
+  /** Only when asked for ONE student: every afternoon recorded, newest first. */
+  days?: AttendanceDay[];
+};
+
+export type AttendanceDay = {
+  day: string; status: string; thobe: boolean; incomplete: boolean; note: string;
+  level: number | null; assignmentNo: number | null;
+  talqeen: { surah: string; ayah: string } | null;
+  lines: { kind: string; kindAr: string; recited: boolean; errors: number; passage: string | null }[];
 };
 
 /* حصيلة الحضور من سجلّ المعلم — للتقارير المطبوعة.

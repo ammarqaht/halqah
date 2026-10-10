@@ -22,18 +22,25 @@ export function PrintHead({ title, sub, assoc }:
             {sub}
           </p>
         )}
+        {/* The print date lives up here now. At the foot it was the line that
+            fell onto a second sheet by itself whenever a report filled the
+            first exactly (10 Oct 2026). */}
+        <p className="mt-0.5 text-[10px] text-ink-400">
+          طُبع في <Num>{toArabicDigits(formatDate(new Date().toISOString()))}</Num>
+        </p>
       </div>
       <LogoJamiyah height={38} />
     </header>
   );
 }
 
-/** The print-date line every report closes with. */
+/** A legend under the sheet, when it needs one — and nothing when it does
+    not. The print date moved into PrintHead. */
 export function PrintFoot({ children }: { children?: React.ReactNode }) {
+  if (!children) return null;
   return (
-    <footer className="keep mt-6 flex items-center justify-between border-t border-ink-150 pt-2 text-micro text-ink-500">
-      <span>{children}</span>
-      <span>تاريخ الطباعة: <Num>{toArabicDigits(formatDate(new Date().toISOString()))}</Num></span>
+    <footer className="keep mt-3 border-t border-ink-150 pt-1.5 text-[10px] text-ink-500">
+      {children}
     </footer>
   );
 }

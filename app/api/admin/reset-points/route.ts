@@ -21,23 +21,19 @@ import { readSession } from '@/lib/auth';
    boy DID is touched: his days, his recitation, his exams and his مقرّر are the
    record of a term's work, and they are not money.
 
-   THE PHRASE IS CHECKED ON THE SERVER, for the same reason it is on the full
-   reset: a check that lives only in a dialog is a check anyone can skip by
-   calling the endpoint. It is not a secret — it is a second pair of hands on a
-   lever that has no undo. */
+   The confirmation code lives in the dialog only, at the client's word: «ابي
+   في رمز تحقق بيني وبين الموقع يدخله من اربع خانات … خله في ui يعني مايحتاج
+   شغل تحقق» (10 Oct 2026). It is a second pair of hands on a lever with no
+   undo, not a lock — the lock is the supervisor's session below, and a
+   preview (3999) token never reaches here (middleware). */
 
 const WIPE = ['orders', 'point_codes', 'point_code_batches', 'point_txns'] as const;
 
-const RESET_PHRASE = process.env.RESET_PHRASE || '2026';
 
 export async function POST(req: Request) {
   const session = await readSession();
   if (!session) return NextResponse.json({ error: 'غير مصرّح' }, { status: 401 });
 
-  const { phrase } = await req.json().catch(() => ({}));
-  if (String(phrase ?? '').trim() !== RESET_PHRASE) {
-    return NextResponse.json({ error: 'الرمز غير صحيح.' }, { status: 403 });
-  }
 
   const started = Date.now();
   try {

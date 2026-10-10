@@ -161,12 +161,18 @@
 @page{size:A4;margin:12mm}
 
 @media print{
-  html,body{background:#fff!important}
+  /* `html,body{height:100%}` is the screen's; printed, it made the document
+     as tall as the window, and a landscape sheet (shorter than any window)
+     got a blank second page after it (10 Oct 2026). */
+  html,body,#__next{background:#fff!important;height:auto!important;min-height:0!important}
   .no-print{display:none!important}
   .sheet-a4{width:auto;min-height:0;margin:0;padding:0;box-shadow:none}
   /* A page box is per-DOCUMENT, so a landscape sheet declares its own and the
      route that prints it is the only thing in the document. */
-  .sheet-a4.landscape{width:auto}
+  /* min-height too: the screen's `.sheet-a4.landscape{min-height:794px}` is two
+     classes and outranked the print rule's one, so a landscape sheet stayed
+     794px tall on a 718px page and pushed out a blank second sheet. */
+  .sheet-a4.landscape{width:auto;min-height:0}
   /* A card must never be cut in half by a page break, and a long table keeps
      its header on every sheet. */
   .keep{break-inside:avoid;page-break-inside:avoid}

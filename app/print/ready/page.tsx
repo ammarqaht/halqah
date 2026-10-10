@@ -17,8 +17,15 @@ import { followUpRows, followedRows, listRows } from '@/lib/followup';
 import { TRACK_AR } from '@/lib/types';
 import { shortName, teacherName } from '@/lib/normalise';
 import { formatDate } from '@/lib/dates';
+import { useParts } from '@/lib/reportParts';
+
+const COLS: [string, string | null][] = [
+  ['#', null], ['الطالب', null], ['رقم الهوية', 'nid'], ['الحلقة', 'halaqa'], ['المسار', 'track'],
+  ['المستوى', 'level'], ['الجزء الجاهز', 'ajza'], ['تاريخ اجتياز الماسي', 'diamond'], ['ملاحظات الجمعية', 'notes'],
+];
 
 function ReadySheet() {
+  const show = useParts('ready');
   const db = useDB();
   const sp = useSearchParams();
   const halaqaId = sp.get('halaqa');
@@ -64,8 +71,7 @@ function ReadySheet() {
           <table className="w-full border-collapse text-[11px]">
             <thead>
               <tr className="bg-page/60 text-[10px] text-ink-700">
-                {['#', 'الطالب', 'رقم الهوية', 'الحلقة', 'المسار', 'المستوى',
-                  'الجزء الجاهز', 'تاريخ اجتياز الماسي', 'ملاحظات الجمعية'].map((h) => (
+                {COLS.filter(([, part]) => !part || show(part)).map(([h]) => (
                   <th key={h} className={PCELL}>{h}</th>))}
               </tr>
             </thead>
@@ -74,30 +80,30 @@ function ReadySheet() {
                 <tr key={r.student.id} className="keep h-[28px]">
                   <td className={PCELL}><Num>{toArabicDigits(i + 1)}</Num></td>
                   <td className={`${PCELL} text-start`}>{r.student.fullName}</td>
-                  <td className={PCELL}>
+                  {show('nid') && <td className={PCELL}>
                     {r.student.nationalId
                       ? <Num>{toArabicDigits(r.student.nationalId)}</Num> : '—'}
-                  </td>
-                  <td className={`${PCELL} text-start`}>{teacherOf(r.student.halaqaId)}</td>
-                  <td className={PCELL}>{r.student.track ? TRACK_AR[r.student.track] : '—'}</td>
-                  <td className={PCELL}>
+                  </td>}
+                  {show('halaqa') && <td className={`${PCELL} text-start`}>{teacherOf(r.student.halaqaId)}</td>}
+                  {show('track') && <td className={PCELL}>{r.student.track ? TRACK_AR[r.student.track] : '—'}</td>}
+                  {show('level') && <td className={PCELL}>
                     {r.student.currentLevel != null
                       ? <Num>{toArabicDigits(r.student.currentLevel)}</Num> : '—'}
-                  </td>
-                  <td className={PCELL}>
+                  </td>}
+                  {show('ajza') && <td className={PCELL}>
                     {r.ready.ajza != null ? <Num>{toArabicDigits(r.ready.ajza)}</Num> : '—'}
-                  </td>
-                  <td className={PCELL}>
+                  </td>}
+                  {show('diamond') && <td className={PCELL}>
                     {r.diamondOn ? <Num>{toArabicDigits(formatDate(r.diamondOn))}</Num> : '—'}
-                  </td>
-                  <td className={`${PCELL} w-24`} />
+                  </td>}
+                  {show('notes') && <td className={`${PCELL} w-24`} />}
                 </tr>
               ))}
             </tbody>
           </table>
         )}
 
-        <PrintFoot>عمود الملاحظات فارغ عمدًا — يكتب فيه مختبِر الجمعية يوم الاختبار.</PrintFoot>
+        <PrintFoot />
       </div>
     </>
   );

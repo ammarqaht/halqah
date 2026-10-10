@@ -23,10 +23,13 @@ import { useDB } from '@/lib/store';
 import { derive } from '@/lib/derive';
 import { halaqaLabel, shortName } from '@/lib/normalise';
 import { formatDate } from '@/lib/dates';
+import { useParts } from '@/lib/reportParts';
+import { Suspense } from 'react';
 
 const n2 = (v: number) => toArabicDigits(v.toFixed(2));
 
-export default function ProgressSheet() {
+function ProgressSheet() {
+  const show = useParts('progress');
   const db = useDB();
   const d = useMemo(() => derive(db), [db]);
 
@@ -55,6 +58,7 @@ export default function ProgressSheet() {
           <p className="mt-8 text-center text-base2 text-ink-500">لا حلقات بعد.</p>
         ) : (
           <>
+            {show('totals') && <>
             <PrintSec>المجموع لكل حلقة، ومتوسّطه لكل طالب</PrintSec>
             <table className="keep w-full border-collapse text-[11px]">
               <thead>
@@ -108,7 +112,9 @@ export default function ProgressSheet() {
                 </tr>
               </tfoot>
             </table>
+            </>}
 
+            {show('tracks') && <>
             <PrintSec>المسارات في كل حلقة</PrintSec>
             <table className="keep w-full border-collapse text-[11px]">
               <thead>
@@ -134,13 +140,14 @@ export default function ProgressSheet() {
                 ))}
               </tbody>
             </table>
+            </>}
           </>
         )}
 
-        <PrintFoot>
-          الأرقام كما جاءت في الملف المرفوع — «للطالب» متوسّطٌ على طلاب الحلقة، وما سواه مجموع.
-        </PrintFoot>
+        <PrintFoot />
       </div>
     </>
   );
 }
+
+export default function Page() { return <Suspense><ProgressSheet /></Suspense>; }

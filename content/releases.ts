@@ -20,7 +20,8 @@
    ───────────────────────────────────────────────────────────────────────── */
 import type { LucideIcon } from 'lucide-react';
 import {
-  Calculator, ClipboardList, GraduationCap, Layers3, MessageSquareText, ShieldCheck, Users,
+  Calculator, CalendarDays, ClipboardList, GraduationCap, Layers3, ListChecks,
+  MessageSquareText, Printer, ShieldCheck, Users,
 } from 'lucide-react';
 
 export type Audience = 'admin' | 'teacher' | 'student';
@@ -51,6 +52,29 @@ export type Release = {
 };
 
 export const RELEASES: Release[] = [
+  {
+    id: '2026-10-10-report-parts',
+    date: '2026-10-10',
+    audience: ['admin'],
+    title: 'اختر ما يُطبع من كل تقرير',
+    summary:
+      'في «التقارير» صار لكل تقرير أقسامه أو أعمدته، تختار منها ما تريد طباعته. وفي تقرير الطالب صار الحضور يومًا بيوم بما سمّعه، وكل التقارير تُطبع على A4 بلا صفحات فارغة.',
+    points: [
+      { icon: ListChecks, title: 'أنت تختار',
+        body: 'علّم الأقسام أو الأعمدة التي تريدها، والمعاينة تتغيّر معك قبل الطباعة.' },
+      { icon: CalendarDays, title: 'حضور الطالب يومًا بيوم',
+        body: 'كل يوم سجّله معلّمه: حضوره وثوبه، وما سمّعه في الدرس والمراجعتين، وأخطاؤه.' },
+      { icon: Printer, title: 'A4 مضبوط',
+        body: 'لا صفحة فارغة بعد التقرير، وتاريخ الطباعة صار في رأس الورقة.' },
+    ],
+    tour: {
+      href: '/admin/reports?r=student',
+      steps: [
+        { target: 'report-parts', title: 'أقسام التقرير',
+          body: 'علّم ما تريد طباعته وأزل ما لا تريده. «الكل» يعلّم كل شيء، و«الافتراضي» يرجعه كما كان.' },
+      ],
+    },
+  },
   {
     id: '2026-10-09-exam-detail-student',
     date: '2026-10-09',

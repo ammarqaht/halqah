@@ -83,10 +83,7 @@ function HonourSheet() {
           </ol>
         )}
 
-        <footer className="mt-10 flex items-center justify-between border-t border-ink-150 pt-3 text-micro text-ink-500">
-          <span>بارك الله فيهم وزادهم من فضله</span>
-          <span><Num>{toArabicDigits(formatDate(new Date().toISOString()))}</Num></span>
-        </footer>
+        <p className="keep mt-4 text-center text-xs2 text-ink-500">بارك الله فيهم وزادهم من فضله</p>
       </div>
     </>
   );

@@ -386,24 +386,21 @@ export async function hydrateFromServer(): Promise<void> {
        open would upload its stale copy straight back, and «تصفير» would only
        ever hold until someone opened a laptop. */
     const RESET_KEY = 'halqah_reset_at';
+    /* A reset elsewhere means this device's copy predates it: throw the copy
+       away — and then LOAD, like any other page. This used to stop here with
+       an empty store, so a browser opening the system for the first time
+       (which has seen no reset, and so «missed» every one) showed nothing
+       until it was refreshed a second time. */
+    let base0 = cur;
     if (remote.resetAt) {
       let seen: string | null = null;
       try { seen = localStorage.getItem(RESET_KEY); } catch { /* private mode */ }
       if (seen !== remote.resetAt) {
-        db = { ...EMPTY };
+        base0 = { ...EMPTY };
         /* And nothing is owed any more. A mark left standing here would make
            the next hydrate carry rows this device was just told to forget. */
         readUnsent(); unsent.clear(); writeUnsent();
-        try {
-          localStorage.setItem(KEY, JSON.stringify(db));
-          localStorage.setItem(RESET_KEY, String(remote.resetAt));
-        } catch { /* private mode */ }
-        serverRev = typeof remote.rev === 'number' ? remote.rev : null;
-        snapshot(db as unknown as Record<string, unknown>, remote);
-        hydrated = true;
-        subs.forEach((f) => f());
-        setSync('saved');
-        return;
+        try { localStorage.setItem(RESET_KEY, String(remote.resetAt)); } catch { /* private mode */ }
       }
     }
     /* The server is the record. A cache holding work this device made while
@@ -422,11 +419,11 @@ export async function hydrateFromServer(): Promise<void> {
        all. A list with unsent rows still carries them, which is the whole and
        only thing the rule was for. */
     readUnsent();
-    const merged: DB = { ...cur };
+    const merged: DB = { ...base0 };
     let carried = 0;
     for (const k of SYNCED) {
       const server = (remote[k] ?? []) as { id?: string }[];
-      const local = (cur[k] ?? []) as { id?: string }[];
+      const local = (base0[k] ?? []) as { id?: string }[];
       if (unsent.has(k) && server.length === 0 && local.length > 0) {
         carried += local.length; continue;
       }
@@ -445,7 +442,7 @@ export async function hydrateFromServer(): Promise<void> {
         (remote.students as Student[]).map((x) => [x.id, x]));
       const byKey = new Map<string, Student>(
         (remote.students as Student[]).filter((x) => x.dedupeKey).map((x) => [x.dedupeKey!, x]));
-      const local = cur.students.filter(
+      const local = base0.students.filter(
         (x) => !byId.has(x.id) && !(x.dedupeKey && byKey.has(x.dedupeKey)));
       merged.students = [...(remote.students as Student[]), ...local];
       if (local.length) carried += local.length;
@@ -453,7 +450,7 @@ export async function hydrateFromServer(): Promise<void> {
     if (Array.isArray(remote.halaqat) && remote.halaqat.length) {
       const names = new Set((remote.halaqat as Halaqa[]).map((h) => h.name));
       merged.halaqat = [...(remote.halaqat as Halaqa[]),
-                        ...cur.halaqat.filter((h) => !names.has(h.name))];
+                        ...base0.halaqat.filter((h) => !names.has(h.name))];
     }
     db = migrate(merged);
     /* In step with the server as of this load (lib/rev). */

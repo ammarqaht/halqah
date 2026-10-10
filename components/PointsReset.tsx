@@ -6,8 +6,9 @@
    So it is the same block, down to the warn-tinted strip and the red word on the
    button — because it is the same KIND of act, and a lever with no undo should
    look like the other lever with no undo rather than like a card that happens to
-   be red. The phrase is checked on the SERVER: a check that lives in a dialog is
-   one anyone can skip by calling the endpoint.
+   be red. The confirmation is four boxes and the code 1590, checked HERE —
+   «رمز تحقق بيني وبين الموقع يدخله من اربع خانات … خله في ui» (client,
+   10 Oct 2026).
 
    It is narrower than the database reset and says so. What it empties is the
    economy — movements, codes, orders — and what it leaves is everything a boy
@@ -19,9 +20,12 @@ import { useState } from 'react';
 import { AlertTriangle, CheckCircle2, Coins, Loader2, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Sheet, SheetHead } from '@/components/Sheet';
-import { Btn, INPUT, Modal } from '@/components/ui';
+import { Btn, Modal } from '@/components/ui';
 import { Num } from '@/components/Num';
-import { cx } from '@/lib/cx';
+import { PinInput } from '@/components/student/PinInput';
+
+/** The confirmation code — a second pair of hands, not a lock (see header). */
+const RESET_CODE = '1590';
 
 type Done = { txns: number; codes: number; orders: number };
 
@@ -38,7 +42,7 @@ export function PointsResetCard() {
     try {
       const r = await fetch('/api/admin/reset-points', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phrase }),
+        body: JSON.stringify({}),
       });
       const d = await r.json();
       if (!r.ok) { setErr(d.error ?? 'تعذّر التصفير.'); return; }
@@ -91,11 +95,11 @@ export function PointsResetCard() {
         </div>
       </Sheet>
 
-      <Modal open={open} onClose={() => !busy && setOpen(false)} title="تصفير النقاط"
+      <Modal open={open} onClose={() => { if (!busy) { setOpen(false); setPhrase(''); } }} title="تصفير النقاط"
         footer={<>
           <Btn onClick={() => setOpen(false)} disabled={busy}>إلغاء</Btn>
           <Btn variant="primary" className="!bg-risk-700 hover:!bg-risk-700/90"
-            onClick={reset} disabled={busy || phrase.trim().length < 4}>
+            onClick={reset} disabled={busy || phrase !== RESET_CODE}>
             {busy ? <><Loader2 size={16} className="animate-spin" />جارٍ المسح…</> : 'نعم، صفّر'}
           </Btn>
         </>}>
@@ -113,15 +117,16 @@ export function PointsResetCard() {
               المتجر. لا يمكن التراجع.
             </p>
 
-            <label className="mt-4 block">
+            <div className="mt-4">
               <span className="mb-1.5 block text-xs2 font-medium text-ink-700">
-                اكتب الرمز السرّي للتأكيد
+                اكتب رمز التحقق للتأكيد
               </span>
-              <input value={phrase} onChange={(e) => setPhrase(e.target.value)}
-                inputMode="numeric" dir="ltr" autoComplete="off"
-                aria-label="الرمز السرّي للتصفير"
-                className={cx(INPUT, 'h-12 text-center tracking-[.4em]')} />
-            </label>
+              <PinInput value={phrase} onChange={setPhrase} length={4} autoFocus
+                label="رمز التحقق للتصفير" />
+              {phrase.length === 4 && phrase !== RESET_CODE && (
+                <p role="alert" className="mt-2 text-center text-panel text-risk-700">الرمز غير صحيح.</p>
+              )}
+            </div>
 
             {err && (
               <p role="alert" className="mt-3 rounded-lg border border-risk-200 bg-risk-100 px-3.5 py-2.5 text-panel text-risk-700">

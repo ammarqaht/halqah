@@ -12,6 +12,7 @@
    Talqeen students are counted everywhere here — §4.11 includes them in all
    association statistics. */
 import { Suspense, useMemo } from 'react';
+import { useParts } from '@/lib/reportParts';
 import { useSearchParams } from 'next/navigation';
 import { Printer } from 'lucide-react';
 import { PrintHead, PrintFoot, PrintSec, PCELL } from '@/components/PrintHead';
@@ -60,8 +61,7 @@ function AssociationSheet() {
      different times, and a sheet carrying five tables when one was wanted is
      four tables of noise. Absent, everything prints — the report has always
      meant «all of it», and a bare link must keep meaning that. */
-  const only = sp.get('sections');
-  const show = (id: string) => !only || only.split(',').includes(id);
+  const show = useParts('association');
 
   const d = useMemo(() => derive(db), [db]);
   const readyByHalaqa = useMemo(() => {
