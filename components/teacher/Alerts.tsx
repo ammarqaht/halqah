@@ -21,7 +21,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import {
-  Award, Bell, BellOff, CalendarClock, ChevronLeft, FileText, Megaphone, UserX,
+  Award, Bell, BellOff, CalendarClock, ChevronLeft, Crown, FileText, Megaphone, UserX,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Btn, Empty, Modal } from '@/components/ui';
@@ -38,6 +38,7 @@ export const KIND: Record<Alert['kind'], { icon: LucideIcon; tone: string; label
   PLAN:     { icon: FileText,      tone: 'text-brand-800 bg-brand-100', label: 'خطة' },
   ABSENCE:  { icon: UserX,         tone: 'text-risk-700 bg-risk-100',   label: 'غياب متكرر' },
   MESSAGE:  { icon: Megaphone,     tone: 'text-ink-700 bg-ink-100',     label: 'من الإدارة' },
+  KNIGHTS:  { icon: Crown,         tone: 'text-warn-700 bg-warn-100',   label: 'فرسان الأسبوع' },
 };
 
 /**

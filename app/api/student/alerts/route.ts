@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { shortName } from '@/lib/normalise';
+import { lastWeekEnd } from '@/lib/week';
+import { knightsOfWeek } from '@/lib/knights';
 import { scope } from '../_scope';
 import { isoDate } from '@/lib/dates';
 import { EXAM_TYPE_AR, type ExamType } from '@/lib/points';
@@ -34,7 +37,7 @@ const KIND_AR: Record<string, string> = {
 const NEWS_DAYS = 14;
 
 export type StudentAlert = {
-  kind: 'NOTE' | 'EXAM' | 'BOOKED' | 'GIFT' | 'MESSAGE';
+  kind: 'NOTE' | 'EXAM' | 'BOOKED' | 'GIFT' | 'MESSAGE' | 'KNIGHTS';
   key: string;
   read: boolean;
   /** Where a tap goes, when there is anywhere. */
@@ -173,6 +176,29 @@ export async function GET() {
       body: m.body,
       at: m.createdAt.toISOString(),
     });
+  }
+
+  /* ── فرسان الأسبوع ───────────────────────────────────────────────────────
+     «بشكل اسبوعي كل احد يكون فيه اشعار … عن فرسان الأسبوع» (client, 10 Oct
+     2026). Last week's knights of HIS halaqa — and if he is one of them, it
+     says so to him first. Keyed by the week: one card a Sunday. */
+  const mine = await db.student.findUnique({ where: { id: me }, select: { halaqaId: true } });
+  if (mine?.halaqaId) {
+    const to = lastWeekEnd();
+    const k = await knightsOfWeek({ to, halaqaId: mine.halaqaId }).catch(() => null);
+    if (k && k.rows.length) {
+      const self = k.rows.find((r) => r.id === me);
+      const names = k.rows.map((r) => shortName(r.fullName));
+      push({
+        kind: 'KNIGHTS',
+        key: alertKey('KNIGHTS', to),
+        title: self ? 'مبارك! أنت من فرسان الأسبوع' : 'فرسان الأسبوع في حلقتك',
+        body: self
+          ? `أتممت ${self.met} من ${self.of} أيام حاضرًا في وقتك بثوبك ومسمّعًا. وفرسان حلقتك: ${names.join('، ')}.`
+          : `${names.join('، ')} — بارك الله فيهم. كن منهم في الأسبوع القادم.`,
+        at: to,
+      });
+    }
   }
 
   /* Newest first — the same order his teacher's list reads in. */

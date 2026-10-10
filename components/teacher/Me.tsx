@@ -8,7 +8,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { useRouter } from 'next/navigation';
 
 export type Alert = {
-  kind: 'EXAM_DUE' | 'BOOKED' | 'RESULT' | 'PLAN' | 'ABSENCE' | 'MESSAGE';
+  kind: 'EXAM_DUE' | 'BOOKED' | 'RESULT' | 'PLAN' | 'ABSENCE' | 'MESSAGE' | 'KNIGHTS';
   /** Stable while the alert means the same thing — what its read-marker uses. */
   key: string;
   read: boolean;

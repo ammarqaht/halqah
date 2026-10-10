@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { weekOf, weekDays, shiftWeek, weekLabel, WEEKDAY_AR } from './week';
+import { weekOf, weekDays, shiftWeek, weekLabel, WEEKDAY_AR, lastWeekEnd } from './week';
 
 /* الأحد إلى الخميس. Friday and Saturday are not absences to explain — the
    halaqa does not meet, so they never appear. */
@@ -35,5 +35,18 @@ describe('أسبوع الحلقة', () => {
     expect(weekDays('2026-09-27')[4]).toBe('2026-10-01');
     expect(weekLabel('2026-09-27')).toBe('27 سبتمبر – 1 أكتوبر');
     expect(weekLabel('2026-09-13')).toBe('13 – 17 سبتمبر');
+  });
+});
+
+describe('lastWeekEnd — the week «فرسان الأسبوع» is announced for', () => {
+  it('on Sunday it is yesterday', () => {
+    expect(lastWeekEnd(new Date(2026, 9, 11))).toBe('2026-10-10');   // Sun → Sat
+  });
+  it('holds that Saturday all week', () => {
+    expect(lastWeekEnd(new Date(2026, 9, 15))).toBe('2026-10-10');   // Thu
+    expect(lastWeekEnd(new Date(2026, 9, 17))).toBe('2026-10-10');   // Sat itself
+  });
+  it('turns the page the next Sunday', () => {
+    expect(lastWeekEnd(new Date(2026, 9, 18))).toBe('2026-10-17');
   });
 });

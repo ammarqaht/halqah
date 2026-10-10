@@ -19,7 +19,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Award, Bell, BellOff, CalendarClock, ChevronLeft, Gift, Megaphone, MessageSquare,
+  Award, Crown, Bell, BellOff, CalendarClock, ChevronLeft, Gift, Megaphone, MessageSquare,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Btn, Empty, Modal } from '@/components/ui';
@@ -28,7 +28,7 @@ import { relativeDay, formatDate } from '@/lib/dates';
 import { cx } from '@/lib/cx';
 
 export type StudentAlert = {
-  kind: 'NOTE' | 'EXAM' | 'BOOKED' | 'GIFT' | 'MESSAGE';
+  kind: 'NOTE' | 'EXAM' | 'BOOKED' | 'GIFT' | 'MESSAGE' | 'KNIGHTS';
   key: string; read: boolean; href?: string;
   title: string; body: string; at: string;
 };
@@ -39,6 +39,7 @@ export const KIND: Record<StudentAlert['kind'], { icon: LucideIcon; tone: string
   BOOKED:  { icon: CalendarClock, tone: 'text-info-700 bg-info-100' },
   GIFT:    { icon: Gift,          tone: 'text-warn-700 bg-warn-100' },
   MESSAGE: { icon: Megaphone,     tone: 'text-ink-700 bg-ink-100' },
+  KNIGHTS: { icon: Crown,         tone: 'text-warn-700 bg-warn-100' },
 };
 
 const READ_EVENT = 'student-alerts-read';
@@ -46,7 +47,7 @@ const READ_EVENT = 'student-alerts-read';
 /** What each kind is called above its card in the arrival story. */
 export const KIND_LABEL: Record<StudentAlert['kind'], string> = {
   NOTE: 'من معلّمك', EXAM: 'نتيجة اختبار', BOOKED: 'موعد اختبار',
-  GIFT: 'هداياك', MESSAGE: 'من الإدارة',
+  GIFT: 'هداياك', MESSAGE: 'من الإدارة', KNIGHTS: 'فرسان الأسبوع',
 };
 
 /** How many sit on الرئيسية before «عرض المزيد» takes the rest. */

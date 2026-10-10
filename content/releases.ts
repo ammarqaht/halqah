@@ -20,7 +20,7 @@
    ───────────────────────────────────────────────────────────────────────── */
 import type { LucideIcon } from 'lucide-react';
 import {
-  Calculator, CalendarDays, ClipboardList, GraduationCap, Layers3, ListChecks,
+  Calculator, CalendarDays, ClipboardList, Crown, GraduationCap, Layers3, ListChecks,
   MessageSquareText, Printer, ShieldCheck, Users,
 } from 'lucide-react';
 
@@ -52,6 +52,22 @@ export type Release = {
 };
 
 export const RELEASES: Release[] = [
+  {
+    id: '2026-10-10-weekly-knights',
+    date: '2026-10-10',
+    audience: ['admin'],
+    title: 'فرسان الأسبوع — تكريم كل أحد',
+    summary:
+      'كل يوم أحد يصل إشعار بفرسان الأسبوع الماضي: لك بفرسان كل الحلقات، ولكل معلّم بفرسان حلقته، ولكل طالب بفرسان حلقته — ومن كان منهم يُهنَّأ باسمه. من باب تكريمهم وتشجيع غيرهم.',
+    points: [
+      { icon: Crown, title: 'لك أنت',
+        body: 'بطاقة كل أحد بالفرسان حلقةً حلقة، ومنها مباشرة إلى ورقة «فرسان الأسبوع» للطباعة.' },
+      { icon: Users, title: 'للمعلّم',
+        body: 'تنبيه في بوابته بفرسان حلقته في الأسبوع الماضي.' },
+      { icon: GraduationCap, title: 'للطالب',
+        body: '«مبارك! أنت من فرسان الأسبوع» لمن أتمّها، وأسماء فرسان حلقته لغيره ليكون منهم.' },
+    ],
+  },
   {
     id: '2026-10-10-report-parts',
     date: '2026-10-10',

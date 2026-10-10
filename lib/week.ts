@@ -73,3 +73,17 @@ export function weekLabel(sunday: string): string {
     ? `${Number(da)} – ${Number(db)} ${monthB}`
     : `${Number(da)} ${monthA} – ${Number(db)} ${monthB}`;
 }
+
+/**
+ * The Saturday that closed the last full week — the week «فرسان الأسبوع» is
+ * announced for. «بشكل اسبوعي كل احد يكون فيه اشعار … عن فرسان الأسبوع»
+ * (client, 10 Oct 2026): on Sunday it is yesterday, and it stays that Saturday
+ * until the next Sunday turns the page. Sunday-to-Saturday covers every
+ * halaqa day whatever weekdays a halaqa meets on.
+ */
+export function lastWeekEnd(today: Date = new Date()): string {
+  const d = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  d.setDate(d.getDate() - (d.getDay() + 1));
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+

@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { lastWeekEnd } from '@/lib/week';
+import { knightsOfWeek } from '@/lib/knights';
 import { fail, scope, teacherSettings } from '../_scope';
 import { absence, dayState, opensItself, type DayRecord } from '@/lib/teacher';
 import { badgeAr } from '@/lib/day';
@@ -16,7 +18,7 @@ import { applyAutoAbsence } from '@/lib/absence-run';
 const NEWS_DAYS = 14;
 
 export type Alert = {
-  kind: 'EXAM_DUE' | 'BOOKED' | 'RESULT' | 'PLAN' | 'ABSENCE' | 'MESSAGE';
+  kind: 'EXAM_DUE' | 'BOOKED' | 'RESULT' | 'PLAN' | 'ABSENCE' | 'MESSAGE' | 'KNIGHTS';
   /** Stable for as long as the alert means the same thing — see `alertKey`. */
   key: string;
   /** False until the teacher has opened it. «التنبيه غير المقروء فيه دائرة
@@ -189,6 +191,22 @@ export async function GET(req: Request) {
       body: a.streak >= 3
         ? `${shortName(s.fullName)} غاب ${a.streak} أيام حلقة متتالية`
         : `${shortName(s.fullName)} غاب ${a.inWindow} أيام في آخر شهر`,
+    });
+  }
+
+  /* فرسان الأسبوع — «بشكل اسبوعي كل احد يكون فيه اشعار … عن فرسان الأسبوع»
+     (client, 10 Oct 2026). Last week's (lib/week `lastWeekEnd`), for his
+     halaqa, from Sunday; keyed by the week so next Sunday brings a new one. */
+  const knightsTo = lastWeekEnd();
+  const knights = await knightsOfWeek({ to: knightsTo, halaqaId: halaqa.id }).catch(() => null);
+  if (knights && knights.rows.length) {
+    const names = knights.rows.map((k) => shortName(k.fullName));
+    push({
+      kind: 'KNIGHTS',
+      key: alertKey('KNIGHTS', halaqa.id, knightsTo),
+      href: '/teacher/students',
+      at: knightsTo,
+      body: `فرسان حلقتك هذا الأسبوع (${names.length}): ${names.join('، ')} — بارك الله فيهم.`,
     });
   }
 
