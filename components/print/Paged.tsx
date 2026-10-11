@@ -386,6 +386,40 @@ export function AutoPaged({ title, landscape, children, toolbar = true }: {
         const tb = tableIn(el);
         const rows = tb ? rowsOf(tb) : [];
         if (!tb || rows.length < 4) {
+          /* Not a table — but a list or a grid of cards is cut the same way,
+             between its rows (فرسان الأسبوع: one <ul> of every knight moved
+             whole to page two and left page one empty, 11 Oct 2026). Items
+             that share a line in a grid travel together. */
+          const items = Array.from(el.children) as HTMLElement[];
+          if (items.length >= 4 && !isHeading(el)) {
+            const top0 = el.getBoundingClientRect().top;
+            const lines: { els: HTMLElement[]; top: number }[] = [];
+            for (const c of items) {
+              const t = Math.round(c.getBoundingClientRect().top - top0);
+              const last = lines[lines.length - 1];
+              if (last && Math.abs(last.top - t) < 2) last.els.push(c);
+              else lines.push({ els: [c], top: t });
+            }
+            if (lines.length >= 2) {
+              const lineH = (k: number) => (k + 1 < lines.length ? lines[k + 1].top : el.offsetHeight) - lines[k].top;
+              const gapH = h - el.offsetHeight;
+              let k = 0;
+              while (k < lines.length) {
+                if (used + lineH(k) + gapH > bodyH && used > 0) page();
+                const wrap = el.cloneNode(false) as HTMLElement;
+                let take = gapH;
+                while (k < lines.length && (used + take + lineH(k) <= bodyH || take === gapH)) {
+                  lines[k].els.forEach((c) => wrap.append(c.cloneNode(true)));
+                  take += lineH(k); k++;
+                  if (used + take > bodyH) break;
+                }
+                body.append(wrap);
+                used += take;
+                if (k < lines.length) page();
+              }
+              return;
+            }
+          }
           if (used > 0) page();
           body.append(el.cloneNode(true)); used += h;
           return;

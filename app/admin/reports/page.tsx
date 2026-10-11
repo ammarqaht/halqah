@@ -48,18 +48,28 @@ function printHref(id: ReportId, halaqa: string, student: string, parts: string,
   return `${base}${base.includes('?') ? '&' : '?'}parts=${encodeURIComponent(parts)}`;
 }
 
-/** Keep a same-origin frame exactly as tall as what it shows. */
+/** Keep a same-origin frame exactly as tall as what it shows.
+    The pages are dealt AFTER load — the report's data arrives later — and
+    `body` is pinned to the frame's own height, so watching it saw nothing
+    (11 Oct 2026: the preview stopped after the first row). Watch the document
+    for the pages appearing, and the pages for changing size. */
 function fitFrame(f: HTMLIFrameElement) {
   const doc = f.contentDocument;
   if (!doc?.body) return;
-  /* The pages themselves, not the document: the print layout is at least a
-     screen tall, and a frame sized by that could only ever grow. */
-  const set = () => {
-    const d = doc.querySelector('.pd-doc') ?? doc.body;
-    f.style.height = `${Math.max(Math.ceil(d.getBoundingClientRect().height + 96), 400)}px`;
-  };
+  let watched: Element | null = null;
+  const ro = new ResizeObserver(() => set());
+  function set() {
+    /* The last `.pd-doc` holds the pages; an earlier one is the hidden probe. */
+    const docs = doc!.querySelectorAll('.pd-doc');
+    const d = docs[docs.length - 1] ?? doc!.querySelector('.sheet-a4');
+    if (d && d !== watched) { if (watched) ro.unobserve(watched); ro.observe(d); watched = d; }
+    /* No pages yet (the frame's first, blank document): leave its class height. */
+    if (!d) return;
+    const h = d.getBoundingClientRect().bottom + 48;
+    f.style.height = `${Math.max(Math.ceil(h), 400)}px`;
+  }
   set();
-  new ResizeObserver(set).observe(doc.body);
+  new MutationObserver(set).observe(doc.body, { childList: true, subtree: true });
 }
 
 function ReportsScreen() {
@@ -143,7 +153,14 @@ function ReportsScreen() {
               {/* As tall as the document: a report of three pages shows three
                   pages, one under the other, not a box to scroll inside. */}
               <iframe id="report-frame" key={href} src={href} title={report.label}
-                onLoad={(e) => fitFrame(e.currentTarget)}
+                ref={(f) => {
+                  /* A frame can finish loading before React attaches
+                     `onLoad`; listen ourselves, and catch up if it already has. */
+                  if (!f || f.dataset.fit) return;
+                  f.dataset.fit = '1';
+                  f.addEventListener('load', () => fitFrame(f));
+                  if (f.contentDocument?.readyState === 'complete') fitFrame(f);
+                }}
                 className={cx('block w-full border-0 bg-ink-100',
                   landscape ? 'h-[900px] min-w-[1140px]' : 'h-[1123px]')} />
             </div>
