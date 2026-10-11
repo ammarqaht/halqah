@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- النسخة الاحتياطية الأسبوعية (scripts/backup-weekly.mjs): every Saturday at
+     23:00 on the owner's Mac; a Mac asleep at that hour runs it on waking.
+     Install:   cp scripts/backup/com.medad.halqah.backup.plist ~/Library/LaunchAgents/
+                launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.medad.halqah.backup.plist
+     Run now:   launchctl kickstart gui/$(id -u)/com.medad.halqah.backup
+     Remove:    launchctl bootout gui/$(id -u)/com.medad.halqah.backup
+     Log:       ~/Documents/Halqah-Backups/backup.log (a failure also shows a
+                macOS notification).
+     The node path is pinned (launchd has no nvm): after a node upgrade, point
+     it at `which node` again and re-run the bootstrap above. -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.medad.halqah.backup</string>
+  <key>WorkingDirectory</key><string>/Users/ammarqaht/Desktop/Medad/Halqah/web</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/ammarqaht/.nvm/versions/node/v24.14.1/bin/node</string>
+    <string>--env-file=.env.local</string>
+    <string>scripts/backup-weekly.mjs</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Weekday</key><integer>6</integer>
+    <key>Hour</key><integer>23</integer>
+    <key>Minute</key><integer>0</integer>
+  </dict>
+  <key>StandardOutPath</key><string>/Users/ammarqaht/Documents/Halqah-Backups/backup.log</string>
+  <key>StandardErrorPath</key><string>/Users/ammarqaht/Documents/Halqah-Backups/backup.log</string>
+</dict>
+</plist>
