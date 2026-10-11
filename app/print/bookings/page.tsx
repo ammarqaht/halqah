@@ -5,6 +5,7 @@
    Printed because the supervisor walks the circle with it in his hand before he
    sits anyone down. Grouped by halaqa, for the same reason the gift pick-list
    is: he calls students circle by circle, not one by one across the mosque. */
+import { AutoPaged } from '@/components/print/Paged';
 import { useMemo } from 'react';
 import { Printer } from 'lucide-react';
 import { LogoMark, LogoJamiyah } from '@/components/Logo';
@@ -47,7 +48,7 @@ export default function BookingSheet() {
         <Btn variant="primary" icon={Printer} onClick={() => window.print()}>طباعة</Btn>
       </div>
 
-      <div className="sheet-a4 font-sans" dir="rtl">
+      <AutoPaged title="حجوزات الاختبارات" toolbar={false}>
         <header className="mb-6 flex items-center justify-between gap-4 border-b-2 border-brand-700 pb-4">
           <LogoMark height={38} white={false} />
           <div className="text-center">
@@ -105,7 +106,7 @@ export default function BookingSheet() {
         ))}
 
 
-      </div>
+      </AutoPaged>
     </>
   );
 }

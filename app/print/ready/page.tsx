@@ -6,12 +6,11 @@
    date he passed its diamond badge. The last column is left blank on purpose —
    the association's examiner writes in it on exam day.
    `?halaqa=` narrows to one halaqa when only part of the list is going. */
+import { AutoPaged } from '@/components/print/Paged';
 import { Suspense, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Printer } from 'lucide-react';
 import { PrintHead, PrintFoot, PCELL } from '@/components/PrintHead';
 import { Num, toArabicDigits, plural } from '@/components/Num';
-import { Btn } from '@/components/ui';
 import { useDB } from '@/lib/store';
 import { followUpRows, followedRows, listRows } from '@/lib/followup';
 import { TRACK_AR } from '@/lib/types';
@@ -51,11 +50,8 @@ function ReadySheet() {
 
   return (
     <>
-      <div className="no-print mx-auto mb-4 flex w-[794px] max-w-full items-center justify-end px-2">
-        <Btn variant="primary" icon={Printer} onClick={() => window.print()}>طباعة</Btn>
-      </div>
 
-      <div className="sheet-a4 font-sans" dir="rtl">
+      <AutoPaged title="الجاهزون لاختبار الجمعية">
         <PrintHead assoc title="كشف الجاهزين لاختبار الجمعية"
           sub={<>
             أتمّوا الجزء واجتازوا الوسام الماسي عليه — بانتظار موعد الجمعية
@@ -104,7 +100,7 @@ function ReadySheet() {
         )}
 
         <PrintFoot />
-      </div>
+      </AutoPaged>
     </>
   );
 }

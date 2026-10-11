@@ -334,10 +334,13 @@ export function DateRangeField({
             weight, and the length of the period rides at the other end as a
             figure rather than as a second line under everything. */}
         <span className="flex min-w-0 flex-1 items-center gap-2">
-          <span className="min-w-0 flex-1 truncate text-panel text-ink-900">
-            <span className="font-medium"><Gregorian iso={from} year={!sameYear} /></span>
-            <span className="mx-1.5 text-ink-300">←</span>
-            <span className="font-medium"><Gregorian iso={to} /></span>
+          {/* Wraps rather than truncates: «١ يناير ← ١١…» hid the very date
+              the supervisor had just picked (11 Oct 2026). Each date stays
+              whole; the line breaks at the arrow if the panel is narrow. */}
+          <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 text-panel leading-snug text-ink-900">
+            <span className="whitespace-nowrap font-medium"><Gregorian iso={from} year={!sameYear} /></span>
+            <span className="text-ink-300">←</span>
+            <span className="whitespace-nowrap font-medium"><Gregorian iso={to} /></span>
           </span>
           <span className="shrink-0 rounded-lg bg-page px-2 py-1 text-micro text-ink-600">
             {days > 0 ? <><Num className="font-medium text-ink-800">{days}</Num> يومًا</> : 'اختر'}

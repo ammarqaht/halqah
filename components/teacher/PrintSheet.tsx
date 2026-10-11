@@ -8,12 +8,12 @@
    sheet as much as to a screen: a report that prints an empty table with no
    sentence on it is a report a teacher hands to a parent by mistake. */
 import { useEffect, useState } from 'react';
-import { AlertTriangle, Printer } from 'lucide-react';
-import { Btn, Empty } from '@/components/ui';
+import { AlertTriangle } from 'lucide-react';
+import { Empty } from '@/components/ui';
+import { AutoPaged } from '@/components/print/Paged';
 import { Num, toArabicDigits } from '@/components/Num';
 import { PrintHead, PrintFoot } from '@/components/PrintHead';
 import { formatDate } from '@/lib/dates';
-import { cx } from '@/lib/cx';
 
 export type Head = {
   halaqa: { name: string; teacher: string; timeSlot: string };
@@ -38,13 +38,7 @@ export function PrintSheet({
   foot?: React.ReactNode;
 }) {
   return (
-    <>
-      <div className={cx('no-print mx-auto mb-4 flex max-w-full items-center justify-end px-2',
-        landscape ? 'w-[1123px]' : 'w-[794px]')}>
-        <Btn variant="primary" icon={Printer} onClick={() => window.print()}>طباعة</Btn>
-      </div>
-
-      <div className={cx('sheet-a4 font-sans', landscape && 'landscape')} dir="rtl">
+    <AutoPaged title={title} landscape={landscape}>
         <PrintHead title={title}
           sub={head ? (
             <>
@@ -74,8 +68,7 @@ export function PrintSheet({
         ) : children}
 
         <PrintFoot>{foot}</PrintFoot>
-      </div>
-    </>
+    </AutoPaged>
   );
 }
 

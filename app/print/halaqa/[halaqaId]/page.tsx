@@ -11,16 +11,14 @@
    someone who could not tell them apart. A pass is «✓ ٣» — the mark and how
    many ajza it covered; a failure is «✗ ٣» on an unshaded row. */
 import { Suspense, use, useMemo } from 'react';
-import { Printer } from 'lucide-react';
-import { PrintHead, PrintFoot, PCELL } from '@/components/PrintHead';
-import { Num, toArabicDigits, plural } from '@/components/Num';
-import { Btn } from '@/components/ui';
+import { Num, toArabicDigits } from '@/components/Num';
+import { PagedDoc, SecHead, Kpi, Kpis, TableTitle, type Block } from '@/components/print/Paged';
+import { shortName } from '@/lib/normalise';
 import { useDB } from '@/lib/store';
 import { followUpRows, followedRows } from '@/lib/followup';
 import { EXAM_TYPE_SHORT_AR, type ExamType } from '@/lib/points';
 import { TRACK_AR } from '@/lib/types';
 import { formatDate } from '@/lib/dates';
-import { cx } from '@/lib/cx';
 import { useAttendance } from '@/components/useAttendance';
 import { useParts } from '@/lib/reportParts';
 
@@ -32,6 +30,12 @@ const COLS: [string, string | null][] = [
   ['الجمعية', 'assoc'], ['الجزء', 'assoc'], ['آخر اختبار', 'lastExam'],
   ['مستواه', 'lastExam'], ['الدرجة', 'lastExam'], ['ملاحظة', 'note'],
 ];
+
+/* Relative widths, so every page's slice of the table lines up. */
+const WEIGHT: Record<string, number> = {
+  '#': 3, 'الطالب': 19, 'الصف': 6, 'الحضور': 6, 'المستوى': 7, 'استلم الخطة': 8,
+  'آخر درس': 10, 'الجمعية': 8, 'الجزء': 4, 'آخر اختبار': 12, 'مستواه': 5, 'الدرجة': 5, 'ملاحظة': 14,
+};
 
 function HalaqaReport({ params }: { params: Promise<{ halaqaId: string }> }) {
   const { halaqaId } = use(params);
@@ -65,149 +69,85 @@ function HalaqaReport({ params }: { params: Promise<{ halaqaId: string }> }) {
   const passed = rows.filter((r) => r.lastAssociation?.passed === true).length;
   const failed = rows.filter((r) => r.lastAssociation && r.lastAssociation.passed !== true).length;
 
+  const cols = COLS.filter(([, part]) => !part || show(part));
+  const totalW = cols.reduce((a, [h]) => a + (WEIGHT[h] ?? 6), 0);
+
+  const blocks: Block[] = [
+    {
+      key: 'head', section: halaqa.timeSlot || 'الحلقة',
+      node: <SecHead kicker="تقرير الحلقة" title={`حلقة ${halaqa.teacher}`}
+        lead={<>{halaqa.name} · جامع محمد العبدالكريم — حي أُحد</>} />,
+    },
+    {
+      key: 'kpis',
+      node: (
+        <Kpis>
+          <Kpi tone="deep" value={<Num>{toArabicDigits(rows.length)}</Num>} label="طالبًا نشطًا" />
+          <Kpi tone="teal" value={attRate === null ? '—' : <Num>{toArabicDigits(attRate)}٪</Num>} label="نسبة الحضور"
+            note={att && att.total.recorded > 0
+              ? <><Num>{toArabicDigits(att.total.attended)}</Num> من <Num>{toArabicDigits(att.total.recorded)}</Num> تسجيلًا</>
+              : 'لا تسجيل بعد'} />
+          <Kpi tone="gold" value={<Num>{toArabicDigits(passed)}</Num>} label="اجتازوا اختبار الجمعية" />
+          <Kpi tone="risk" value={<Num>{toArabicDigits(failed)}</Num>} label="لم يجتازوه" />
+        </Kpis>
+      ),
+    },
+  ];
+
+  if (rows.length) {
+    blocks.push({
+      key: 'roster',
+      table: {
+        title: <TableTitle meta={show('assoc') ? '✓ اجتاز اختبار الجمعية (والرقم أجزاؤه) · ✗ لم يجتز · والصف المظلّل لمن اجتاز' : undefined}>
+          طلاب الحلقة</TableTitle>,
+        cols: cols.map(([h]) => `${(((WEIGHT[h] ?? 6) / totalW) * 100).toFixed(2)}%`),
+        head: <tr>{cols.map(([h]) => <th key={h}>{h}</th>)}</tr>,
+        rows: rows.map((r, i) => {
+          const s = r.student;
+          const last = r.lastExam;
+          const assoc = r.lastAssociation;
+          const assocPassed = assoc?.passed === true;
+          const a = att?.students[s.id];
+          const l = att?.lastLesson?.[s.id];
+          return (
+            <tr key={s.id} className={assocPassed ? 'ok' : undefined}>
+              <td><Num>{toArabicDigits(i + 1)}</Num></td>
+              <td className="s">{s.fullName}</td>
+              {show('grade') && <td>{s.grade || '—'}</td>}
+              {show('attendance') && <td>{!a || a.recorded === 0 ? '—' : <>
+                <Num>{toArabicDigits(a.attended)}</Num><span className="pd-mut">/{toArabicDigits(a.recorded)}</span></>}</td>}
+              {show('level') && <td>{!s.track ? '—' : <>{TRACK_AR[s.track]}
+                {s.track !== 'TALQEEN' && s.currentLevel != null && <> <Num>{toArabicDigits(s.currentLevel)}</Num></>}</>}</td>}
+              {show('issued') && <td>{r.plan?.issuedAt ? <Num>{toArabicDigits(formatDate(r.plan.issuedAt))}</Num> : '—'}</td>}
+              {show('lesson') && <td>{!l ? '—' : <>{l.surah}{l.ayah && <> <Num>{toArabicDigits(l.ayah)}</Num></>}</>}</td>}
+              {show('assoc') && <td>{assoc ? <Num>{toArabicDigits(formatDate(assoc.takenOn))}</Num> : '—'}</td>}
+              {show('assoc') && <td>{!assoc ? '' : (
+                <span className={assocPassed ? 'pd-pos' : 'pd-neg'}>
+                  {assocPassed ? '✓' : '✗'}{assoc.ajza != null && <> <Num>{toArabicDigits(assoc.ajza)}</Num></>}
+                </span>)}</td>}
+              {show('lastExam') && <td>{last
+                ? <>{EXAM_TYPE_SHORT_AR[last.type as ExamType] ?? last.type}{' '}
+                    <Num className="pd-mut">{toArabicDigits(formatDate(last.takenOn))}</Num></>
+                : '—'}</td>}
+              {show('lastExam') && <td>{last?.level != null ? <Num>{toArabicDigits(last.level)}</Num> : ''}</td>}
+              {show('lastExam') && <td>{!last || last.score == null ? '' : (
+                <span className={last.passed === true ? 'pd-pos' : last.passed === false ? 'pd-neg' : undefined}>
+                  <Num>{toArabicDigits(last.score)}</Num></span>)}</td>}
+              {show('note') && <td className="s">{last?.note || ''}</td>}
+            </tr>
+          );
+        }),
+      },
+    });
+  } else {
+    blocks.push({ key: 'none', node: <p className="py-12 text-center text-[11pt] text-[var(--pd-mut)]">لا طلاب نشطين في هذه الحلقة.</p> });
+  }
+
+  /* عرضيّ — 22 Sep 2026: thirteen columns, two of them a passage and a note,
+     do not fit a portrait page without crushing the names. */
   return (
-    <>
-      {/* عرضيّ — 22 Sep 2026: thirteen columns, two of them a passage and a
-          note, do not fit a portrait page without crushing the names. A page
-          box is per-DOCUMENT, so the sheet declares its own. */}
-      <style>{'@page { size: A4 landscape; margin: 10mm; }'}</style>
-      <div className="no-print mx-auto mb-4 flex w-[1123px] max-w-full items-center justify-end px-2">
-        <Btn variant="primary" icon={Printer} onClick={() => window.print()}>طباعة</Btn>
-      </div>
-
-      <div className="sheet-a4 landscape font-sans" dir="rtl">
-        <PrintHead title={`تقرير حلقة ${halaqa.teacher}`}
-          sub={`جامع محمد العبدالكريم — ${toArabicDigits(plural(rows.length, 'طالب واحد', 'طالبان', 'طلاب', 'طالبًا'))}`
-            + (attRate !== null ? ` · الحضور ${toArabicDigits(attRate)}٪ من ${toArabicDigits(att!.total.recorded)} تسجيلًا` : '')} />
-
-        {rows.length === 0 ? (
-          <p className="py-12 text-center text-lg2 text-ink-500">لا طلاب نشطين في هذه الحلقة.</p>
-        ) : (
-          <table className="w-full border-collapse text-[11px]">
-            <thead>
-              <tr className="bg-page/60 text-[10px] text-ink-700">
-                {/* «الحضور» is the REGISTER's — what his teacher marked,
-                    afternoon by afternoon, not the uploaded file's term total.
-                    The two exam blocks are separate on purpose: the association
-                    is the outward milestone and reads on its own, and «آخر
-                    اختبار» beside it is whatever he sat last, with the level he
-                    sat it on, his mark, and the examiner's note. */}
-                {COLS.filter(([, part]) => !part || show(part)).map(([h]) => (
-                  <th key={h} className={PCELL}>{h}</th>))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r, i) => {
-                const s = r.student;
-                /* ONE definition of «آخر اختبار» — the row's own, so this
-                   paper can never disagree with the follow-up screen. */
-                const last = r.lastExam;
-                /* اختبرته الجمعية، واجتاز. كان التظليل يقع على كل من اختُبر —
-                   فالراسب يظهر في اللون نفسه الذي يظهر فيه الناجح، وورقة تُقرأ
-                   بلمحة لا تحتمل ذلك. */
-                const assoc = r.lastAssociation;
-                const assocPassed = assoc?.passed === true;
-                return (
-                  <tr key={s.id} className={cx('keep h-[26px]', assocPassed && 'bg-ok-100')}>
-                    <td className={PCELL}><Num>{toArabicDigits(i + 1)}</Num></td>
-                    <td className={`${PCELL} whitespace-nowrap text-start`}>{s.fullName}</td>
-                    {show('grade') && (
-<td className={PCELL}>{s.grade || '—'}</td>)}
-                    {show('attendance') && (
-<td className={PCELL}>
-                      {(() => {
-                        const a = att?.students[s.id];
-                        if (!a || a.recorded === 0) return '—';
-                        return (<>
-                          <Num>{toArabicDigits(a.attended)}</Num>
-                          <span className="text-ink-500">/<Num>{toArabicDigits(a.recorded)}</Num></span>
-                        </>);
-                      })()}
-                    </td>)}
-                    {/* المسار والمستوى في خلية واحدة: «ذهبي ١٥». */}
-                    {show('level') && (
-<td className={`${PCELL} whitespace-nowrap`}>
-                      {!s.track ? '—' : (<>
-                        {TRACK_AR[s.track]}
-                        {s.track !== 'TALQEEN' && s.currentLevel != null && (
-                          <> <Num>{toArabicDigits(s.currentLevel)}</Num></>
-                        )}
-                      </>)}
-                    </td>)}
-                    {/* متى أخذ ورقته — الجواب عن «كم صار له على هذا المستوى؟»
-                        بلا حساب، وهو أوّل ما يُسأل عن المتأخّر. */}
-                    {show('issued') && (
-<td className={`${PCELL} whitespace-nowrap`}>
-                      {r.plan?.issuedAt
-                        ? <Num>{toArabicDigits(formatDate(r.plan.issuedAt))}</Num>
-                        : '—'}
-                    </td>)}
-                    {show('lesson') && (
-<td className={`${PCELL} whitespace-nowrap`}>
-                      {(() => {
-                        const l = att?.lastLesson?.[s.id];
-                        if (!l) return '—';
-                        return (<>
-                          {l.surah}{l.ayah && <> <Num>{toArabicDigits(l.ayah)}</Num></>}
-                        </>);
-                      })()}
-                    </td>)}
-                    {/* اختبار الجمعية بتاريخه، ثم أجزاؤه ونتيجته. والراسب
-                        يُعلَّم ✗ ولا يُظلَّل. */}
-                    {show('assoc') && (
-<td className={`${PCELL} whitespace-nowrap`}>
-                      {assoc
-                        ? <Num>{toArabicDigits(formatDate(assoc.takenOn))}</Num>
-                        : '—'}
-                    </td>)}
-                    {show('assoc') && (
-<td className={`${PCELL} whitespace-nowrap`}>
-                      {!assoc ? '' : (
-                        <span className={cx('font-bold', assocPassed ? 'text-ok-700' : 'text-risk-700')}>
-                          {assocPassed ? '✓' : '✗'}
-                          {assoc.ajza != null && <> <Num>{toArabicDigits(assoc.ajza)}</Num></>}
-                        </span>
-                      )}
-                    </td>)}
-                    {/* وآخر اختبار من أيّ نوع: اسمه وتاريخه، والمستوى الذي
-                        جلس له عليه — لا مستواه اليوم، فقد تقدّم منذ ذلك. */}
-                    {show('lastExam') && (
-<td className={`${PCELL} whitespace-nowrap`}>
-                      {last
-                        ? <>{EXAM_TYPE_SHORT_AR[last.type as ExamType] ?? last.type}{' '}
-                            <Num className="text-ink-500">{toArabicDigits(formatDate(last.takenOn))}</Num></>
-                        : '—'}
-                    </td>)}
-                    {show('lastExam') && (
-<td className={PCELL}>
-                      {last?.level != null ? <Num>{toArabicDigits(last.level)}</Num> : ''}
-                    </td>)}
-                    {show('lastExam') && (
-<td className={PCELL}>
-                      {!last || last.score == null ? '' : (
-                        <span className={cx('font-medium',
-                          last.passed === true ? 'text-ok-700'
-                            : last.passed === false ? 'text-risk-700' : 'text-ink-800')}>
-                          <Num>{toArabicDigits(last.score)}</Num>
-                        </span>
-                      )}
-                    </td>)}
-                    {/* ما كتبه المختبِر، إن كتب. وتُترك فارغة لا بشرطة: الشرطة
-                        في عمود ملاحظات تُقرأ ملاحظةً. */}
-                    {show('note') && (
-<td className={`${PCELL} text-start`}>{last?.note || ''}</td>)}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-
-        <PrintFoot>
-          {show('assoc') && <>✓ اجتاز اختبار الجمعية (والرقم أجزاؤه) · ✗ لم يجتز</>}
-        </PrintFoot>
-      </div>
-    </>
+    <PagedDoc landscape title={`تقرير حلقة ${shortName(halaqa.teacher)}`} blocks={blocks}
+      deps={[rows, att, cols.length]} />
   );
 }
 

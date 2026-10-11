@@ -65,8 +65,8 @@ export const REPORT_PARTS: Record<string, PartsSpec> = {
     { id: 'exams',      label: 'حصيلة الاختبارات' },
     { id: 'attendance', label: 'الحضور والتسميع' },
     { id: 'points',     label: 'النقاط' },
-    { id: 'halaqat',    label: 'الحلقات' },
-    { id: 'list',       label: 'الاختبارات واحدًا واحدًا' },
+    { id: 'halaqat',    label: 'كل حلقة على حدة — طلابها' },
+    { id: 'list',       label: 'اختبارات كل حلقة' },
   ] },
   progress: { kind: 'sections', parts: [
     { id: 'totals', label: 'المجموع لكل حلقة' },

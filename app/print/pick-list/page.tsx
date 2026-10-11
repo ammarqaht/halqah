@@ -6,6 +6,7 @@
    the supervisor walks to one circle with its pile, not to one student with one
    parcel. Each row carries a tick box: the sheet is worked on with a pen in the
    mosque and entered afterwards. */
+import { AutoPaged } from '@/components/print/Paged';
 import { useMemo } from 'react';
 import { Printer } from 'lucide-react';
 import { LogoMark, LogoJamiyah } from '@/components/Logo';
@@ -58,7 +59,7 @@ export default function PickList() {
         <Btn variant="primary" icon={Printer} onClick={() => window.print()}>طباعة</Btn>
       </div>
 
-      <div className="sheet-a4 font-sans" dir="rtl">
+      <AutoPaged title="قائمة تسليم الهدايا" toolbar={false}>
         <header className="mb-6 flex items-center justify-between gap-4 border-b-2 border-brand-700 pb-4">
           <LogoMark height={38} white={false} />
           <div className="text-center">
@@ -111,7 +112,7 @@ export default function PickList() {
         )}
 
 
-      </div>
+      </AutoPaged>
     </>
   );
 }

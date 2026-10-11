@@ -9,9 +9,10 @@
 
    No behavioural note, no medical line, no guardian number — §١٧ forbids all
    three, and none of them exist in the database to print. */
+import { AutoPaged } from '@/components/print/Paged';
 import { useParams } from 'next/navigation';
-import { AlertTriangle, Printer } from 'lucide-react';
-import { Btn, Empty } from '@/components/ui';
+import { AlertTriangle } from 'lucide-react';
+import { Empty } from '@/components/ui';
 import { Num, toArabicDigits } from '@/components/Num';
 import { PrintHead, PrintFoot, PrintSec, PCELL, PCELL_TIGHT } from '@/components/PrintHead';
 import { useFetch } from '@/components/teacher/PrintSheet';
@@ -58,11 +59,8 @@ export default function StudentReport() {
 
   return (
     <>
-      <div className="no-print mx-auto mb-4 flex w-[794px] max-w-full items-center justify-end px-2">
-        <Btn variant="primary" icon={Printer} onClick={() => window.print()}>طباعة</Btn>
-      </div>
 
-      <div className="sheet-a4 font-sans" dir="rtl">
+      <AutoPaged title="تقرير الطالب">
         <PrintHead title="تقرير الطالب"
           sub={s ? (
             <>
@@ -302,7 +300,7 @@ export default function StudentReport() {
         )}
 
         <PrintFoot>● حاضر · ◐ متأخر · ✕ غائب</PrintFoot>
-      </div>
+      </AutoPaged>
     </>
   );
 }

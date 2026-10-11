@@ -15,12 +15,12 @@
    the supervisor's browser copy. It asks `/api/admin/knights`, which reads the
    same `lib/knights.ts` the teacher's sheet reads — one definition of a title
    children are named by. */
+import { AutoPaged } from '@/components/print/Paged';
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Check, Printer, Shirt } from 'lucide-react';
+import { Check, Shirt } from 'lucide-react';
 import { LogoMark, LogoJamiyah } from '@/components/Logo';
 import { Num, toArabicDigits } from '@/components/Num';
-import { Btn } from '@/components/ui';
 import { useDB } from '@/lib/store';
 import { shortName } from '@/lib/normalise';
 import { formatDate } from '@/lib/dates';
@@ -59,11 +59,8 @@ function KnightsSheet() {
 
   return (
     <>
-      <div className="no-print mx-auto mb-4 flex w-[794px] max-w-full items-center justify-end px-2">
-        <Btn variant="primary" icon={Printer} onClick={() => window.print()}>طباعة</Btn>
-      </div>
 
-      <div className="sheet-a4 font-sans" dir="rtl">
+      <AutoPaged title="فرسان الأسبوع">
         <header className="mb-6 flex items-center justify-between gap-4 border-b-2 border-brand-700 pb-4">
           <LogoMark height={44} white={false} />
           <div className="text-center">
@@ -134,7 +131,7 @@ function KnightsSheet() {
         )}
 
 
-      </div>
+      </AutoPaged>
     </>
   );
 }

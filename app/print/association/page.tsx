@@ -11,6 +11,7 @@
 
    Talqeen students are counted everywhere here — §4.11 includes them in all
    association statistics. */
+import { AutoPaged } from '@/components/print/Paged';
 import { Suspense, useMemo } from 'react';
 import { useParts } from '@/lib/reportParts';
 import { useSearchParams } from 'next/navigation';
@@ -108,7 +109,7 @@ function AssociationSheet() {
         <Btn variant="primary" icon={Printer} onClick={() => window.print()}>طباعة</Btn>
       </div>
 
-      <div className="sheet-a4 font-sans" dir="rtl">
+      <AutoPaged title="إحصاءات الجمعية" toolbar={false}>
         <PrintHead assoc title="إحصاءات الحلقات"
           sub={period
             ? <>الفترة {from && <>من <Num>{toArabicDigits(formatDate(from))}</Num></>}{' '}
@@ -205,7 +206,7 @@ function AssociationSheet() {
         <PrintFoot>
           «جاهز»: أتمّ الجزء واجتاز الوسام الماسي عليه، ولم تختبره الجمعية على هذا الجزء بعد.
         </PrintFoot>
-      </div>
+      </AutoPaged>
     </>
   );
 }

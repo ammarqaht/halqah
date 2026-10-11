@@ -48,6 +48,20 @@ function printHref(id: ReportId, halaqa: string, student: string, parts: string,
   return `${base}${base.includes('?') ? '&' : '?'}parts=${encodeURIComponent(parts)}`;
 }
 
+/** Keep a same-origin frame exactly as tall as what it shows. */
+function fitFrame(f: HTMLIFrameElement) {
+  const doc = f.contentDocument;
+  if (!doc?.body) return;
+  /* The pages themselves, not the document: the print layout is at least a
+     screen tall, and a frame sized by that could only ever grow. */
+  const set = () => {
+    const d = doc.querySelector('.pd-doc') ?? doc.body;
+    f.style.height = `${Math.max(Math.ceil(d.getBoundingClientRect().height + 96), 400)}px`;
+  };
+  set();
+  new ResizeObserver(set).observe(doc.body);
+}
+
 function ReportsScreen() {
   const { panelOpen, setPanelOpen } = usePanel();
   const db = useDB();
@@ -125,9 +139,12 @@ function ReportsScreen() {
              Rendering the print route itself means the preview cannot drift
              from the sheet: they are the same page. */
           <div className={cx('rise mx-auto w-full', landscape ? 'max-w-[1190px]' : 'max-w-[860px]')}>
-            <div className="overflow-x-auto overflow-y-hidden rounded-xl border border-ink-200 bg-white shadow-soft">
+            <div className="overflow-x-auto overflow-y-hidden rounded-xl border border-ink-200 bg-ink-100 shadow-soft">
+              {/* As tall as the document: a report of three pages shows three
+                  pages, one under the other, not a box to scroll inside. */}
               <iframe id="report-frame" key={href} src={href} title={report.label}
-                className={cx('block w-full border-0 bg-white',
+                onLoad={(e) => fitFrame(e.currentTarget)}
+                className={cx('block w-full border-0 bg-ink-100',
                   landscape ? 'h-[900px] min-w-[1140px]' : 'h-[1123px]')} />
             </div>
             <p className="mt-3 text-center text-micro text-ink-500">

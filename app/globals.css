@@ -193,6 +193,100 @@
   *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
 }
 
+/* ── التقرير المصفوح — components/print/Paged.tsx ─────────────────────────────
+   Real A4 pages laid out before the printer sees them, in the look of the
+   client's reference report (11 Oct 2026): cream paper, a hairline running
+   head, a gold kicker over a serif title, cards with a coloured cap, and a
+   foot rule fading into the page number. Sizes in mm so screen and paper are
+   the same page. */
+.pd-doc{--pd-teal:#3C9E96;--pd-deep:#0A403C;--pd-gold:#C9AE4A;--pd-gold-d:#8E7A2A;--pd-sand:#B9A27A;
+  --pd-risk:#B4552F;--pd-ink:#1E2B2A;--pd-ink2:#3A4745;--pd-mut:#6B7573;--pd-line:#E4DFD3;
+  --pd-paper:#FBF9F4;--pd-card:#fff;--pd-track:#ECE8DE;--pd-tint:#F3F0E8;
+  --pd-pos:#2C7773;--pd-ok:#E6F0EC;--pd-gold-l:#E2C866}
+/* Measured with the page's own type, or every row is a pixel off and the
+   last rows of a page run into its foot. */
+.pd-probe{position:absolute;top:0;left:auto;right:-200vw;visibility:hidden;pointer-events:none;
+  font-size:9pt;line-height:1.6;color:var(--pd-ink)}
+.pd-page{position:relative;width:210mm;height:297mm;overflow:hidden;margin:0 auto 10mm;
+  background:var(--pd-paper);color:var(--pd-ink);font-size:9pt;line-height:1.6;
+  box-shadow:0 12px 32px -12px rgba(25,30,28,.28)}
+.pd-land .pd-page{width:297mm;height:210mm}
+.pd-head{position:absolute;top:7mm;right:14mm;left:14mm;height:9mm;display:flex;align-items:center;gap:2.5mm;
+  border-bottom:.3mm solid var(--pd-line);padding-bottom:1.6mm}
+.pd-head-t{font-family:BrandDisplay,serif;font-weight:700;font-size:8.6pt;color:var(--pd-deep)}
+.pd-head-s{margin-inline-start:auto;font-size:7.6pt;color:var(--pd-mut)}
+.pd-body{position:absolute;top:21mm;bottom:15mm;right:14mm;left:14mm}
+.pd-foot{position:absolute;bottom:6mm;right:14mm;left:14mm;display:flex;align-items:center;gap:3mm;
+  font-size:7pt;color:var(--pd-mut)}
+.pd-foot-l{flex:1;height:.3mm;background:linear-gradient(to left,var(--pd-teal),rgba(60,158,150,0))}
+.pd-foot-n{font-family:BrandDisplay,serif;font-weight:700;font-size:10.5pt;color:var(--pd-deep)}
+.pd-block{margin-bottom:4mm}
+.pd-block:last-child{margin-bottom:0}
+.pd-sec{margin-bottom:1mm}
+.pd-kicker{font-size:8pt;font-weight:700;color:var(--pd-gold-d);margin-bottom:.4mm}
+.pd-h1{font-family:BrandDisplay,serif;font-weight:700;font-size:20pt;line-height:1.3;color:var(--pd-deep)}
+.pd-lead{font-size:9.6pt;line-height:1.75;color:var(--pd-ink2);margin-top:1.5mm}
+.pd-sec-num{font-family:BrandDisplay,serif;font-weight:700;font-size:40pt;line-height:.95;color:var(--pd-teal)}
+.pd-kpis{display:grid;gap:3mm}
+.pd-kpi{background:var(--pd-card);border:.25mm solid var(--pd-line);border-top-width:1.1mm;border-radius:2mm;
+  padding:2.6mm 3.4mm 2.8mm;min-width:0}
+.pd-kpi-v{font-family:BrandDisplay,serif;font-weight:700;font-size:21pt;line-height:1.1;color:var(--pd-deep)}
+.pd-kpi-of{font-size:12pt;color:var(--pd-mut);font-weight:500}
+.pd-kpi-l{font-weight:700;font-size:8.8pt;color:var(--pd-ink);margin-top:.8mm}
+.pd-kpi-n{font-size:7.2pt;color:var(--pd-mut);line-height:1.5;margin-top:.3mm}
+.pd-cap-teal{border-top-color:var(--pd-teal)}.pd-cap-deep{border-top-color:var(--pd-deep)}
+.pd-cap-gold{border-top-color:var(--pd-gold)}.pd-cap-sand{border-top-color:var(--pd-sand)}
+.pd-cap-risk{border-top-color:var(--pd-risk)}
+.pd-card{background:var(--pd-card);border:.25mm solid var(--pd-line);border-radius:2mm;padding:3.4mm 3.8mm;min-width:0}
+.pd-card-t{font-family:BrandDisplay,serif;font-weight:700;font-size:10.5pt;color:var(--pd-deep);
+  display:flex;align-items:center;gap:1.8mm;line-height:1.35}
+.pd-card-t::before{content:'';width:1.1mm;height:3.8mm;background:var(--pd-gold);border-radius:.5mm;flex-shrink:0}
+.pd-card-m{font-size:7.2pt;color:var(--pd-mut);margin:.4mm 0 2mm}
+.pd-grid2{display:grid;grid-template-columns:1fr 1fr;gap:4mm}
+.pd-grid2>*{min-width:0}
+.pd-bar{display:grid;grid-template-columns:34mm 1fr 18mm;align-items:center;gap:2.5mm;padding:1mm 0;font-size:8.4pt}
+.pd-bar-l{font-weight:500;color:var(--pd-ink);line-height:1.3;min-width:0}
+.pd-bar-sub{display:block;font-size:6.8pt;font-weight:400;color:var(--pd-mut)}
+.pd-bar-track{height:3.4mm;border-radius:1.2mm;background:var(--pd-track);overflow:hidden}
+.pd-bar-fill{display:block;height:100%;border-radius:1.2mm}
+.pd-fill-teal{background:var(--pd-teal)}.pd-fill-deep{background:var(--pd-deep)}
+.pd-fill-gold{background:var(--pd-gold)}.pd-fill-sand{background:var(--pd-sand)}.pd-fill-risk{background:var(--pd-risk)}
+.pd-bar-f{font-weight:700;font-size:8.4pt;color:var(--pd-deep);text-align:end;white-space:nowrap}
+.pd-table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;font-size:8pt;
+  background:var(--pd-card);border:.25mm solid var(--pd-line);border-radius:2mm;overflow:hidden}
+.pd-table th{background:var(--pd-deep);color:#fff;font-weight:700;font-size:7.4pt;padding:1.6mm 1.4mm;text-align:center}
+.pd-table td{padding:1.3mm 1.4mm;text-align:center;border-top:.2mm solid var(--pd-line);color:var(--pd-ink);
+  overflow:hidden;text-overflow:ellipsis}
+.pd-table td.s{text-align:start}
+.pd-table tbody tr:nth-child(even) td{background:var(--pd-tint)}
+.pd-table tr.ok td{background:var(--pd-ok)}
+.pd-pos{color:var(--pd-pos);font-weight:700}.pd-neg{color:var(--pd-risk);font-weight:700}.pd-mut{color:var(--pd-mut)}
+/* Sheets written as ordinary markup (AutoPaged) put on the same clothes:
+   tables get the deep head and the cream zebra, hairlines in the paper's own
+   line colour. Zebra and lines sit at :where() weight, so a cell a sheet
+   colours on purpose (a day's status, a passing row) keeps its colour. */
+.pd-auto table{border-collapse:separate;border-spacing:0;background:var(--pd-card);
+  border:.25mm solid var(--pd-line);border-radius:2mm;overflow:hidden}
+.pd-auto th{background:var(--pd-deep);color:#fff;font-weight:700;border-color:rgba(255,255,255,.14)!important}
+.pd-auto thead tr{background:var(--pd-deep)}
+.pd-auto td{border-color:var(--pd-line)}
+:where(.pd-auto tbody tr:nth-child(even)) td{background:var(--pd-tint)}
+.pd-auto h2{color:var(--pd-deep)}
+
+/* The cover — dark, full-bleed, unnumbered. */
+.pd-cover{background:var(--pd-deep);color:#fff;display:flex;flex-direction:column;align-items:center;text-align:center}
+.pd-cover::before{content:'';position:absolute;top:0;inset-inline:0;height:2.4mm;
+  background:linear-gradient(to left,var(--pd-teal),var(--pd-gold))}
+@media print{
+  /* A millimetre short of the sheet: Safari rounds a landscape page box down a
+     fraction, and a page exactly 210mm tall then spilled a blank sheet after
+     every page (11 Oct 2026). The body keeps its slack in Paged.tsx. */
+  .pd-doc .pd-page{margin:0;box-shadow:none;break-after:page;page-break-after:always;height:296mm}
+  .pd-doc.pd-land .pd-page{height:209mm}
+  .pd-doc .pd-page:last-child{break-after:auto;page-break-after:auto}
+  .pd-probe{display:none}
+}
+
 /* A sheet previewed inside the reports screen borrows that screen's chrome:
    its own print button would be the second one on the page. */
 .embedded .no-print{display:none!important}

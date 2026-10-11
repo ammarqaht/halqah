@@ -8,9 +8,29 @@ import { LogoMark, LogoJamiyah } from '@/components/Logo';
 import { Num, toArabicDigits } from '@/components/Num';
 import { formatDate } from '@/lib/dates';
 import { cx } from '@/lib/cx';
+import { usePaged } from '@/components/print/Paged';
 
 export function PrintHead({ title, sub, assoc }:
   { title: string; sub?: React.ReactNode; assoc?: boolean }) {
+  /* Inside a paged document the mark already rides in every page's running
+     head, so this becomes the reference report's section head: a gold kicker,
+     the serif title, the line under it — and the association's mark beside it,
+     which is the one the running head does not carry. */
+  if (usePaged()) {
+    return (
+      <header className="mb-4 flex items-end justify-between gap-4 border-b border-[color:var(--pd-line)] pb-3">
+        <div className="min-w-0">
+          <p className="pd-kicker">{assoc ? 'تقرير مرفوع إلى الجمعية' : 'حلقات جامع محمد العبدالكريم — حي أُحد'}</p>
+          <h1 className="pd-h1">{title}</h1>
+          {sub && <p className={cx('mt-1 text-[9pt] leading-relaxed', assoc ? 'font-medium text-assoc-700' : 'text-[var(--pd-ink2)]')}>{sub}</p>}
+          <p className="mt-0.5 text-[7.5pt] text-[var(--pd-mut)]">
+            طُبع في <Num>{toArabicDigits(formatDate(new Date().toISOString()))}</Num>
+          </p>
+        </div>
+        <LogoJamiyah height={36} />
+      </header>
+    );
+  }
   return (
     <header className={cx('keep mb-4 flex items-center justify-between gap-4 border-b-2 pb-3',
       assoc ? 'border-assoc-300' : 'border-brand-700')}>

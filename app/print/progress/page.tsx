@@ -14,11 +14,10 @@
    figure that compares a halaqa of four with one of twenty-five. The period is
    the file's, not a range picked here: nothing in the roster is dated, and a
    sheet that cannot be honest about its own window must not print one. */
+import { AutoPaged } from '@/components/print/Paged';
 import { useMemo } from 'react';
-import { Printer } from 'lucide-react';
 import { PrintHead, PrintFoot, PrintSec, PCELL } from '@/components/PrintHead';
 import { Num, toArabicDigits } from '@/components/Num';
-import { Btn } from '@/components/ui';
 import { useDB } from '@/lib/store';
 import { derive } from '@/lib/derive';
 import { halaqaLabel, shortName } from '@/lib/normalise';
@@ -43,11 +42,8 @@ function ProgressSheet() {
 
   return (
     <>
-      <div className="no-print mx-auto mb-4 flex w-[794px] max-w-full items-center justify-end px-2">
-        <Btn variant="primary" icon={Printer} onClick={() => window.print()}>طباعة</Btn>
-      </div>
 
-      <div className="sheet-a4 font-sans" dir="rtl">
+      <AutoPaged title="تقدّم الحلقات">
         <PrintHead title="تقدّم الحلقات"
           sub={<span>
             {db.sourceFile ? `من ملف: ${db.sourceFile}` : 'من آخر ملف مرفوع'}
@@ -145,7 +141,7 @@ function ProgressSheet() {
         )}
 
         <PrintFoot />
-      </div>
+      </AutoPaged>
     </>
   );
 }

@@ -12,9 +12,10 @@
 
    Set large, and every mark carries a shape as well as a colour: it is read from
    two metres away and photocopied in greyscale. */
-import { AlertTriangle, Check, Printer, Shirt } from 'lucide-react';
+import { AutoPaged } from '@/components/print/Paged';
+import { AlertTriangle, Check, Shirt } from 'lucide-react';
 import { LogoMark, LogoJamiyah } from '@/components/Logo';
-import { Btn, Empty } from '@/components/ui';
+import { Empty } from '@/components/ui';
 import { Num, toArabicDigits } from '@/components/Num';
 import { PrintFoot } from '@/components/PrintHead';
 import { useReport, type Head } from '@/components/teacher/PrintSheet';
@@ -33,11 +34,8 @@ export default function KnightsSheet() {
 
   return (
     <>
-      <div className="no-print mx-auto mb-4 flex w-[794px] max-w-full items-center justify-end px-2">
-        <Btn variant="primary" icon={Printer} onClick={() => window.print()}>طباعة</Btn>
-      </div>
 
-      <div className="sheet-a4 font-sans" dir="rtl">
+      <AutoPaged title="فرسان الأسبوع">
         <header className="mb-8 flex items-center justify-between gap-4 border-b-2 border-brand-700 pb-4">
           <LogoMark height={44} white={false} />
           <div className="text-center">
@@ -110,7 +108,7 @@ export default function KnightsSheet() {
           الأيام المحسوبة هي أيام الحلقة المسجَّلة في المدة — وأيّ يوم فيه تحضير
           يُحسب يوم حلقة. والمتأخر حاضر تُحسب له نقاطه، ولا يُعدّ فارسًا
         </PrintFoot>
-      </div>
+      </AutoPaged>
     </>
   );
 }

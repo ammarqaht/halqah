@@ -442,21 +442,32 @@ it is never yanked out of the page without falling.
 Print is a first-class output here, not an afterthought — the supervisor prints plans daily.
 
 - Dedicated `/print/*` routes. No rail, no panel, no TopBar.
-- A4 at 794 × 1123 px so the on-screen preview matches the sheet.
-- `BrandDisplay` headings, Arabic-Indic numerals, both logos in the header
-  (mosque right, association left — the lockup from §5 of the requirements PDF).
+- **Paged documents** (`components/print/Paged.tsx`, client-approved 11 Oct 2026 as the standard for
+  every report): real `.pd-page` sections of 210×297mm (297×210mm landscape), `@page { margin: 0 }`,
+  margins inside the page (body top 21mm, bottom 15mm, sides 14mm). Printed 1mm short (296/209mm):
+  Safari rounds a landscape page box down and otherwise spills a blank sheet after every page.
+  Content is measured and dealt onto pages before printing; a table is cut between rows with its
+  header repeated, a title never stranded with fewer than three rows, a heading never alone at a foot.
+  - `PagedDoc` — block-based (the period and halaqa reports); `newPage` starts a halaqa's section.
+  - `AutoPaged` — wraps an ordinary sheet and pages its top-level elements (all other reports).
+  - Pieces: `SecHead`, `Kpi`/`Kpis`, `Card`, `Bar`, `TableTitle`; `PrintHead` becomes a section head
+    inside a paged document (`usePaged`).
+- **Look** — modelled on the client's reference «التحليل الاستراتيجي»: cream paper, a hairline running
+  head (the mosque mark · report name · section) and a foot rule fading into the page number; a
+  gold kicker over a `BrandDisplay` title; white cards with a coloured cap (teal · deep · gold · sand ·
+  risk); tables with a deep-green head and a cream zebra. Only the period report has a cover (dark,
+  full-bleed, unnumbered). The palette is deliberately outside the app tokens and lives ONCE as
+  `--pd-*` variables on `.pd-doc` (globals.css) — never hardcode its hexes elsewhere.
+- Logos: the mosque mark rides in every running head; the association's sits in the section head
+  (`PrintHead`) and on the cover.
+- Portrait by default; the halaqa report and the weekly registration are `landscape` (forced by the
+  document's own `@page`).
+- Status is shape + colour (✓/✗, ▲ for a threshold); muted text meets AA (`--pd-mut`); every figure
+  through `Num`/`toArabicDigits`.
+- Legacy single sheets (`.sheet-a4`: plan sheets, cards, credentials) keep `PageFit` (zoom ≥ 0.8 into
+  whole pages). Shipped as release `2026-10-11-reports-redesign`.
+- `BrandDisplay` headings, Arabic-Indic numerals.
 - Status **shapes** carry meaning; the sheet must survive a greyscale printer.
-- `@page { size: A4; margin: 12mm; }`, `thead { display: table-header-group; }`,
-  `tr { page-break-inside: avoid; }` — the same technique that produced the requirements PDF.
-  The on-screen sheet's padding is the same 12mm, so a line wraps on screen where it wraps on paper.
-- **Whole pages only** (client, 11 Oct 2026): «صفحة وحدة، أو صفحتين كاملة … لا تخلي صفحة ونص».
-  `components/PageFit.tsx` (mounted by both print layouts) measures the sheet; a slight overflow
-  is scaled with CSS `zoom` (floor 0.8) into one page fewer, and the screen draws exactly
-  `--sheet-pages` A4 pages. Documents of several `.sheet-a4` (the boys' cards) are pre-paged and skipped.
-- Portrait everywhere, except the two weekly grids (`/print/halaqa`, `/print/registration`), which
-  declare their own `@page { size: A4 landscape; margin: 10mm }`.
-
----
 
 ### 8.1 ورقة الخطة — ثلاث خلايا، لا اثنتا عشرة
 

@@ -4,11 +4,10 @@
    desk. The figures are the same ledger every screen reads — nothing here is a
    stored number. Talqeen students are absent, not zero — §4.11 keeps them
    outside the points system entirely. */
+import { AutoPaged } from '@/components/print/Paged';
 import { Suspense, use, useMemo } from 'react';
-import { Printer } from 'lucide-react';
 import { PrintHead, PrintFoot, PCELL } from '@/components/PrintHead';
 import { Num, toArabicDigits, plural } from '@/components/Num';
-import { Btn } from '@/components/ui';
 import { useDB } from '@/lib/store';
 import { balances, earnsPoints, EMPTY_BALANCE } from '@/lib/points';
 import { formatDate } from '@/lib/dates';
@@ -46,11 +45,8 @@ function PointsSheet({ params }: { params: Promise<{ halaqaId: string }> }) {
 
   return (
     <>
-      <div className="no-print mx-auto mb-4 flex w-[794px] max-w-full items-center justify-end px-2">
-        <Btn variant="primary" icon={Printer} onClick={() => window.print()}>طباعة</Btn>
-      </div>
 
-      <div className="sheet-a4 font-sans" dir="rtl">
+      <AutoPaged title="قائمة نقاط الحلقة">
         <PrintHead title="قائمة نقاط الحلقة"
           sub={`حلقة ${halaqa.teacher} — ${toArabicDigits(plural(rows.length, 'طالب واحد', 'طالبان', 'طلاب', 'طالبًا'))}`} />
 
@@ -87,7 +83,7 @@ function PointsSheet({ params }: { params: Promise<{ halaqaId: string }> }) {
         )}
 
         <PrintFoot />
-      </div>
+      </AutoPaged>
     </>
   );
 }

@@ -6,9 +6,10 @@
    and hangs where they all pass it; this one covers twenty-five and hangs where
    they sit. It is read from two metres away, so it is set large — and the places
    carry a shape as well as a colour because it will be photocopied. */
-import { AlertTriangle, Printer } from 'lucide-react';
+import { AutoPaged } from '@/components/print/Paged';
+import { AlertTriangle } from 'lucide-react';
 import { LogoMark, LogoJamiyah } from '@/components/Logo';
-import { Btn, Empty } from '@/components/ui';
+import { Empty } from '@/components/ui';
 import { Num, toArabicDigits } from '@/components/Num';
 import { PrintFoot } from '@/components/PrintHead';
 import { useFetch } from '@/components/teacher/PrintSheet';
@@ -31,11 +32,8 @@ export default function HonourSheet() {
 
   return (
     <>
-      <div className="no-print mx-auto mb-4 flex w-[794px] max-w-full items-center justify-end px-2">
-        <Btn variant="primary" icon={Printer} onClick={() => window.print()}>طباعة</Btn>
-      </div>
 
-      <div className="sheet-a4 font-sans" dir="rtl">
+      <AutoPaged title="لوحة الشرف">
         <header className="mb-8 flex items-center justify-between gap-4 border-b-2 border-brand-700 pb-4">
           <LogoMark height={44} white={false} />
           <div className="text-center">
@@ -82,7 +80,7 @@ export default function HonourSheet() {
         <PrintFoot>
           النقاط مجموع الحركات: يومية واختبارات وأكواد، ناقصًا المشتريات والخصم
         </PrintFoot>
-      </div>
+      </AutoPaged>
     </>
   );
 }

@@ -3,12 +3,11 @@
    للطباعة وتعليقها في الحلقة». It is pinned to a wall and read from two metres
    away, so it is set large, and the ranks carry a shape as well as a colour
    (DESIGN.md §1.4) because it will be photocopied in greyscale. */
+import { AutoPaged } from '@/components/print/Paged';
 import { Suspense, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Printer } from 'lucide-react';
 import { LogoMark, LogoJamiyah } from '@/components/Logo';
 import { Num, toArabicDigits } from '@/components/Num';
-import { Btn } from '@/components/ui';
 import { useDB } from '@/lib/store';
 import { balances, earnsPoints, EMPTY_BALANCE } from '@/lib/points';
 import { shortName } from '@/lib/normalise';
@@ -34,11 +33,8 @@ function HonourSheet() {
 
   return (
     <>
-      <div className="no-print mx-auto mb-4 flex w-[794px] max-w-full items-center justify-end px-2">
-        <Btn variant="primary" icon={Printer} onClick={() => window.print()}>طباعة</Btn>
-      </div>
 
-      <div className="sheet-a4 font-sans" dir="rtl">
+      <AutoPaged title="لوحة الشرف">
         <header className="mb-8 flex items-center justify-between gap-4 border-b-2 border-brand-700 pb-4">
           <LogoMark height={44} white={false} />
           <div className="text-center">
@@ -84,7 +80,7 @@ function HonourSheet() {
         )}
 
         <p className="keep mt-4 text-center text-xs2 text-ink-500">بارك الله فيهم وزادهم من فضله</p>
-      </div>
+      </AutoPaged>
     </>
   );
 }

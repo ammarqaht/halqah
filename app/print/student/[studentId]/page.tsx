@@ -4,11 +4,10 @@
    current level and its sheet, every exam, the ledger's summary with the last
    movements, and the latest Ratel snapshot. Talqeen students get identity,
    exams and Ratel only — §4.11 keeps them outside plans and points. */
+import { AutoPaged } from '@/components/print/Paged';
 import { Suspense, use, useMemo } from 'react';
-import { Printer } from 'lucide-react';
 import { PrintHead, PrintFoot, PrintSec, PCELL, PCELL_TIGHT } from '@/components/PrintHead';
 import { Num, toArabicDigits, plural } from '@/components/Num';
-import { Btn } from '@/components/ui';
 import { useDB } from '@/lib/store';
 import { followUpRows } from '@/lib/followup';
 import { scoreMax } from '@/lib/exams';
@@ -75,11 +74,8 @@ function StudentReport({ params }: { params: Promise<{ studentId: string }> }) {
 
   return (
     <>
-      <div className="no-print mx-auto mb-4 flex w-[794px] max-w-full items-center justify-end px-2">
-        <Btn variant="primary" icon={Printer} onClick={() => window.print()}>طباعة</Btn>
-      </div>
 
-      <div className="sheet-a4 font-sans" dir="rtl">
+      <AutoPaged title="التقرير الشامل للطالب">
         <PrintHead title="تقرير طالب" sub={`${s.fullName} — ${halaqa ? `حلقة ${halaqaLabel(shortName(halaqa.teacher))}` : 'بلا حلقة'}`} />
 
         {show('info') && (
@@ -389,7 +385,7 @@ function StudentReport({ params }: { params: Promise<{ studentId: string }> }) {
         )}
 
         <PrintFoot />
-      </div>
+      </AutoPaged>
     </>
   );
 }

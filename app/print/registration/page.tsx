@@ -22,13 +22,12 @@
    2026). The name gave up the width for them — a name is read once and the
    marks are read twenty times, and a tick that has to be aimed at is a tick
    that gets misread. */
+import { AutoPaged } from '@/components/print/Paged';
 import { Suspense, useEffect, useState } from 'react';
 import { shortName } from '@/lib/normalise';
 import { useSearchParams } from 'next/navigation';
-import { Printer } from 'lucide-react';
 import { LogoMark, LogoJamiyah } from '@/components/Logo';
 import { Num, toArabicDigits } from '@/components/Num';
-import { Btn } from '@/components/ui';
 import { formatDate } from '@/lib/dates';
 import { WEEKDAY_AR } from '@/lib/teacher';
 import { asDate } from '@/lib/dates';
@@ -89,15 +88,7 @@ function RegistrationSheet() {
 
   return (
     <>
-      {/* A page box is per-DOCUMENT, so the landscape sheet declares its own —
-          the same line الورقة الأسبوعية carries, and for the same reason. */}
-      <style>{'@page { size: A4 landscape; margin: 10mm; }'}</style>
-
-      <div className="no-print mx-auto mb-4 flex w-[1123px] max-w-full items-center justify-end px-2">
-        <Btn variant="primary" icon={Printer} onClick={() => window.print()}>طباعة</Btn>
-      </div>
-
-      <div className="sheet-a4 landscape font-sans" dir="rtl">
+      <AutoPaged title="تسجيل المعلم — أسبوع" landscape>
         <header className="mb-5 flex items-center justify-between gap-4 border-b-2 border-brand-700 pb-3">
           <LogoMark height={38} white={false} />
           <div className="text-center">
@@ -237,7 +228,7 @@ function RegistrationSheet() {
             <span>★ اختبار اجتازه</span>
           </span>
         </footer>
-      </div>
+      </AutoPaged>
     </>
   );
 }

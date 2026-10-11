@@ -1,254 +1,314 @@
 'use client';
-/* بيانات فترة — what actually happened between two dates.
-   `?from=YYYY-MM-DD&to=YYYY-MM-DD`, either bound optional.
+/* تقرير الفترة — what happened between two dates, mosque-wide and then halaqa
+   by halaqa. `?from=YYYY-MM-DD&to=YYYY-MM-DD`, either bound optional.
 
-   Distinct from إحصاءات الجمعية, which counts the roster AS IT STANDS and only
-   narrows its exam tally to the window. This sheet is the window itself: every
-   exam sat, every sheet issued, every point moved. The roster is not sliced,
-   because the store keeps no history of who was enrolled when — and a figure
-   that cannot be honest about its own period should not be printed beside ones
-   that can. */
+   «كل حلقة بلحالها بس مجمّعة في ملف واحد حتى لو أكثر من صفحة … ولحق الفترة
+   غلاف» (client, 11 Oct 2026). So: a cover; one overview page for the whole
+   mosque; then every halaqa on pages of its own, numbered like the chapters of
+   the reference report — its figures, its boys one per row, and its exams.
+
+   Laid out by components/print/Paged: real A4 pages on screen, each with its
+   running head and page number, so the preview IS the print.
+
+   Attendance and recitation come from the teachers' register
+   (/api/admin/attendance), never from an imported file. Exams, levels and
+   points come from the store. */
 import { Suspense, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Printer } from 'lucide-react';
-import { PrintHead, PrintFoot, PrintSec, PCELL } from '@/components/PrintHead';
-import { Num, toArabicDigits, pointWord } from '@/components/Num';
-import { Btn } from '@/components/ui';
+import { LogoFull, LogoJamiyah } from '@/components/Logo';
+import { Num, toArabicDigits } from '@/components/Num';
 import { useDB } from '@/lib/store';
 import { EXAM_TYPE_AR, type ExamType } from '@/lib/points';
-import { halaqaLabel, shortName } from '@/lib/normalise';
+import { shortName } from '@/lib/normalise';
 import { formatDate } from '@/lib/dates';
+import { TRACK_AR } from '@/lib/types';
+import { EMPTY_ATTENDANCE, type Attendance } from '@/lib/attendance';
 import { useAttendance } from '@/components/useAttendance';
 import { useParts } from '@/lib/reportParts';
+import {
+  PagedDoc, SecHead, Kpi, Kpis, Card, Bar, TableTitle, type Block,
+} from '@/components/print/Paged';
 
 const EXAM_ORDER: ExamType[] = ['BADGE_GOLDEN', 'BADGE_DIAMOND', 'ASSOCIATION', 'TAJWEED', 'MOCK'];
+const MONTH_AR = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+  'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
 
-function PeriodSheet() {
+/** «١١ أكتوبر ٢٠٢٦» — how a date is said on a cover. */
+const longDate = (iso: string) => {
+  const [y, m, d] = iso.split('-').map(Number);
+  return toArabicDigits(`${d} ${MONTH_AR[m - 1] ?? ''} ${y}`);
+};
+const pct = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 100) : null);
+const n = (v: number) => <Num>{toArabicDigits(v)}</Num>;
+const pc = (v: number | null) => (v == null ? <span className="pd-mut">—</span> : <Num>{toArabicDigits(v)}٪</Num>);
+
+/** Several boys' register summaries added up — every afternoon counts once. */
+function addUp(list: Attendance[]) {
+  const t = { recorded: 0, attended: 0, late: 0, absent: 0, recitedDays: 0, lines: 0, errors: 0 };
+  for (const a of list) {
+    t.recorded += a.recorded; t.attended += a.attended; t.late += a.late; t.absent += a.absent;
+    t.recitedDays += a.recitedDays; t.lines += a.lines; t.errors += a.errors;
+  }
+  return t;
+}
+
+function PeriodReport() {
   const show = useParts('period');
   const db = useDB();
   const sp = useSearchParams();
   const from = sp.get('from') || '';
   const to = sp.get('to') || '';
   const att = useAttendance({ from: from || null, to: to || null });
-
-  /* An ISO date compares correctly as a string, and both bounds are inclusive
-     — «من ١/٩ إلى ٣٠/٩» must contain the thirtieth. */
   const inRange = (d: string) => (!from || d >= from) && (!to || d <= to);
 
-  const exams = useMemo(
-    () => db.exams.filter((e) => inRange(e.takenOn))
-      .sort((a, b) => (a.takenOn < b.takenOn ? 1 : -1)),
-    [db.exams, from, to]);
+  const exams = useMemo(() => db.exams.filter((e) => inRange(e.takenOn))
+    .sort((a, b) => (a.takenOn < b.takenOn ? 1 : -1)),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [db.exams, from, to]);
+  const txns = useMemo(() => db.txns.filter((t) => inRange(t.createdAt.slice(0, 10))),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [db.txns, from, to]);
 
-  const plans = useMemo(
-    () => db.plans.filter((p) => p.printedCount > 0 && inRange(p.issuedAt.slice(0, 10))),
-    [db.plans, from, to]);
+  const granted = txns.filter((t) => t.delta > 0).reduce((s, t) => s + t.delta, 0);
+  const spent = txns.filter((t) => t.delta < 0).reduce((s, t) => s - t.delta, 0);
+  const passed = exams.filter((e) => e.passed === true).length;
 
-  const txns = useMemo(
-    () => db.txns.filter((t) => inRange(t.createdAt.slice(0, 10))), [db.txns, from, to]);
+  /* Each halaqa with its boys, their register, their exams and their points. */
+  const halaqat = useMemo(() => {
+    const grantedBy = new Map<string, number>();
+    for (const t of txns) if (t.delta > 0) grantedBy.set(t.studentId, (grantedBy.get(t.studentId) ?? 0) + t.delta);
+    return [...db.halaqat]
+      .sort((a, b) => a.teacher.localeCompare(b.teacher, 'ar'))
+      .map((h) => {
+        const boys = db.students
+          .filter((s) => s.halaqaId === h.id && s.status === 'ACTIVE')
+          .sort((a, b) => a.fullName.localeCompare(b.fullName, 'ar'));
+        const sum = addUp(boys.map((s) => att?.students[s.id] ?? EMPTY_ATTENDANCE));
+        const hx = exams.filter((e) => e.halaqaId === h.id);
+        return {
+          h, boys, sum, exams: hx,
+          passed: hx.filter((e) => e.passed === true).length,
+          points: boys.reduce((s, b) => s + (grantedBy.get(b.id) ?? 0), 0),
+          grantedBy,
+        };
+      })
+      .filter((x) => x.boys.length > 0 || x.exams.length > 0);
+  }, [db.halaqat, db.students, att, exams, txns]);
 
-  const nameOf = (id: string) => db.students.find((s) => s.id === id)?.fullName ?? '—';
-  const teacherOf = (id: string | null) => {
-    const h = id ? db.halaqat.find((x) => x.id === id) : null;
-    return h ? halaqaLabel(shortName(h.teacher)) : '—';
-  };
+  const total = att?.total;
+  const recitedRate = total ? pct(total.recitedDays, total.attended) : null;
+  const boysCount = halaqat.reduce((s, x) => s + x.boys.length, 0);
 
-  const byType = useMemo(() => {
-    const m = new Map<string, { total: number; passed: number }>();
-    for (const e of exams) {
-      const r = m.get(e.type) ?? { total: 0, passed: 0 };
-      r.total++; if (e.passed === true) r.passed++;
-      m.set(e.type, r);
-    }
-    return m;
-  }, [exams]);
+  const span = from && to ? `${longDate(from)} — ${longDate(to)}`
+    : from ? `منذ ${longDate(from)}` : to ? `حتى ${longDate(to)}` : 'المدة كاملة';
 
-  const granted = txns.filter((t) => t.delta > 0).reduce((n, t) => n + t.delta, 0);
-  const spent = txns.filter((t) => t.delta < 0).reduce((n, t) => n - t.delta, 0);
-
-  /* Which halaqat were actually busy in the window. */
-  const byHalaqa = useMemo(() => {
-    const m = new Map<string, { exams: number; passed: number; plans: number }>();
-    for (const e of exams) {
-      const k = e.halaqaId ?? '—';
-      const r = m.get(k) ?? { exams: 0, passed: 0, plans: 0 };
-      r.exams++; if (e.passed === true) r.passed++;
-      m.set(k, r);
-    }
-    for (const p of plans) {
-      const st = db.students.find((s) => s.id === p.studentId);
-      const k = st?.halaqaId ?? '—';
-      const r = m.get(k) ?? { exams: 0, passed: 0, plans: 0 };
-      r.plans++; m.set(k, r);
-    }
-    return [...m.entries()].sort((a, b) => b[1].exams - a[1].exams);
-  }, [exams, plans, db.students]);
-
-  const span = from && to ? `من ${formatDate(from)} إلى ${formatDate(to)}`
-    : from ? `منذ ${formatDate(from)}`
-    : to ? `حتى ${formatDate(to)}`
-    : 'المدة كاملة — لم تُحدَّد فترة';
-
-  const nothing = exams.length === 0 && plans.length === 0 && txns.length === 0;
-
-  return (
+  /* ── the cover ───────────────────────────────────────────────────────── */
+  const cover = (
     <>
-      <div className="no-print mx-auto mb-4 flex w-[794px] max-w-full items-center justify-end px-2">
-        <Btn variant="primary" icon={Printer} onClick={() => window.print()}>طباعة</Btn>
+      <div className="mt-[22mm] rounded-[3mm] border-[1.2mm] border-[color:var(--pd-gold)] bg-[var(--pd-paper)] px-[9mm] py-[6mm]">
+        <LogoFull height={92} />
       </div>
-
-      <div className="sheet-a4 font-sans" dir="rtl">
-        <PrintHead title="بيانات الفترة" sub={<span>{toArabicDigits(span)}</span>} />
-
-        {nothing ? (
-          <p className="mt-8 text-center text-base2 text-ink-500">
-            لا يوجد نشاط مسجَّل في هذه الفترة.
-          </p>
-        ) : (
-          <>
-            {show('summary') && <div className="keep mb-4 grid grid-cols-4 gap-3">
-              {([
-                ['اختبارات', exams.length],
-                ['اجتازوا', exams.filter((e) => e.passed === true).length],
-                ['خطط سُلِّمت', plans.length],
-                ['حركات نقاط', txns.length],
-              ] as const).map(([label, v]) => (
-                <div key={label} className="rounded-lg border border-ink-200 px-3 py-2.5 text-center">
-                  <p className="text-[10px] text-ink-500">{label}</p>
-                  <p className="font-display text-h3 text-ink-900"><Num>{toArabicDigits(v)}</Num></p>
-                </div>
-              ))}
-            </div>}
-
-            {show('exams') && <>
-            <PrintSec>حصيلة الاختبارات في الفترة</PrintSec>
-            <table className="keep w-full border-collapse text-[11px]">
-              <thead>
-                <tr className="bg-page/60 text-[10px] text-ink-700">
-                  <th className={PCELL}>النوع</th>
-                  {EXAM_ORDER.map((t) => <th key={t} className={PCELL}>{EXAM_TYPE_AR[t]}</th>)}
-                </tr>
-              </thead>
-              <tbody>
-                {(['total', 'passed'] as const).map((k) => (
-                  <tr key={k}>
-                    <th className={`${PCELL} bg-page/60 font-medium`}>{k === 'total' ? 'أُجري' : 'اجتازوا'}</th>
-                    {EXAM_ORDER.map((t) => (
-                      <td key={t} className={PCELL}>
-                        <Num>{toArabicDigits(byType.get(t)?.[k] ?? 0)}</Num>
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            </>}
-
-            {/* الحضور والتسميع في الفترة — من سجلّ المعلمين. A period report
-                that counted exams and points but not a single afternoon was
-                missing the thing the period is actually made of. */}
-            {show('attendance') && att && att.total.recorded > 0 && (
-              <>
-                <PrintSec>الحضور والتسميع في الفترة</PrintSec>
-                <table className="keep w-full border-collapse text-[11px]">
-                  <tbody>
-                    <tr>
-                      <th className={`${PCELL} bg-page/60 font-medium`}>تسجيلات</th>
-                      <td className={PCELL}><Num>{toArabicDigits(att.total.recorded)}</Num></td>
-                      <th className={`${PCELL} bg-page/60 font-medium`}>حضور</th>
-                      <td className={PCELL}>
-                        <Num>{toArabicDigits(att.total.attended)}</Num>
-                        {att.total.rate !== null && <> · <Num>{toArabicDigits(att.total.rate)}</Num>٪</>}
-                      </td>
-                      <th className={`${PCELL} bg-page/60 font-medium`}>غياب</th>
-                      <td className={PCELL}><Num>{toArabicDigits(att.total.absent)}</Num></td>
-                    </tr>
-                    <tr>
-                      <th className={`${PCELL} bg-page/60 font-medium`}>متأخر</th>
-                      <td className={PCELL}><Num>{toArabicDigits(att.total.late)}</Num></td>
-                      <th className={`${PCELL} bg-page/60 font-medium`}>أخطاء</th>
-                      <td className={PCELL} colSpan={3}><Num>{toArabicDigits(att.total.errors)}</Num></td>
-                    </tr>
-                  </tbody>
-                </table>
-              </>
-            )}
-
-            {show('points') && <>
-            <PrintSec>النقاط في الفترة</PrintSec>
-            <table className="keep w-full border-collapse text-[11px]">
-              <tbody>
-                <tr>
-                  <th className={`${PCELL} bg-page/60 font-medium`}>مُنحت</th>
-                  <td className={PCELL}><Num>{toArabicDigits(granted)}</Num> {pointWord(granted)}</td>
-                  <th className={`${PCELL} bg-page/60 font-medium`}>صُرفت</th>
-                  <td className={PCELL}><Num>{toArabicDigits(spent)}</Num> {pointWord(spent)}</td>
-                  <th className={`${PCELL} bg-page/60 font-medium`}>الصافي</th>
-                  <td className={PCELL}><Num>{toArabicDigits(granted - spent)}</Num></td>
-                </tr>
-              </tbody>
-            </table>
-            </>}
-
-            {show('halaqat') && byHalaqa.length > 0 && (
-              <>
-                <PrintSec>الحلقات في الفترة</PrintSec>
-                <table className="w-full border-collapse text-[11px]">
-                  <thead>
-                    <tr className="bg-page/60 text-[10px] text-ink-700">
-                      {['الحلقة', 'اختبارات', 'اجتازوا', 'خطط سُلِّمت'].map((h) => (
-                        <th key={h} className={PCELL}>{h}</th>))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {byHalaqa.map(([id, r]) => (
-                      <tr key={id} className="keep">
-                        <td className={`${PCELL} text-start`}>{teacherOf(id === '—' ? null : id)}</td>
-                        <td className={PCELL}><Num>{toArabicDigits(r.exams)}</Num></td>
-                        <td className={PCELL}><Num>{toArabicDigits(r.passed)}</Num></td>
-                        <td className={PCELL}><Num>{toArabicDigits(r.plans)}</Num></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </>
-            )}
-
-            {show('list') && exams.length > 0 && (
-              <>
-                <PrintSec>الاختبارات، واحدًا واحدًا</PrintSec>
-                <table className="w-full border-collapse text-[10px]">
-                  <thead>
-                    <tr className="bg-page/60 text-[9.5px] text-ink-700">
-                      {['التاريخ', 'الطالب', 'الحلقة', 'النوع', 'المستوى', 'الدرجة', 'النتيجة'].map((h) => (
-                        <th key={h} className={PCELL}>{h}</th>))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {exams.map((e) => (
-                      <tr key={e.id} className="keep">
-                        <td className={PCELL}><Num>{toArabicDigits(formatDate(e.takenOn))}</Num></td>
-                        <td className={`${PCELL} text-start`}>{nameOf(e.studentId)}</td>
-                        <td className={`${PCELL} text-start`}>{teacherOf(e.halaqaId)}</td>
-                        <td className={PCELL}>{EXAM_TYPE_AR[e.type as ExamType] ?? e.type}</td>
-                        <td className={PCELL}>{e.level === null ? '—' : <Num>{toArabicDigits(e.level)}</Num>}</td>
-                        <td className={PCELL}>{e.score === null ? '—' : <Num>{toArabicDigits(e.score)}</Num>}</td>
-                        <td className={PCELL}>
-                          {e.passed === null ? '—' : e.passed ? 'اجتاز' : 'لم يجتز'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </>
-            )}
-          </>
-        )}
-
-        <PrintFoot />
+      <p className="mt-[30mm] text-[10pt] font-bold text-[var(--pd-gold-l)]">تقرير الإدارة</p>
+      <h1 className="mt-[3mm] font-display text-[40pt] font-bold leading-[1.15]">تقرير الفترة</h1>
+      <p className="mt-[6mm] font-display text-[19pt] font-bold text-[var(--pd-gold-l)]"><Num>{span}</Num></p>
+      <p className="mt-[5mm] max-w-[140mm] text-[10.5pt] text-white/80">
+        الحضور والتسميع والاختبارات والنقاط — لمجموع الحلقات، ثم لكل حلقة على حدة.
+      </p>
+      <div className="mt-[18mm] grid w-[170mm] grid-cols-4 border-y border-white/15">
+        {([
+          [n(halaqat.length), 'حلقات'],
+          [n(boysCount), 'طالبًا'],
+          [pc(total && total.recorded ? total.rate : null), 'نسبة الحضور'],
+          [<>{n(passed)}<span className="text-[13pt] text-white/60">/{toArabicDigits(exams.length)}</span></>, 'اختبارًا مجتازًا'],
+        ] as const).map(([v, l], i) => (
+          <div key={i} className="border-white/15 py-[5mm] [&:not(:last-child)]:border-e">
+            <p className="font-display text-[22pt] font-bold leading-none">{v}</p>
+            <p className="mt-[2mm] text-[8.5pt] text-white/70">{l}</p>
+          </div>
+        ))}
+      </div>
+      <div className="mt-auto mb-[16mm] flex flex-col items-center gap-[3mm]">
+        <div className="rounded-[2.5mm] border border-[color:var(--pd-gold)] px-[9mm] py-[3.5mm]">
+          <p className="text-[8pt] font-bold text-[var(--pd-gold-l)]">حلقات جامع محمد العبدالكريم — حي أُحد</p>
+          <div className="mt-[2mm] flex justify-center"><LogoJamiyah height={30} white /></div>
+        </div>
+        <p className="text-[7.5pt] text-white/55">طُبع في <Num>{longDate(new Date().toISOString().slice(0, 10))}</Num></p>
       </div>
     </>
   );
+
+  /* ── the overview ────────────────────────────────────────────────────── */
+  const blocks: Block[] = [];
+  const S0 = 'النظرة العامة';
+
+  if (show('summary') || show('attendance') || show('exams') || show('points')) {
+    blocks.push({
+      key: 'ov-head', section: S0,
+      node: <SecHead kicker={S0} title="الفترة في أرقام"
+        lead={<>
+          {total && total.recorded > 0
+            ? <>سجّل المعلمون {n(total.recorded)} حضورًا في الفترة، حضر منها الطلاب {pc(total.rate)}، وسمّعوا في {pc(recitedRate)} من أيام حضورهم. </>
+            : <>لم يُسجَّل حضور في هذه الفترة بعد. </>}
+          {exams.length > 0 && <>وأُجري {n(exams.length)} اختبارًا اجتاز منها {n(passed)}.</>}
+        </>} />,
+    });
+  }
+
+  if (show('summary')) {
+    blocks.push({
+      key: 'ov-kpis',
+      node: (
+        <Kpis>
+          <Kpi tone="teal" value={pc(total && total.recorded ? total.rate : null)} label="نسبة الحضور"
+            note={total ? <>{n(total.attended)} من {n(total.recorded)} تسجيلًا</> : undefined} />
+          <Kpi tone="deep" value={pc(recitedRate)} label="أيام التسميع"
+            note={total ? <>{n(total.lines)} سطرًا · {n(total.errors)} خطأ</> : undefined} />
+          <Kpi tone="gold" value={n(passed)} of={toArabicDigits(exams.length)} label="اختبارات مجتازة"
+            note="من كل ما أُجري في الفترة" />
+          <Kpi tone="sand" value={n(granted)} label="نقاط مُنحت"
+            note={<>صُرف منها {n(spent)} نقطة</>} />
+        </Kpis>
+      ),
+    });
+  }
+
+  if (show('attendance') && halaqat.length > 0) {
+    const byAtt = [...halaqat].sort((a, b) =>
+      (pct(b.sum.attended, b.sum.recorded) ?? -1) - (pct(a.sum.attended, a.sum.recorded) ?? -1));
+    const byRec = [...halaqat].sort((a, b) =>
+      (pct(b.sum.recitedDays, b.sum.attended) ?? -1) - (pct(a.sum.recitedDays, a.sum.attended) ?? -1));
+    blocks.push({
+      key: 'ov-rank',
+      node: (
+        <div className="pd-grid2">
+          <Card title="ترتيب الحلقات حسب الحضور" meta="نسبة الحضور من كل ما سجّله المعلم في الفترة">
+            {byAtt.map((x) => {
+              const v = pct(x.sum.attended, x.sum.recorded);
+              return <Bar key={x.h.id} label={shortName(x.h.teacher)} value={v} figure={pc(v)} tone="teal" />;
+            })}
+          </Card>
+          <Card title="ترتيب الحلقات حسب التسميع" meta="أيام سمّع فيها الطالب من أيام حضوره">
+            {byRec.map((x) => {
+              const v = pct(x.sum.recitedDays, x.sum.attended);
+              return <Bar key={x.h.id} label={shortName(x.h.teacher)} value={v} figure={pc(v)} tone="deep" />;
+            })}
+          </Card>
+        </div>
+      ),
+    });
+  }
+
+  if (show('exams') && exams.length > 0) {
+    blocks.push({
+      key: 'ov-exams',
+      node: (
+        <Card title="الاختبارات حسب النوع" meta="المجتاز من كل ما أُجري — في الفترة كلها">
+          {EXAM_ORDER.map((t) => {
+            const all = exams.filter((e) => e.type === t);
+            if (!all.length) return null;
+            const ok = all.filter((e) => e.passed === true).length;
+            return <Bar key={t} label={EXAM_TYPE_AR[t]} value={pct(ok, all.length)} tone="gold"
+              figure={<>{n(ok)} <span className="pd-mut">من {toArabicDigits(all.length)}</span></>} />;
+          })}
+        </Card>
+      ),
+    });
+  }
+
+  /* ── halaqa by halaqa ────────────────────────────────────────────────── */
+  if (show('halaqat')) {
+    halaqat.forEach((x, i) => {
+      const label = `حلقة ${shortName(x.h.teacher)}`;
+      const attR = pct(x.sum.attended, x.sum.recorded);
+      const recR = pct(x.sum.recitedDays, x.sum.attended);
+      blocks.push({
+        key: `h${x.h.id}-head`, section: label, newPage: true,
+        node: <SecHead num={i + 1} kicker="الحلقات" title={label}
+          lead={<>{x.h.timeSlot ? `${x.h.timeSlot} · ` : ''}{n(x.boys.length)} طالبًا · {n(x.sum.recorded)} تسجيلًا في الفترة</>} />,
+      });
+      blocks.push({
+        key: `h${x.h.id}-kpis`,
+        node: (
+          <Kpis>
+            <Kpi tone="teal" value={pc(attR)} label="الحضور"
+              note={<>{n(x.sum.attended)} من {n(x.sum.recorded)} · تأخر {n(x.sum.late)}</>} />
+            <Kpi tone="deep" value={pc(recR)} label="التسميع"
+              note={<>{n(x.sum.lines)} سطرًا · {n(x.sum.errors)} خطأ</>} />
+            <Kpi tone="gold" value={n(x.passed)} of={toArabicDigits(x.exams.length)} label="اختبارات مجتازة" />
+            <Kpi tone="sand" value={n(x.points)} label="نقاط مُنحت" note="لطلاب الحلقة في الفترة" />
+          </Kpis>
+        ),
+      });
+
+      if (x.boys.length) {
+        blocks.push({
+          key: `h${x.h.id}-boys`,
+          table: {
+            title: <TableTitle meta="الحضور والتسميع من سجلّ المعلم · الاختبارات في الفترة · ▲ غاب أكثر من يومين">الطلاب</TableTitle>,
+            cols: ['6%', '30%', '11%', '11%', '7%', '7%', '9%', '7%', '12%'],
+            head: (
+              <tr>
+                {['#', 'الطالب', 'المستوى', 'الحضور', 'تأخر', 'غياب', 'التسميع', 'أخطاء', 'الاختبارات']
+                  .map((c) => <th key={c}>{c}</th>)}
+              </tr>
+            ),
+            rows: x.boys.map((s, k) => {
+              const a = att?.students[s.id] ?? EMPTY_ATTENDANCE;
+              const se = x.exams.filter((e) => e.studentId === s.id);
+              const sp = se.filter((e) => e.passed === true).length;
+              return (
+                <tr key={s.id}>
+                  <td>{n(k + 1)}</td>
+                  <td className="s">{s.fullName}</td>
+                  <td>{s.track ? <>{TRACK_AR[s.track]}{s.track !== 'TALQEEN' && s.currentLevel != null && <> {n(s.currentLevel)}</>}</> : '—'}</td>
+                  <td>{a.recorded ? <>{n(a.attended)}<span className="pd-mut">/{toArabicDigits(a.recorded)}</span></> : <span className="pd-mut">—</span>}</td>
+                  <td>{a.recorded ? n(a.late) : ''}</td>
+                  {/* Shape as well as colour: «▲» survives a greyscale copier. */}
+                  <td className={a.absent > 2 ? 'pd-neg' : undefined}>{a.recorded ? <>{a.absent > 2 && '▲ '}{n(a.absent)}</> : ''}</td>
+                  <td>{a.recorded ? n(a.recitedDays) : ''}</td>
+                  <td>{a.recorded ? n(a.errors) : ''}</td>
+                  <td>{se.length ? <><span className={sp ? 'pd-pos' : undefined}>{n(sp)}</span><span className="pd-mut">/{toArabicDigits(se.length)}</span></> : ''}</td>
+                </tr>
+              );
+            }),
+          },
+        });
+      }
+
+      if (show('list') && x.exams.length) {
+        blocks.push({
+          key: `h${x.h.id}-exams`,
+          table: {
+            title: <TableTitle meta="الأحدث أولًا">اختبارات الحلقة في الفترة</TableTitle>,
+            cols: ['14%', '36%', '18%', '10%', '10%', '12%'],
+            head: <tr>{['التاريخ', 'الطالب', 'النوع', 'المستوى', 'الدرجة', 'النتيجة'].map((c) => <th key={c}>{c}</th>)}</tr>,
+            rows: x.exams.map((e) => (
+              <tr key={e.id}>
+                <td><Num>{toArabicDigits(formatDate(e.takenOn))}</Num></td>
+                <td className="s">{db.students.find((s) => s.id === e.studentId)?.fullName ?? '—'}</td>
+                <td>{EXAM_TYPE_AR[e.type as ExamType] ?? e.type}</td>
+                <td>{e.level == null ? '—' : n(e.level)}</td>
+                <td>{e.score == null ? '—' : n(e.score)}</td>
+                <td className={e.passed === true ? 'pd-pos' : e.passed === false ? 'pd-neg' : undefined}>
+                  {e.passed == null ? '—' : e.passed ? 'اجتاز' : 'لم يجتز'}
+                </td>
+              </tr>
+            )),
+          },
+        });
+      }
+    });
+  }
+
+  if (!blocks.length) {
+    blocks.push({ key: 'empty', section: S0,
+      node: <p className="py-16 text-center text-[11pt] text-[var(--pd-mut)]">لم يُختر شيء للطباعة.</p> });
+  }
+
+  return (
+    <PagedDoc title="تقرير الفترة" cover={cover} blocks={blocks}
+      deps={[att, exams, txns, halaqat, sp.toString()]} />
+  );
 }
 
-export default function Page() { return <Suspense><PeriodSheet /></Suspense>; }
+export default function Page() { return <Suspense><PeriodReport /></Suspense>; }
