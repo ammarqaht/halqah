@@ -29,3 +29,4 @@ yarn-error.log*
 
 # local tooling — the dev-server launch config, not part of the app
 .claude/
+scripts/oneoff/*.json

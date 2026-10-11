@@ -148,15 +148,22 @@
    Print is a first-class output here, not an afterthought: the supervisor
    prints plans daily and card sheets weekly. A4 is laid out at 794 × 1123 px so
    what he sees on screen is the sheet that comes out of the tray.             */
-.sheet-a4{width:794px;min-height:1123px;margin:0 auto;background:#fff;
-  padding:14mm 12mm;box-shadow:0 12px 32px -12px rgba(25,30,28,.28)}
+/* Whole pages: components/PageFit.tsx sets `--sheet-pages` (how many A4 pages
+   the sheet prints on) and `--sheet-z` (the zoom that made it fit them). The
+   sizes divide by the zoom so the sheet stays an A4 page wide on screen while
+   its content is laid out smaller — and the padding is the printer's 12mm
+   margin, so a line wraps on screen exactly where it wraps on paper. */
+.sheet-a4{--z:var(--sheet-z,1);width:calc(794px / var(--z));
+  min-height:calc(1123px * var(--sheet-pages,1) / var(--z));margin:0 auto;background:#fff;
+  padding:calc(12mm / var(--z));box-shadow:0 12px 32px -12px rgba(25,30,28,.28)}
 
 /* الورقة الأسبوعية is the one sheet that cannot be portrait: it is a GRID of
    five halaqa days across, each day carrying حضور، ثوب and the three recitation
    lines — twenty-nine columns. The paper the halaqa fills in by hand is landscape
    for exactly this reason, and §١٤'s «ورقة واحدة» is a promise about the number
    of pages, not about their orientation. Everything else stays portrait. */
-.sheet-a4.landscape{width:1123px;min-height:794px}
+.sheet-a4.landscape{width:calc(1123px / var(--z));
+  min-height:calc(794px * var(--sheet-pages,1) / var(--z));padding:calc(10mm / var(--z))}
 
 @page{size:A4;margin:12mm}
 

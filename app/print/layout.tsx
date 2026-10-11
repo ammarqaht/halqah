@@ -9,6 +9,7 @@
    frame, and two of them side by side is one too many. */
 import { useEffect, useState } from 'react';
 import { cx } from '@/lib/cx';
+import { PageFit } from '@/components/PageFit';
 
 export default function PrintLayout({ children }: { children: React.ReactNode }) {
   const [embedded, setEmbedded] = useState(false);
@@ -21,6 +22,7 @@ export default function PrintLayout({ children }: { children: React.ReactNode })
   return (
     <div className={cx('min-h-screen print:min-h-0 print:bg-white print:py-0',
       embedded ? 'embedded bg-white py-0' : 'bg-ink-100 py-8')}>
+      <PageFit />
       {children}
     </div>
   );

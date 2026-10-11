@@ -446,8 +446,15 @@ Print is a first-class output here, not an afterthought — the supervisor print
 - `BrandDisplay` headings, Arabic-Indic numerals, both logos in the header
   (mosque right, association left — the lockup from §5 of the requirements PDF).
 - Status **shapes** carry meaning; the sheet must survive a greyscale printer.
-- `@page { size: A4; margin: 18mm 16mm; }`, `thead { display: table-header-group; }`,
+- `@page { size: A4; margin: 12mm; }`, `thead { display: table-header-group; }`,
   `tr { page-break-inside: avoid; }` — the same technique that produced the requirements PDF.
+  The on-screen sheet's padding is the same 12mm, so a line wraps on screen where it wraps on paper.
+- **Whole pages only** (client, 11 Oct 2026): «صفحة وحدة، أو صفحتين كاملة … لا تخلي صفحة ونص».
+  `components/PageFit.tsx` (mounted by both print layouts) measures the sheet; a slight overflow
+  is scaled with CSS `zoom` (floor 0.8) into one page fewer, and the screen draws exactly
+  `--sheet-pages` A4 pages. Documents of several `.sheet-a4` (the boys' cards) are pre-paged and skipped.
+- Portrait everywhere, except the two weekly grids (`/print/halaqa`, `/print/registration`), which
+  declare their own `@page { size: A4 landscape; margin: 10mm }`.
 
 ---
 
