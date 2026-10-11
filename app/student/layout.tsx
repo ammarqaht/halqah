@@ -38,6 +38,7 @@ function Shell({ children }: { children: React.ReactNode }) {
           key: a.key, icon: KIND[a.kind].icon, label: KIND_LABEL[a.kind],
           title: a.kind === 'MESSAGE' ? undefined : a.title,
           body: a.body, at: a.at, href: a.href,
+          lists: a.names ? [{ names: a.names }] : undefined,
         }))} />
       {/* «ما الجديد» sits above the alerts (z-90 over z-80): what changed in
           the portal first, then what happened to him. */}

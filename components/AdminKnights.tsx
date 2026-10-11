@@ -26,7 +26,8 @@ export function AdminKnights() {
         setItems([{
           key: w.to, icon: Crown, label: 'فرسان الأسبوع',
           title: `${w.count} ${w.count === 1 ? 'فارس' : w.count === 2 ? 'فارسان' : w.count <= 10 ? 'فرسان' : 'فارسًا'} هذا الأسبوع`,
-          body: w.groups.map((g) => `${g.halaqa}: ${g.names.join('، ')}`).join('\n'),
+          body: 'فرسان الأسبوع الماضي في كل الحلقات — من حقّق الشروط في كل أيام حلقته:',
+          lists: w.groups.map((g) => ({ title: g.halaqa, names: g.names })),
           at: w.to,
           href: '/admin/reports?r=knights',
         }]);

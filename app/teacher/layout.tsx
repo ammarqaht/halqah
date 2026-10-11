@@ -43,6 +43,7 @@ function Shell({ children }: { children: React.ReactNode }) {
         items={me.alerts.filter((a) => !a.read).map((a) => ({
           key: a.key, icon: KIND[a.kind].icon, label: KIND[a.kind].label,
           body: a.body, at: a.at, href: a.kind === 'MESSAGE' ? undefined : a.href,
+          lists: a.names ? [{ names: a.names }] : undefined,
         }))} />
       {/* «ما الجديد» sits above the alerts (z-90 over z-80): what changed in
           the portal first, then what happened to him. */}

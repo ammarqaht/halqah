@@ -14,6 +14,7 @@ export type Alert = {
   read: boolean;
   href: string;
   body: string;
+  names?: string[];
   studentId?: string;
   /** The day the alert is ABOUT — «يكون معها تاريخ التنبيه» (client, 18 Sep
       2026). Every kind carries one, and they are ordered by it. */

@@ -44,6 +44,9 @@ export type StudentAlert = {
   href?: string;
   title: string;
   body: string;
+  /** فرسان الأسبوع — the names, one per cell; rendered as a table, never a
+      comma-joined sentence (client, 11 Oct 2026). */
+  names?: string[];
   at: string;
 };
 
@@ -193,9 +196,12 @@ export async function GET() {
         kind: 'KNIGHTS',
         key: alertKey('KNIGHTS', to),
         title: self ? 'مبارك! أنت من فرسان الأسبوع' : 'فرسان الأسبوع في حلقتك',
+        /* Whoever met the rule, however many — «مو شرط يكونون ١٠» (client,
+           11 Oct 2026); the count is said so a short list reads as complete. */
         body: self
-          ? `أتممت ${self.met} من ${self.of} أيام حاضرًا في وقتك بثوبك ومسمّعًا. وفرسان حلقتك: ${names.join('، ')}.`
-          : `${names.join('، ')} — بارك الله فيهم. كن منهم في الأسبوع القادم.`,
+          ? `أتممت ${self.met} من ${self.of} أيام حاضرًا في وقتك بثوبك ومسمّعًا. وفرسان حلقتك (${names.length}):`
+          : `فرسان حلقتك في الأسبوع الماضي (${names.length}) — بارك الله فيهم، وكن منهم في الأسبوع القادم:`,
+        names,
         at: to,
       });
     }

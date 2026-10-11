@@ -24,6 +24,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { Btn, Empty, Modal } from '@/components/ui';
 import { Num } from '@/components/Num';
+import { NamesGrid } from '@/components/NamesGrid';
 import { relativeDay, formatDate } from '@/lib/dates';
 import { cx } from '@/lib/cx';
 
@@ -31,6 +32,7 @@ export type StudentAlert = {
   kind: 'NOTE' | 'EXAM' | 'BOOKED' | 'GIFT' | 'MESSAGE' | 'KNIGHTS';
   key: string; read: boolean; href?: string;
   title: string; body: string; at: string;
+  names?: string[];
 };
 
 export const KIND: Record<StudentAlert['kind'], { icon: LucideIcon; tone: string }> = {
@@ -133,6 +135,11 @@ function Row({ alert: a, onRead }: { alert: StudentAlert; onRead: () => void }) 
           className="press flex w-full items-start gap-3 px-[18px] py-3 text-start transition-colors hover:bg-brand-50">
           {body}
         </button>
+      )}
+      {/* Outside the button: a table is not phrasing content. Indented to
+          sit under the text, past the icon. */}
+      {a.names && (
+        <div className="-mt-1 pb-3 pe-[18px] ps-[66px]"><NamesGrid names={a.names} compact /></div>
       )}
     </li>
   );

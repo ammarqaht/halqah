@@ -26,6 +26,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { Btn, Empty, Modal } from '@/components/ui';
 import { Num } from '@/components/Num';
+import { NamesGrid } from '@/components/NamesGrid';
 import { useMe, type Alert } from '@/components/teacher/Me';
 import { COPY } from '@/content/teacher';
 import { formatDate, relativeDay } from '@/lib/dates';
@@ -97,6 +98,10 @@ export function AlertRow({ alert: a, onRead }: { alert: Alert; onRead: () => voi
           {body}
           <ChevronLeft size={16} className="mt-1.5 shrink-0 text-ink-300" strokeWidth={2} />
         </Link>
+      )}
+      {/* Beside the link, not in it: a table is not a tap target's label. */}
+      {a.names && (
+        <div className="-mt-1 pb-3 pe-[18px] ps-[62px]"><NamesGrid names={a.names} compact /></div>
       )}
     </li>
   );

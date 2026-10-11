@@ -27,6 +27,9 @@ export type Alert = {
   /** Where a tap goes. «وكل تنبيه ينقل بنقرة إلى مكانه». */
   href: string;
   body: string;
+  /** فرسان الأسبوع — the names, one per cell; rendered as a table, never a
+      comma-joined sentence (client, 11 Oct 2026). */
+  names?: string[];
   studentId?: string;
   at?: string;
 };
@@ -206,7 +209,8 @@ export async function GET(req: Request) {
       key: alertKey('KNIGHTS', halaqa.id, knightsTo),
       href: '/teacher/students',
       at: knightsTo,
-      body: `فرسان حلقتك هذا الأسبوع (${names.length}): ${names.join('، ')} — بارك الله فيهم.`,
+      body: `فرسان حلقتك في الأسبوع الماضي (${names.length}) — بارك الله فيهم:`,
+      names,
     });
   }
 

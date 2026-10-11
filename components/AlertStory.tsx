@@ -23,6 +23,7 @@ import { ChevronLeft, X } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Lattice } from '@/components/Lattice';
 import { Num } from '@/components/Num';
+import { NamesGrid } from '@/components/NamesGrid';
 import { formatDate, relativeDay } from '@/lib/dates';
 import { cx } from '@/lib/cx';
 
@@ -34,6 +35,9 @@ export type StoryItem = {
   /** A headline when the alert has one; the body stands alone when not. */
   title?: string;
   body: string;
+  /** Names to set out as a table under the body — فرسان الأسبوع, one table
+      per halaqa on the supervisor's card. */
+  lists?: { title?: string; names: string[] }[];
   at?: string;
   href?: string;
 };
@@ -155,6 +159,12 @@ export function AlertStory({ items, ready, onSeen }: {
             a.title ? 'mt-2 text-base2' : 'mt-2 font-display text-xl2 text-ink-900')}>
             {a.body}
           </p>
+          {a.lists?.length ? (
+            /* A long list scrolls inside the card; the buttons stay in reach. */
+            <div className="-mx-1 max-h-[min(42vh,calc(100svh-26rem))] overflow-y-auto px-1">
+              {a.lists.map((l, n) => <NamesGrid key={n} title={l.title} names={l.names} />)}
+            </div>
+          ) : null}
           {day && (
             <p className="mt-3 text-cap text-ink-400">
               {relativeDay(day)} · <Num>{formatDate(day)}</Num>
