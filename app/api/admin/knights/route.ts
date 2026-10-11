@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { readSession } from '@/lib/auth';
 import { knightsOfWeek } from '@/lib/knights';
 import { isoDate } from '@/lib/dates';
+import { lastWeekEnd } from '@/lib/week';
 
 /* فرسان الأسبوع — عند المشرف، للمسجد كله أو لحلقة واحدة.
    «ويكون فيه صفحة لطباعة أسماء الفرسان عند المشرف» (client, 18 Sep 2026).
@@ -20,7 +21,10 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const today = isoDate(new Date());
-  const to = (url.searchParams.get('to') || today).slice(0, 10);
+  /* Last week, Sunday to Saturday — the same week the Sunday card announces.
+     «7 days ending today» on a Sunday was Monday-to-Sunday: it dropped last
+     Sunday and judged boys on today's half-registered halaqa. */
+  const to = (url.searchParams.get('to') || lastWeekEnd()).slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(to)) {
     return NextResponse.json({ error: 'تاريخ غير صحيح.' }, { status: 400 });
   }

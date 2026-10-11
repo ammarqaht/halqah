@@ -4,6 +4,7 @@ import { levelOf, planOf as sheetOf, pointerOf } from '@/lib/level';
 import { fail, scope, teacherSettings } from '../_scope';
 import { absence, daysInPeriod, type DayRecord } from '@/lib/teacher';
 import { knightsOfWeek } from '@/lib/knights';
+import { lastWeekEnd } from '@/lib/week';
 import { badgeAr } from '@/lib/day';
 import {
   balances, earnsPoints, EXAM_TYPE_SHORT_AR, type ExamType,
@@ -242,10 +243,14 @@ export async function GET(req: Request) {
      rows are read by lib/knights.ts, which the supervisor's own sheet reads
      too: one definition of a title children are named by. */
   if (kind === 'KNIGHTS') {
-    const k = await knightsOfWeek({ to, halaqaId: who.halaqaId });
+    /* Last week, Sunday to Saturday — not the 30-day default every other
+       report reads, and not «7 days ending today», which on a Sunday dropped
+       last Sunday and judged boys on today's half-registered halaqa. */
+    const k = await knightsOfWeek({
+      to: url.searchParams.get('to') ? to : lastWeekEnd(), halaqaId: who.halaqaId });
     return NextResponse.json({
       kind, ...head,
-      from: k.from,
+      from: k.from, to: k.to,
       halaqaDays: k.days.length,
       rows: k.rows,
       considered: k.considered,
