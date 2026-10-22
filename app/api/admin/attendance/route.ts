@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { talqeenLines } from '@/lib/talqeenLines';
 import { db } from '@/lib/db';
 import { readSession } from '@/lib/auth';
 import { summariseAll, totalFor, type DayRow } from '@/lib/attendance';
@@ -43,11 +44,16 @@ export async function GET(req: Request) {
     select: {
       studentId: true, day: true, status: true, thobe: true, incomplete: true, note: true,
       track: true, level: true, assignmentNo: true, talqeenSurah: true, talqeenAyah: true,
+      talqeenReviewFrom: true, talqeenReviewTo: true,
       lines: { select: { kind: true, recited: true, errors: true } },
     },
   });
 
-  const rows = entries as unknown as DayRow[];
+  /* A talqeen afternoon is a recited one when his teacher wrote what he read —
+     the same lines المتابعة shows (lib/talqeenLines, 22 Oct 2026). */
+  const rows: DayRow[] = entries.map((e) => ({
+    ...e, lines: [...e.lines, ...talqeenLines(e)],
+  }));
   const per = summariseAll(rows);
 
   /* «آخر درس» — where the lesson line last reached: the latest afternoon he
@@ -89,14 +95,14 @@ export async function GET(req: Request) {
       level: e.level, assignmentNo: e.assignmentNo,
       talqeen: e.talqeenSurah
         ? { surah: e.talqeenSurah, ayah: e.talqeenAyah != null ? String(e.talqeenAyah) : '' } : null,
-      lines: PLAN_KIND_ORDER.map((kind) => {
+      lines: [...(e.track === 'TALQEEN' ? [] : PLAN_KIND_ORDER).map((kind) => {
         const l = e.lines.find((x) => x.kind === kind);
         return {
           kind, kindAr: PLAN_KIND_AR[kind],
           recited: !!l?.recited, errors: l?.errors ?? 0,
           passage: passageLabel(passages.get(passageKey(e.track, e.level, e.assignmentNo, kind))),
         };
-      }),
+      }), ...talqeenLines(e)],
     }));
   }
 

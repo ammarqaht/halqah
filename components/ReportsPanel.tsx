@@ -201,7 +201,7 @@ export function ReportsPanel({ onClose }: { onClose: () => void }) {
       {report.needs === 'student' && (
         <PanelGroup label="الطالب">
           <Combobox value={sp.get('student') ?? ''} onChange={(v) => set('student', v)}
-            options={db.students.map((s) => ({
+            options={db.students.filter((s) => s.status !== 'INACTIVE').map((s) => ({
               value: s.id, label: s.fullName,
               hint: s.currentLevel != null ? `المستوى ${s.currentLevel}` : undefined,
             }))}
@@ -211,7 +211,7 @@ export function ReportsPanel({ onClose }: { onClose: () => void }) {
 
       <PanelGroup label="ملخّص">
         <p className="px-1.5 text-panel leading-relaxed text-ink-500">
-          <Num className="font-medium text-ink-800">{db.students.length}</Num> طالبًا ·{' '}
+          <Num className="font-medium text-ink-800">{db.students.filter((s) => s.status === 'ACTIVE').length}</Num> طالبًا ·{' '}
           <Num className="font-medium text-ink-800">{db.halaqat.length}</Num> حلقات ·{' '}
           <Num className="font-medium text-ink-800">{db.exams.length}</Num> اختبارًا
         </p>

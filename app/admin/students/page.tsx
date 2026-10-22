@@ -2,12 +2,13 @@
 /* الطلاب والحلقات — SPEC.md §6.2 (إد-٣-أ) merged with §6.3 (إد-٣-ب).
    One screen: the halaqat live in the contextual panel, the roster fills the
    work area, and selecting a halaqa turns the page into that halaqa's file. */
+import { exportStudents } from '@/lib/exportStudents';
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   UserPlus, Search, Pencil, Inbox, X,
-  AlertTriangle, Users2, Home } from 'lucide-react';
+  AlertTriangle, Users2, Home, FileSpreadsheet } from 'lucide-react';
 import { TopBar } from '@/components/TopBar';
 import { Sheet, SheetHead } from '@/components/Sheet';
 import { Btn, Empty, Chip, INPUT } from '@/components/ui';
@@ -177,6 +178,13 @@ function StudentsScreen() {
         panelOpen={panelOpen} onOpenPanel={() => setPanelOpen(true)}
         action={
           <div className="flex items-center gap-2">
+            {/* «سحب بيانات الطلاب كملف اكسل» (client, 22 Oct 2026) — the list
+                as it is on screen, filters and search included. */}
+            <Btn icon={FileSpreadsheet} disabled={!rows.length} data-tour="students-export"
+              onClick={() => exportStudents(rows, db.halaqat,
+                halaqa ? `طلاب حلقة ${halaqa.teacher}` : viewingInactive ? 'الطلاب المنقطعون' : 'الطلاب')}>
+              تصدير Excel
+            </Btn>
             <Btn variant="primary" icon={UserPlus} onClick={() => setEditStudent('new')}>إضافة طالب</Btn>
           </div>} />
 

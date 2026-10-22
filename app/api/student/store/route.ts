@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { STORE_ORDERING_KEY, orderingOpen } from '@/lib/storeMode';
 import { db } from '@/lib/db';
 import { pointsScope } from '../_scope';
 import { giftAvailability, shortBy, earnsPoints } from '@/lib/points';
@@ -18,15 +19,18 @@ export async function GET() {
   const eligible = earnsPoints({ track: student.track as Track | null });
   if (!eligible) return NextResponse.json({ eligible: false, balance: 0, gifts: [] });
 
-  const [txns, gifts] = await Promise.all([
+  const [txns, gifts, mode] = await Promise.all([
     db.pointTxn.findMany({ where: { studentId: student.id }, select: { delta: true } }),
     db.gift.findMany({ where: { status: 'VISIBLE' }, orderBy: { pointsCost: 'asc' } }),
+    db.setting.findUnique({ where: { key: STORE_ORDERING_KEY } }),
   ]);
   const balance = txns.reduce((n, t) => n + t.delta, 0);
 
   return NextResponse.json({
     eligible: true,
     balance,
+    /** False while the store is for looking only (lib/storeMode). */
+    ordering: orderingOpen(mode?.value),
     gifts: gifts.map((gift) => ({
       id: gift.id, name: gift.name, description: gift.description,
       image: gift.image, pointsCost: gift.pointsCost,

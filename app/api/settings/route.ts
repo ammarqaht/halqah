@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { STORE_ORDERING_KEY } from '@/lib/storeMode';
 import { db } from '@/lib/db';
 import { readSession } from '@/lib/auth';
 
@@ -20,6 +21,10 @@ export async function PUT(req: Request) {
 
   const patch = await req.json() as Record<string, unknown>;
   delete patch.state_rev;   // lib/rev owns it
+  /* A yes/no, or nothing: anything else would quietly close the store. */
+  if (STORE_ORDERING_KEY in patch && typeof patch[STORE_ORDERING_KEY] !== 'boolean') {
+    return NextResponse.json({ error: 'قيمة غير صحيحة.' }, { status: 400 });
+  }
   await db.$transaction(Object.entries(patch).map(([key, value]) =>
     db.setting.upsert({
       where: { key },

@@ -26,6 +26,7 @@ type Day = {
   incomplete?: boolean; note?: string | null; savedBy?: string | null;
   lines: Line[]; recitedCount: number;
   talqeen?: { surah: string; ayah: number | null } | null;
+  talqeenReview?: { from: string; to: string | null } | null;
 };
 type Payload = {
   today: string; week: string; prevWeek: string; nextWeek: string | null;
@@ -171,6 +172,13 @@ export function MyDay() {
             <p className="mt-2.5 text-panel text-ink-700">
               وقفت عند سورة {shown.talqeen.surah}
               {shown.talqeen.ayah != null && <> · آية <Num>{shown.talqeen.ayah}</Num></>}
+            </p>
+          )}
+          {shown.talqeenReview && (
+            <p className="mt-1 text-panel text-ink-700">
+              وراجعت {shown.talqeenReview.to
+                ? <>من سورة {shown.talqeenReview.from} إلى سورة {shown.talqeenReview.to}</>
+                : <>سورة {shown.talqeenReview.from}</>}
             </p>
           )}
 

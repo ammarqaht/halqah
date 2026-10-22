@@ -12,6 +12,7 @@
    And what he CAN afford sorts to the front, dearest first, so the top of the
    grid is always the best thing within reach today.
    ───────────────────────────────────────────────────────────────────────── */
+import { STORE_CLOSED_AR } from '@/lib/storeMode';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2, Store as StoreIcon, PackageCheck, Check, Plus } from 'lucide-react';
 import Link from 'next/link';
@@ -46,12 +47,15 @@ export default function StoreScreen() {
   const [err, setErr] = useState('');
   const [placed, setPlaced] = useState<{ number: number; gift: string } | null>(null);
   const [filter, setFilter] = useState<'all' | 'can'>('all');
+  /* عرض فقط until the supervisor opens ordering (lib/storeMode). Starts closed:
+     a button that flashes and then vanishes is worse than one that appears. */
+  const [ordering, setOrdering] = useState(false);
 
   const shown = useCountUp(balance, 800);
 
   const load = useCallback(() => {
     fetch('/api/student/store').then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (d) { setGifts(d.gifts ?? []); setBalance(d.balance ?? 0); } })
+      .then((d) => { if (d) { setGifts(d.gifts ?? []); setBalance(d.balance ?? 0); setOrdering(d.ordering === true); } })
       .catch(() => setGifts([]));
     fetch('/api/student/orders').then((r) => (r.ok ? r.json() : { orders: [] }))
       .then((d) => setOrders(d.orders ?? [])).catch(() => setOrders([]));
@@ -109,13 +113,21 @@ export default function StoreScreen() {
         </Link>
       </div>
 
+      {/* ── عرض فقط ──────────────────────────────────────────────────────── */}
+      {gifts !== null && !ordering && (
+        <p className="rise flex items-start gap-2.5 rounded-2xl border border-warn-200 bg-warn-100 px-4 py-3 text-panel leading-relaxed text-warn-700">
+          <StoreIcon size={17} className="mt-0.5 shrink-0" />
+          <span>{STORE_CLOSED_AR}</span>
+        </p>
+      )}
+
       {/* ── filters ─────────────────────────────────────────────────────── */}
       {sorted.length > 0 && (
         <div className="rise flex items-center justify-between gap-2.5">
           <div className="flex gap-1.5">
             <FilterChip on={filter === 'all'} onClick={() => setFilter('all')}>الكل</FilterChip>
             <FilterChip on={filter === 'can'} onClick={() => setFilter('can')} count={affordable}>
-              أقدر أشتريها
+              {ordering ? 'أقدر أشتريها' : 'تكفيها نقاطي'}
             </FilterChip>
           </div>
           <span className="shrink-0 text-micro text-ink-500">
@@ -153,7 +165,7 @@ export default function StoreScreen() {
                     : <StoreIcon size={28} className="text-ink-300" />}
                   {can && (
                     <span className="absolute top-2 grid h-[22px] place-items-center rounded-full bg-brand-800 px-2 text-2xs text-white start-2">
-                      يمكنك شراؤها
+                      {ordering ? 'يمكنك شراؤها' : 'نقاطك تكفيها'}
                     </span>
                   )}
                 </div>
@@ -168,6 +180,11 @@ export default function StoreScreen() {
                   {out ? (
                     <span className="mt-auto grid h-[38px] place-items-center rounded-[11px] bg-ink-100 text-panel text-ink-500">
                       غير متوفّر حاليًا
+                    </span>
+                  ) : can && !ordering ? (
+                    /* عرض فقط: he sees it is within reach, and nothing to press. */
+                    <span className="mt-auto grid h-[38px] place-items-center rounded-[11px] bg-brand-100 text-panel font-medium text-brand-800">
+                      نقاطك تكفيها
                     </span>
                   ) : can ? (
                     <button type="button" onClick={() => setConfirm(g)}

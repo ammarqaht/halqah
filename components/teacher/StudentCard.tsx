@@ -73,7 +73,7 @@ export type Card = {
   savedByRole: string;
   points: number;
   /** مسار التلقين وحده — أين وقف، وما سُجِّل له اليوم. */
-  talqeen?: { from: string; surah: string; ayah: number | null };
+  talqeen?: { from: string; surah: string; ayah: number | null; reviewFrom: string; reviewTo: string };
 };
 
 export type LineDraft = { recited: boolean; errors: number; note: string };
@@ -86,6 +86,9 @@ export type Draft = {
   /** آخر سورة قرأها وآخر آية حفظها — التلقين وحده. */
   talqeenSurah?: string;
   talqeenAyah?: string;
+  /** …ومراجعته: من سورة إلى سورة (client, 22 Oct 2026). */
+  talqeenReviewFrom?: string;
+  talqeenReviewTo?: string;
 };
 
 export type SaveState = 'CLEAN' | 'DIRTY' | 'SAVING' | 'SAVED' | 'QUEUED' | 'ERROR';
@@ -98,6 +101,8 @@ export const draftOf = (c: Card): Draft => ({
     { recited: l.recited, errors: l.errors, note: l.note }])),
   talqeenSurah: c.talqeen?.surah ?? '',
   talqeenAyah: c.talqeen?.ayah != null ? String(c.talqeen.ayah) : '',
+  talqeenReviewFrom: c.talqeen?.reviewFrom ?? '',
+  talqeenReviewTo: c.talqeen?.reviewTo ?? '',
 });
 
 const TONE: Record<StatusCode, string> = {
@@ -326,6 +331,33 @@ export function StudentCard({
               </span>
             </p>
           )}
+
+          {/* المراجعة — «نبي معلم حلقة التلقين يقدر يسجل مراجعة لطلابه»
+              (client, 22 Oct 2026). From one surah to another, or a single
+              surah when «إلى» is left empty. Optional: a day of new
+              memorisation alone is still a whole day. */}
+          <div className="mt-3 flex flex-wrap items-end gap-2">
+            <div className="min-w-[8rem] flex-1">
+              <span className="mb-1 block text-micro text-ink-500">راجع من سورة</span>
+              <Combobox value={draft.talqeenReviewFrom ?? ''}
+                onChange={(v) => set(v ? { talqeenReviewFrom: v } : { talqeenReviewFrom: '', talqeenReviewTo: '' })}
+                /* The first choice undoes a review picked by mistake. */
+                options={[{ value: '', label: '— لم يراجع' }, ...SURAHS.map((x) => ({ value: x.name, label: x.name }))]}
+                placeholder="لم يراجع" searchPlaceholder="اكتب اسم السورة"
+                emptyText="لا سورة بهذا الاسم"
+                className="!h-11 !rounded-md !px-3 !text-sm2" />
+            </div>
+            <div className="min-w-[8rem] flex-1">
+              <span className="mb-1 block text-micro text-ink-500">إلى سورة</span>
+              <Combobox value={draft.talqeenReviewTo ?? ''}
+                onChange={(v) => set({ talqeenReviewTo: v })}
+                options={[{ value: '', label: '— السورة نفسها' }, ...SURAHS.map((x) => ({ value: x.name, label: x.name }))]}
+                placeholder="سورة واحدة" searchPlaceholder="اكتب اسم السورة"
+                emptyText="لا سورة بهذا الاسم"
+                disabled={!(draft.talqeenReviewFrom ?? '').trim()}
+                className="!h-11 !rounded-md !px-3 !text-sm2" />
+            </div>
+          </div>
         </div>
       )}
 

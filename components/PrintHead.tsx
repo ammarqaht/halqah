@@ -20,7 +20,7 @@ export function PrintHead({ title, sub, assoc }:
     return (
       <header className="mb-4 flex items-end justify-between gap-4 border-b border-[color:var(--pd-line)] pb-3">
         <div className="min-w-0">
-          <p className="pd-kicker">{assoc ? 'تقرير مرفوع إلى الجمعية' : 'حلقات جامع محمد العبدالكريم — حي أُحد'}</p>
+          <p className="pd-kicker">حلقات جامع محمد العبدالكريم — حي أُحد</p>
           <h1 className="pd-h1">{title}</h1>
           {sub && <p className={cx('mt-1 text-[9pt] leading-relaxed', assoc ? 'font-medium text-assoc-700' : 'text-[var(--pd-ink2)]')}>{sub}</p>}
           <p className="mt-0.5 text-[7.5pt] text-[var(--pd-mut)]">

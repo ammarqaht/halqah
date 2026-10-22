@@ -638,6 +638,14 @@ model DayEntry {
    */
   talqeenSurah String? @map("talqeen_surah")
   talqeenAyah  Int?    @map("talqeen_ayah")
+  /**
+   * مراجعة التلقين — «نبي معلم حلقة التلقين يقدر يسجل مراجعة لطلابه»
+   * (client, 22 Oct 2026). The surahs he went back over that afternoon, from
+   * one to another (the same surah twice, or `to` empty, for a single one).
+   * Matched against the 114 like the position above.
+   */
+  talqeenReviewFrom String? @map("talqeen_review_from")
+  talqeenReviewTo   String? @map("talqeen_review_to")
 
   /**
    * «وخانة ملاحظة قصيرة اختيارية» — تعليمية على التسميع، ظاهرة للمشرف.

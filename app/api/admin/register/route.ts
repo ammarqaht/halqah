@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { talqeenLines } from '@/lib/talqeenLines';
 import { db } from '@/lib/db';
 import { readSession } from '@/lib/auth';
 import { isoDate } from '@/lib/dates';
@@ -100,7 +101,8 @@ export async function GET(req: Request) {
       const cells = days.map((day) => {
         const e = byStudentDay.get(`${st.id}|${day}`);
         if (!e) return { day, status: null as string | null, future: day > today };
-        const lines = [...e.lines]
+        const lines: { kind: string; kindAr: string; recited: boolean; errors: number;
+          note: string | null; passage: string | null }[] = [...e.lines]
           .sort((a, b) => KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind))
           .map((l) => ({
             kind: l.kind, kindAr: KIND_AR[l.kind] ?? l.kind,
@@ -109,6 +111,10 @@ export async function GET(req: Request) {
             passage: passageLabel(
               passages.get(passageKey(e.track, e.level, e.assignmentNo, l.kind))),
           }));
+        /* التلقين: his new memorisation and his review, as lines like any
+           other boy's — so «سمّع» counts them and the day's detail names them
+           (client, 22 Oct 2026). */
+        lines.push(...talqeenLines(e));
         return {
           day, future: false,
           status: e.status as string,
@@ -116,8 +122,8 @@ export async function GET(req: Request) {
           thobe: e.thobe,
           assignmentNo: e.assignmentNo,
           incomplete: e.incomplete,
-          talqeen: e.talqeenSurah
-            ? `${e.talqeenSurah}${e.talqeenAyah != null ? ` ${e.talqeenAyah}` : ''}` : null,
+          /* Carried by `lines` now; a second line saying the same would repeat it. */
+          talqeen: null,
           note: e.note || null,
           savedBy: e.savedByName || null,
           savedByRole: e.savedByRole,

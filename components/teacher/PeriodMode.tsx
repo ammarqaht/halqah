@@ -135,6 +135,8 @@ export function PeriodMode({ onSaved, preselect }: {
           lines: Object.entries(d.lines).map(([kind, v]) => ({ kind, ...v })),
           talqeenSurah: d.talqeenSurah ?? null,
           talqeenAyah: d.talqeenAyah ? Number(d.talqeenAyah) : null,
+          talqeenReviewFrom: d.talqeenReviewFrom || null,
+          talqeenReviewTo: d.talqeenReviewTo || null,
         }),
       });
       if (res.ok) {

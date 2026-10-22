@@ -95,6 +95,8 @@ export async function GET(req: Request) {
       /* مسار التلقين: «آخر سورة قرأها وآخر آية حفظها» — he has no مقرّر, and
          this is the whole of his record. */
       talqeen: e.talqeenSurah ? { surah: e.talqeenSurah, ayah: e.talqeenAyah } : null,
+      /* …ومراجعته ذلك العصر (22 Oct 2026). */
+      talqeenReview: e.talqeenReviewFrom ? { from: e.talqeenReviewFrom, to: e.talqeenReviewTo } : null,
     };
   };
 

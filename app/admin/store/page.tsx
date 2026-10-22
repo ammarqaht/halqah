@@ -21,6 +21,7 @@ import { KPI } from '@/components/Stat';
 import { Num, studentWord, pointWord } from '@/components/Num';
 import { usePanel } from '@/components/PanelState';
 import { GiftDialog } from '@/components/GiftDialog';
+import { StoreModeSwitch } from '@/components/StoreModeSwitch';
 import { PurchaseDialog } from '@/components/PurchaseDialog';
 import { store, useDB } from '@/lib/store';
 import { balances, isLowStock, EMPTY_BALANCE } from '@/lib/points';
@@ -136,6 +137,8 @@ function StoreScreen() {
           </div>} />
 
       <div className="mx-auto max-w-column px-6 py-8 pb-16">
+
+        <StoreModeSwitch />
 
         <div className="rise mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
           <KPI label="طلبات بانتظار التسليم" value={totals.pending} icon={Package} accent

@@ -25,6 +25,8 @@ export default function PickList() {
 
     for (const o of pending) {
       const s = db.students.find((x) => x.id === o.studentId);
+      /* المنقطع لا يظهر في أي تقرير (client, 22 Oct 2026). */
+      if (s?.status === 'INACTIVE') continue;
       const h = s?.halaqaId ? db.halaqat.find((x) => x.id === s.halaqaId) ?? null : null;
       const key = h?.id ?? 'none';
       if (!byHalaqa.has(key)) {

@@ -76,7 +76,11 @@ function AssociationSheet() {
 
   const examCounts = useMemo(() => {
     const m = new Map<string, { total: number; passed: number }>();
+    /* «المنقطعون ما نريد أنهم يظهرون في أي من التقارير» (client, 22 Oct
+       2026) — nor their exams in its tallies. */
+    const active = new Set(db.students.filter((s) => s.status === 'ACTIVE').map((s) => s.id));
     for (const e of db.exams) {
+      if (!active.has(e.studentId)) continue;
       if (from && e.takenOn < from) continue;
       if (to && e.takenOn > to) continue;
       const c = m.get(e.type) ?? { total: 0, passed: 0 };
@@ -85,7 +89,7 @@ function AssociationSheet() {
       m.set(e.type, c);
     }
     return m;
-  }, [db.exams, from, to]);
+  }, [db.exams, db.students, from, to]);
 
   const teachers = new Set(db.halaqat.map((h) => h.teacher)).size;
 
@@ -113,19 +117,18 @@ function AssociationSheet() {
         <PrintHead assoc title="إحصاءات الحلقات"
           sub={period
             ? <>الفترة {from && <>من <Num>{toArabicDigits(formatDate(from))}</Num></>}{' '}
-                {to && <>إلى <Num>{toArabicDigits(formatDate(to))}</Num></>} — مرفوع إلى جمعية تحفيظ الشرقية</>
-            : 'تراكمي منذ بداية التشغيل — مرفوع إلى جمعية تحفيظ الشرقية'} />
+                {to && <>إلى <Num>{toArabicDigits(formatDate(to))}</Num></>}</>
+            : 'تراكمي منذ بداية التشغيل'} />
 
         {d.isEmpty ? (
           <p className="py-12 text-center text-lg2 text-ink-500">القاعدة فارغة — لا شيء يُحصى بعد.</p>
         ) : (
           <>
-            <div className="keep grid grid-cols-4 gap-2">
+            <div className="keep grid grid-cols-3 gap-2">
               {/* «مقيّد» و«نشط» صارا رقمًا واحدًا: الإحصاء للجمعية يصف من في
                   الحلقات، والمنقطع خارجه — فعمود يقول العدد نفسه مرتين أهدر
                   خانة من أربع. */}
               {stat('طالبًا', d.students)}
-              {stat('منقطعون', d.inactiveStudents)}
               {stat('حلقات', d.halaqat)}
               {stat('معلمون', teachers)}
             </div>

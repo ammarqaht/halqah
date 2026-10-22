@@ -61,13 +61,18 @@ function PeriodReport() {
   const att = useAttendance({ from: from || null, to: to || null });
   const inRange = (d: string) => (!from || d >= from) && (!to || d <= to);
 
-  const exams = useMemo(() => db.exams.filter((e) => inRange(e.takenOn))
+  /* «المنقطعون ما نريد أنهم يظهرون في أي من التقارير» (client, 22 Oct 2026):
+     not as rows, and not inside a figure either — their exams, points and
+     afternoons stay in the system and out of every report. */
+  const active = useMemo(() => new Set(db.students.filter((s) => s.status === 'ACTIVE').map((s) => s.id)),
+    [db.students]);
+  const exams = useMemo(() => db.exams.filter((e) => active.has(e.studentId) && inRange(e.takenOn))
     .sort((a, b) => (a.takenOn < b.takenOn ? 1 : -1)),
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  [db.exams, from, to]);
-  const txns = useMemo(() => db.txns.filter((t) => inRange(t.createdAt.slice(0, 10))),
+  [db.exams, active, from, to]);
+  const txns = useMemo(() => db.txns.filter((t) => active.has(t.studentId) && inRange(t.createdAt.slice(0, 10))),
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  [db.txns, from, to]);
+  [db.txns, active, from, to]);
 
   const granted = txns.filter((t) => t.delta > 0).reduce((s, t) => s + t.delta, 0);
   const spent = txns.filter((t) => t.delta < 0).reduce((s, t) => s - t.delta, 0);
@@ -95,7 +100,13 @@ function PeriodReport() {
       .filter((x) => x.boys.length > 0 || x.exams.length > 0);
   }, [db.halaqat, db.students, att, exams, txns]);
 
-  const total = att?.total;
+  /* The mosque's register, added up from the active boys only — the API's own
+     total counts every afternoon ever recorded, a boy who has left included. */
+  const total = useMemo(() => {
+    if (!att) return null;
+    const t = addUp(halaqat.flatMap((x) => x.boys.map((s) => att.students[s.id] ?? EMPTY_ATTENDANCE)));
+    return { ...t, rate: pct(t.attended, t.recorded) };
+  }, [att, halaqat]);
   const recitedRate = total ? pct(total.recitedDays, total.attended) : null;
   const boysCount = halaqat.reduce((s, x) => s + x.boys.length, 0);
 

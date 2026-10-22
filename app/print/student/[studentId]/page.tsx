@@ -324,7 +324,7 @@ function StudentReport({ params }: { params: Promise<{ studentId: string }> }) {
               </colgroup>
               <thead>
                 <tr className="bg-page/60 text-ink-700">
-                  {['اليوم', 'الحضور', 'الثوب', ...(talqeen ? ['التلقين', '', ''] : PLAN_LINES)].map((h, i) => (
+                  {['اليوم', 'الحضور', 'الثوب', ...(talqeen ? ['الحفظ', 'المراجعة', ''] : PLAN_LINES)].map((h, i) => (
                     <th key={i} className={PCELL_TIGHT}>{h}</th>))}
                 </tr>
               </thead>
@@ -343,9 +343,18 @@ function StudentReport({ params }: { params: Promise<{ studentId: string }> }) {
                       {absent ? (
                         <td className={`${PCELL_TIGHT} text-ink-400`} colSpan={3}>{d.note || ''}</td>
                       ) : talqeen ? (
-                        <td className={`${PCELL_TIGHT} text-start`} colSpan={3}>
-                          {d.talqeen ? <>{d.talqeen.surah} <Num>{toArabicDigits(d.talqeen.ayah)}</Num></> : '—'}
-                        </td>
+                        /* «الحفظ» ثم «المراجعة» — lib/talqeenLines (22 Oct 2026). */
+                        <>
+                          {(['TALQEEN_NEW', 'TALQEEN_REVIEW'] as const).map((k) => {
+                            const l = d.lines.find((x) => x.kind === k);
+                            return (
+                              <td key={k} className={`${PCELL_TIGHT} text-start`}>
+                                {l?.passage ? toArabicDigits(l.passage) : <span className="text-ink-400">—</span>}
+                              </td>
+                            );
+                          })}
+                          <td className={PCELL_TIGHT} />
+                        </>
                       ) : d.lines.map((l) => (
                         <td key={l.kind} className={`${PCELL_TIGHT} text-start leading-snug`}>
                           {l.recited ? (

@@ -149,6 +149,8 @@ async function saveOne(who: Who, body: Record<string, never> | Record<string, un
     talqeenSurah: body.talqeenSurah == null ? null : String(body.talqeenSurah),
     talqeenAyah: body.talqeenAyah == null ? null
       : Math.trunc(Number(body.talqeenAyah)) || null,
+    talqeenReviewFrom: body.talqeenReviewFrom == null ? null : String(body.talqeenReviewFrom),
+    talqeenReviewTo: body.talqeenReviewTo == null ? null : String(body.talqeenReviewTo),
     lines: PLAN_KIND_ORDER.map((kind) => {
       const sent = Array.isArray(body.lines)
         ? body.lines.find((l: { kind?: string }) => l?.kind === kind) as

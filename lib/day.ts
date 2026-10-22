@@ -71,6 +71,9 @@ export type Card = {
     from: string;
     surah: string;
     ayah: number | null;
+    /** مراجعته ذلك العصر — من سورة إلى سورة (client, 22 Oct 2026). */
+    reviewFrom: string;
+    reviewTo: string;
   };
 };
 
@@ -93,12 +96,22 @@ export const badgeAr = (b: string | null) => (b ? BADGE_AR[b as keyof typeof BAD
  * clamped to that surah's own count, because «آخر آية حفظها» in الناس cannot be
  * the ninth.
  */
-function readTalqeen(card: SaveCard): { surah: string | null; ayah: number | null } {
+function readTalqeen(card: SaveCard): {
+  surah: string | null; ayah: number | null; reviewFrom: string | null; reviewTo: string | null;
+} {
+  /* The review is two names out of the 114, or none: an end without a start
+     is not a review, and the same surah twice is simply that surah. */
+  const rf = findSurah(card.talqeenReviewFrom);
+  const rt = rf ? findSurah(card.talqeenReviewTo) : null;
+  const review = {
+    reviewFrom: rf?.name ?? null,
+    reviewTo: rt && rt.name !== rf?.name ? rt.name : null,
+  };
   const found = findSurah(card.talqeenSurah);
-  if (!found) return { surah: null, ayah: null };
+  if (!found) return { surah: null, ayah: null, ...review };
   const raw = Math.trunc(Number(card.talqeenAyah));
   const ayah = Number.isFinite(raw) && raw > 0 ? Math.min(raw, found.ayahs) : null;
-  return { surah: found.name, ayah };
+  return { surah: found.name, ayah, ...review };
 }
 
 /**
@@ -223,6 +236,8 @@ export async function cardsFor(args: {
         from: talqeenStart(prog?.talqeenSurah ?? null, prog?.talqeenAyah ?? null),
         surah: entry?.talqeenSurah ?? '',
         ayah: entry?.talqeenAyah ?? null,
+        reviewFrom: entry?.talqeenReviewFrom ?? '',
+        reviewTo: entry?.talqeenReviewTo ?? '',
       } } : {}),
       trackAr: track ? ({ SILVER: 'الفضي', GOLDEN: 'الذهبي', TALQEEN: 'التلقين' })[track] : null,
       level,
@@ -256,6 +271,9 @@ export type SaveCard = {
   /** مسار التلقين وحده: آخر سورة قرأها وآخر آية حفظها. */
   talqeenSurah?: string | null;
   talqeenAyah?: number | null;
+  /** …ومراجعته: من سورة إلى سورة. */
+  talqeenReviewFrom?: string | null;
+  talqeenReviewTo?: string | null;
 };
 
 export type SaveResult = {
@@ -382,6 +400,8 @@ export async function saveCard(args: {
       assignmentNo: at,
       talqeenSurah: talqeen?.surah ?? null,
       talqeenAyah: talqeen?.ayah ?? null,
+      talqeenReviewFrom: talqeen?.reviewFrom ?? null,
+      talqeenReviewTo: talqeen?.reviewTo ?? null,
       level: plan?.level ?? level,
       track: track ?? null,
       incomplete: moved.incomplete,
@@ -401,6 +421,8 @@ export async function saveCard(args: {
           before: {
             status: existing.status, thobe: existing.thobe, note: existing.note,
             assignmentNo: existing.assignmentNo, incomplete: existing.incomplete,
+            talqeenSurah: existing.talqeenSurah, talqeenAyah: existing.talqeenAyah,
+            talqeenReviewFrom: existing.talqeenReviewFrom, talqeenReviewTo: existing.talqeenReviewTo,
             lines: existing.lines.map((l) => ({
               kind: l.kind, recited: l.recited, errors: l.errors, note: l.note })),
           },

@@ -161,6 +161,8 @@ function RegisterScreen() {
     /* التلقين وحده — the server ignores them for anyone else. */
     talqeenSurah: d.talqeenSurah ?? null,
     talqeenAyah: d.talqeenAyah ? Number(d.talqeenAyah) : null,
+    talqeenReviewFrom: d.talqeenReviewFrom || null,
+    talqeenReviewTo: d.talqeenReviewTo || null,
   }), [day]);
 
   const refresh = useRef<ReturnType<typeof setTimeout> | null>(null);

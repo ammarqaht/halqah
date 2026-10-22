@@ -25,6 +25,8 @@ export default function BookingSheet() {
     const by = new Map<string, { title: string; rows: typeof due }>();
     for (const b of due) {
       const s = db.students.find((x) => x.id === b.studentId);
+      /* المنقطع لا يظهر في أي تقرير (client, 22 Oct 2026). */
+      if (s?.status === 'INACTIVE') continue;
       const h = s?.halaqaId ? db.halaqat.find((x) => x.id === s.halaqaId) ?? null : null;
       const key = h?.id ?? 'none';
       if (!by.has(key)) by.set(key, { title: h ? `حلقة ${h.teacher}` : 'طلاب بلا حلقة', rows: [] });

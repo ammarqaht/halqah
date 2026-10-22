@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { STORE_ORDERING_KEY, STORE_CLOSED_AR, orderingOpen } from '@/lib/storeMode';
 import { db } from '@/lib/db';
 import { bumpRev } from '@/lib/rev';
 import { pointsScope, fail } from '../_scope';
@@ -36,6 +37,10 @@ export async function POST(req: Request) {
 
   const { giftId } = await req.json().catch(() => ({}));
   if (!giftId) return fail('اختر هدية.');
+
+  /* عرض فقط — the door is closed here, not only the button (lib/storeMode). */
+  const mode = await db.setting.findUnique({ where: { key: STORE_ORDERING_KEY } });
+  if (!orderingOpen(mode?.value)) return fail(STORE_CLOSED_AR, 403);
 
   const student = await db.student.findUnique({ where: { id: g.s.sub } });
   if (!student) return fail('لم يُعثر على الطالب.', 404);

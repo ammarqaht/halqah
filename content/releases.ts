@@ -20,8 +20,8 @@
    ───────────────────────────────────────────────────────────────────────── */
 import type { LucideIcon } from 'lucide-react';
 import {
-  Calculator, CalendarDays, ClipboardList, Crown, GraduationCap, Layers3, ListChecks,
-  MessageSquareText, Printer, ShieldCheck, Users,
+  BookOpenCheck, Calculator, CalendarDays, ClipboardList, Crown, Eye, FileSpreadsheet, GraduationCap,
+  Layers3, ListChecks, MessageSquareText, Printer, ShieldCheck, Store, Users,
 } from 'lucide-react';
 
 export type Audience = 'admin' | 'teacher' | 'student';
@@ -52,6 +52,55 @@ export type Release = {
 };
 
 export const RELEASES: Release[] = [
+  {
+    id: '2026-10-22-store-talqeen-excel',
+    date: '2026-10-22',
+    audience: ['admin'],
+    title: 'المتجر للعرض، والتلقين في المتابعة، وتصدير Excel',
+    summary:
+      'صار المتجر للعرض فقط حتى تفتح الطلب بنفسك، وصار ما يسمّعه طلاب التلقين — حفظًا ومراجعة — ظاهرًا في المتابعة والتقارير، وتقدر تسحب قائمة الطلاب ملف Excel.',
+    points: [
+      { icon: Store, title: 'المتجر: عرض فقط أو مفتوح',
+        body: 'من «المتجر» تختار: يرى الطلاب الهدايا وكم بقي لهم بلا زرّ طلب، أو تفتح لهم الطلب.' },
+      { icon: BookOpenCheck, title: 'التلقين في المتابعة',
+        body: 'حفظ طالب التلقين ومراجعته يظهران في كشف الحلقة ويُعدّان تسميعًا في التقارير.' },
+      { icon: FileSpreadsheet, title: 'تصدير Excel',
+        body: 'زرّ «تصدير Excel» في «الطلاب والحلقات» يسحب القائمة كما تراها، بتصفيتها وبحثها.' },
+    ],
+    tour: {
+      href: '/admin/store',
+      steps: [
+        { target: 'store-mode', title: 'متجر الطلاب',
+          body: 'هنا تختار: «عرض فقط» الآن، و«مفتوح للطلب» متى أردت أن يطلب الطلاب هداياهم.' },
+      ],
+    },
+  },
+  {
+    id: '2026-10-22-talqeen-review',
+    date: '2026-10-22',
+    audience: ['teacher'],
+    title: 'مراجعة طلاب التلقين',
+    summary:
+      'في بطاقة طالب التلقين صار مع «آخر سورة وآية حفظها» خانتا المراجعة: راجع من سورة إلى سورة. وما تسجّله يراه المشرف في المتابعة.',
+    points: [
+      { icon: BookOpenCheck, title: 'من سورة إلى سورة',
+        body: 'اختر أول سورة راجعها وآخرها، أو سورة واحدة إن لم يراجع غيرها.' },
+      { icon: Eye, title: 'يراه المشرف',
+        body: 'الحفظ والمراجعة يظهران في كشف حلقتك عند المشرف وفي التقارير.' },
+    ],
+  },
+  {
+    id: '2026-10-22-store-view',
+    date: '2026-10-22',
+    audience: ['student'],
+    title: 'المتجر للعرض الآن',
+    summary:
+      'تقدر تشوف الهدايا وأسعارها وكم بقي لك، والطلب يُفتح قريبًا بإذن الله — اجمع نقاطك من الآن.',
+    points: [
+      { icon: Store, title: 'شوف وجهّز نقاطك',
+        body: 'الهدية التي تكفيها نقاطك تظهر لك «نقاطك تكفيها»، وغيرها يقول لك كم بقي.' },
+    ],
+  },
   {
     id: '2026-10-11-reports-redesign',
     date: '2026-10-11',
