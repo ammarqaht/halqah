@@ -229,6 +229,8 @@ export async function GET(req: Request) {
     /* Set for حساب المطوّر — the portal shows its band, and the middleware
        refuses every save. */
     preview: g.s?.preview ?? null,
+    /* A supervisor standing in on this portal — the band says so. */
+    acting: !!g.s?.acting,
     halaqa: {
       id: halaqa.id,
       name: halaqaLabel(halaqa.name || halaqa.teacher),

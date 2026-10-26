@@ -47,7 +47,10 @@ export async function scope(req: Request): Promise<
     if (!t.halaqaId) return { ok: false, res: fail('حسابك لم يُربط بحلقة بعد.', 403) };
     return {
       ok: true,
-      who: { id: t.sub, name: t.name, role: 'TEACHER', halaqaId: t.halaqaId },
+      /* المشرف نائبًا — signed in on this portal with his own account to stand
+         in for an absent teacher (26 Oct 2026). The same chair §٦ already gives
+         him: everything he saves is stamped SUPERVISOR, with his own name. */
+      who: { id: t.sub, name: t.name, role: t.acting ? 'SUPERVISOR' : 'TEACHER', halaqaId: t.halaqaId },
       s: t,
     };
   }

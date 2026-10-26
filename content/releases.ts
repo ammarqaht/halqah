@@ -20,7 +20,7 @@
    ───────────────────────────────────────────────────────────────────────── */
 import type { LucideIcon } from 'lucide-react';
 import {
-  BookOpenCheck, Calculator, CalendarDays, ClipboardList, Crown, Eye, FileSpreadsheet, GraduationCap,
+  BookOpenCheck, Calculator, KeyRound, LogIn, UserCheck, CalendarDays, ClipboardList, Crown, Eye, FileSpreadsheet, GraduationCap,
   Layers3, ListChecks, MessageSquareText, Printer, ShieldCheck, Store, Users,
 } from 'lucide-react';
 
@@ -52,6 +52,34 @@ export type Release = {
 };
 
 export const RELEASES: Release[] = [
+  {
+    id: '2026-10-26-acting-supervisor',
+    date: '2026-10-26',
+    audience: ['admin'],
+    title: 'سجّل عن المعلم الغائب من جوالك',
+    summary:
+      'إذا غاب معلم، افتح بوابة المعلم واضغط «أنا مشرف — أسجّل عن معلم غائب»، وادخل باسم المستخدم وكلمة المرور التي تدخل بها هنا. تختار حلقته، وتسجّل الحضور والتسميع وكل شيء.',
+    points: [
+      { icon: LogIn, title: 'بحسابك أنت',
+        body: 'لا رمز جديد تحفظه: اسم مستخدمك وكلمة مرورك نفسها، من شاشة دخول المعلم.' },
+      { icon: UserCheck, title: 'أي حلقة',
+        body: 'شريط أعلى الصفحة تختار منه الحلقة، وتنتقل بين الحلقات متى شئت.' },
+      { icon: KeyRound, title: 'باسمك في السجل',
+        body: 'كل ما تحفظه يظهر «سجّله المشرف فلان»، والمعلم يراه في بوابته. وينتهي دخولك بعد يوم.' },
+    ],
+  },
+  {
+    id: '2026-10-26-teacher-stay-in',
+    date: '2026-10-26',
+    audience: ['teacher'],
+    title: 'تبقى داخلًا',
+    summary:
+      'سجّلت دخولك مرة؟ خلاص — تبقى داخل بوابتك ولا تحتاج تدخل كل مرة، حتى تضغط «خروج» بنفسك.',
+    points: [
+      { icon: LogIn, title: 'مرة واحدة',
+        body: 'افتح البوابة من جوالك متى شئت وتجدها مفتوحة على حلقتك.' },
+    ],
+  },
   {
     id: '2026-10-22-store-talqeen-excel',
     date: '2026-10-22',

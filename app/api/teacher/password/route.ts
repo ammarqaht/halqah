@@ -15,6 +15,8 @@ import { fail } from '../_scope';
 export async function POST(req: Request) {
   const s = await readTeacherSession();
   if (!s) return fail('غير مصرّح', 401);
+  /* A supervisor standing in changes his password where it lives. */
+  if (s.acting) return fail('كلمة مرور المشرف تُغيَّر من حسابه في لوحة المشرف.', 403);
 
   const { current, next } = await req.json().catch(() => ({}));
   const nextPw = String(next ?? '');

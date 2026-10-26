@@ -34,11 +34,15 @@ function LoginScreen() {
   const [loginId, setLoginId] = useState(() =>
     (sp.get('u') ?? '').replace(/\D/g, '').slice(0, 4));
   const [password, setPassword] = useState('');
+  /* المشرف نائبًا — his own long number, not a teacher's four digits
+     (client, 26 Oct 2026). */
+  const [asSupervisor, setAsSupervisor] = useState(false);
+  const [adminId, setAdminId] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
 
   const curtain = useCurtain();
-  const ready = loginId.length === 4 && password.length > 0;
+  const ready = (asSupervisor ? adminId.trim().length >= 3 : loginId.length === 4) && password.length > 0;
 
   const go = async () => {
     if (busy || !ready) return;
@@ -46,7 +50,7 @@ function LoginScreen() {
     try {
       const res = await fetch('/api/teacher/auth', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: loginId, password }),
+        body: JSON.stringify({ username: asSupervisor ? adminId.trim() : loginId, password }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setErr(data.error ?? 'تعذّر الدخول. حاول مرة أخرى.'); setBusy(false); return; }
@@ -79,14 +83,23 @@ function LoginScreen() {
       )}
 
       <form className="mt-7 space-y-5" onSubmit={(e) => { e.preventDefault(); void go(); }}>
-        <div>
-          <div className="mb-2.5 flex items-baseline justify-between gap-3">
-            <span className="text-xs2 font-medium text-ink-700">{COPY.idLabel}</span>
-            <span className="text-micro text-ink-500">{COPY.idHint}</span>
+        {asSupervisor ? (
+          <Field label="اسم المستخدم للمشرف" hint="الذي تدخل به لوحة المشرف" htmlFor="admin-id">
+            <input id="admin-id" value={adminId} autoFocus autoComplete="username"
+              dir="ltr" autoCapitalize="none" spellCheck={false}
+              onChange={(e) => setAdminId(e.target.value)}
+              className={cx(INPUT, 'h-12 text-lg2')} />
+          </Field>
+        ) : (
+          <div>
+            <div className="mb-2.5 flex items-baseline justify-between gap-3">
+              <span className="text-xs2 font-medium text-ink-700">{COPY.idLabel}</span>
+              <span className="text-micro text-ink-500">{COPY.idHint}</span>
+            </div>
+            <PinInput value={loginId} onChange={setLoginId} length={4} autoFocus
+              label={COPY.idLabel} />
           </div>
-          <PinInput value={loginId} onChange={setLoginId} length={4} autoFocus
-            label={COPY.idLabel} />
-        </div>
+        )}
 
         <Field label={COPY.pwLabel} hint={COPY.pwHint} htmlFor="pw">
           <input id="pw" type="password" value={password}
@@ -109,10 +122,25 @@ function LoginScreen() {
                  : COPY.signIn}
         </Btn>
 
-        <p className="flex items-start gap-2 text-panel leading-relaxed text-ink-500">
-          <ShieldCheck size={15} className="mt-0.5 shrink-0 text-ink-400" />
-          {COPY.forgot} وكلمة المرور {PASSWORD_MIN} أحرف على الأقل.
-        </p>
+        {asSupervisor ? (
+          <p className="flex items-start gap-2 text-panel leading-relaxed text-ink-500">
+            <ShieldCheck size={15} className="mt-0.5 shrink-0 text-ink-400" />
+            تدخل نائبًا عن المعلم الغائب: تختار حلقته من الشريط أعلى الصفحة، وكل ما تحفظه يُسجَّل باسمك.
+          </p>
+        ) : (
+          <p className="flex items-start gap-2 text-panel leading-relaxed text-ink-500">
+            <ShieldCheck size={15} className="mt-0.5 shrink-0 text-ink-400" />
+            {COPY.forgot} وكلمة المرور {PASSWORD_MIN} أحرف على الأقل.
+          </p>
+        )}
+
+        {/* The other door on the same screen — for a supervisor standing in
+            for an absent teacher. */}
+        <button type="button"
+          onClick={() => { setAsSupervisor(!asSupervisor); setErr(''); setPassword(''); }}
+          className="min-h-11 w-full py-2 text-center text-panel font-medium text-brand-800 underline-offset-4 hover:underline">
+          {asSupervisor ? 'دخول المعلم برقمه' : 'أنا مشرف — أسجّل عن معلم غائب'}
+        </button>
       </form>
 
       <LoginDoors here="teacher" />

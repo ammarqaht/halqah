@@ -39,6 +39,7 @@ export type TeacherMe = {
   who: { id: string; name: string; role: 'TEACHER' | 'SUPERVISOR' };
   /** Set for حساب المطوّر (lib/dev). Nothing saves. */
   preview: string | null;
+  acting?: boolean;
   halaqa: { id: string; name: string; teacher: string; timeSlot: string; mosque: string };
   today: string;
   /** Whether today is one of the days this halaqa's own days open by themselves.

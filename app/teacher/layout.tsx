@@ -19,6 +19,7 @@ import { MedadFoot } from '@/components/MedadFoot';
 import { WhatsNew } from '@/components/whatsnew/WhatsNew';
 import { Tour } from '@/components/whatsnew/Tour';
 import { DevBand } from '@/components/DevBand';
+import { ActingBand } from '@/components/teacher/ActingBand';
 import { AlertStory } from '@/components/AlertStory';
 import { KIND } from '@/components/teacher/Alerts';
 
@@ -32,6 +33,7 @@ function Shell({ children }: { children: React.ReactNode }) {
       {/* «من يمينها إلى يسارها» across the top — see components/ScrollProgress. */}
       <ScrollProgress />
       {me.preview && <DevBand portal="teacher" />}
+      {me.acting && <ActingBand />}
       <TeacherNav />
       <main className="mx-auto max-w-column px-5 pb-28 pt-4 md:px-6 md:pb-16 md:pt-8">
         {children}

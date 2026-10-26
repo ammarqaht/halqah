@@ -110,12 +110,16 @@ export async function requireSession(): Promise<Session> {
 /** Generic message on purpose: never reveal which field was wrong. */
 export const BAD_CREDENTIALS = 'رقم الهوية أو كلمة المرور غير صحيحة.';
 
+const DUMMY_HASH = '$2b$12$WXluQjvPuq7wGitvfsVjZOuDyx/RCfBKyItJjvS/6xWvk58LhUE2.';
+
 export async function authenticate(username: string, password: string) {
   const user = await db.adminUser.findUnique({ where: { username: username.trim() } });
   /* Hash a dummy when the user is missing, so a wrong username and a wrong
      password take the same time and cannot be told apart by timing. */
   if (!user || !user.active) {
-    await bcrypt.compare(password, '$2b$12$invalidinvalidinvalidinvalidinvalidinvalidinvalidinvalidin');
+    /* A real 60-character hash of a random string: an invalid one returns at
+       once, and the time difference would name which usernames exist. */
+    await bcrypt.compare(password, DUMMY_HASH);
     return null;
   }
   if (!(await verifyPassword(password, user.passwordHash))) return null;
@@ -330,9 +334,15 @@ export const loginIdFor = (index: number) => String(LOGIN_ID_FIRST + index);
 const TEACHER_COOKIE = 'halqah_teacher';
 
 /**
- * A week without use — renewed at most once a day while he uses it (see
- * `renewTeacherSession`), so a teacher who opens it every circle never signs in
- * again, and a phone left untouched for a week is signed out.
+ * A year, renewed at most once a day while he uses it (see
+ * `renewTeacherSession`) — so a teacher signs in once and stays in: «إذا المعلم
+ * سجّل بحسابه لا يطلع منه بتاتًا … ما يحتاج يسجّل دخول كل شوي» (client,
+ * 26 Oct 2026). A year rather than «never» for the same reason the student's
+ * is: browsers cap a cookie at about four hundred days. What still ends it is
+ * the sign-out button, and the supervisor deactivating him or moving his
+ * halaqa — renewal re-reads his account.
+ *
+ * It was a week without use until 26 Oct 2026; before that, thirty days.
  *
  * It was thirty days from sign-in. The client asked for «كل اسبوع»; counted
  * from sign-in, a week would end mid-التسميع, in front of twenty-five boys,
@@ -343,7 +353,12 @@ const TEACHER_COOKIE = 'halqah_teacher';
  * halaqa's record — every boy's level, attendance and exam results — where a
  * boy's carries only his own.
  */
-export const TEACHER_SESSION_DAYS = 7;
+export const TEACHER_SESSION_DAYS = 365;
+
+/** المشرف نائبًا عن معلم — a working day, not a year: his own sign-in lasts
+    hours (SESSION_HOURS), and standing in on a teacher's portal must not
+    outlast it. «هذا للمعلم بس» (client, 26 Oct 2026). */
+export const ACTING_HOURS = SESSION_HOURS;
 
 /**
  * Sign-in is a four-digit LOGIN NUMBER from 2001, and a password.
@@ -378,14 +393,27 @@ export type TeacherSession = {
   issuedAt: number;
   /** Set on حساب المطوّر's token — see `PREVIEW_HOURS`. Nothing is saved under it. */
   preview: string | null;
+  /** A SUPERVISOR standing in for an absent teacher, signed in on this portal
+      with his own account: `sub` is his admin id, and what he saves is stamped
+      with his name (app/api/teacher/_scope). 26 Oct 2026. */
+  acting: boolean;
+  /** When the token ends, in seconds. */
+  exp: number;
 };
 
 export async function createTeacherSession(t: {
   id: string; fullName: string; username: string; halaqaId: string | null;
-}, preview: string | null = null) {
-  const life = preview ? PREVIEW_HOURS * 3600 : TEACHER_SESSION_DAYS * 24 * 60 * 60;
+}, preview: string | null = null, acting = false,
+/** Keep an existing end rather than start a new one — switching halaqa must
+    not extend a supervisor's day. */
+expSec?: number) {
+  const life = expSec ? Math.max(1, expSec - nowSec())
+    : preview ? PREVIEW_HOURS * 3600
+    : acting ? ACTING_HOURS * 3600
+    : TEACHER_SESSION_DAYS * 24 * 60 * 60;
   const token = await new SignJWT({
-    name: t.fullName, username: t.username, halaqaId: t.halaqaId, ...(preview ? { preview } : {}),
+    name: t.fullName, username: t.username, halaqaId: t.halaqaId,
+    ...(preview ? { preview } : {}), ...(acting ? { acting: true } : {}),
   })
     .setProtectedHeader({ alg: 'HS256' })
     .setSubject(t.id)
@@ -415,6 +443,8 @@ export async function readTeacherSession(): Promise<TeacherSession | null> {
       halaqaId: payload.halaqaId ? String(payload.halaqaId) : null,
       issuedAt: Number(payload.iat ?? 0),
       preview: payload.preview ? String(payload.preview) : null,
+      acting: payload.acting === true,
+      exp: Number(payload.exp ?? 0),
     };
   } catch {
     return null;
@@ -429,6 +459,13 @@ export async function readTeacherSession(): Promise<TeacherSession | null> {
  * session as it now stands, or null when he may no longer be in.
  */
 export async function renewTeacherSession(s: TeacherSession): Promise<TeacherSession | null> {
+  /* A supervisor standing in is not renewed: his hours end, and he signs in
+     again. Whether his account is still live is checked on every request. */
+  if (s.acting) {
+    const a = await db.adminUser.findUnique({ where: { id: s.sub }, select: { active: true } });
+    if (!a?.active) { await destroyTeacherSession(); return null; }
+    return s;
+  }
   if (s.preview || nowSec() - s.issuedAt < RENEW_AFTER_SEC) return s;
   const t = await db.teacher.findUnique({ where: { id: s.sub }, include: { halaqa: true } });
   if (!t?.active || !t.halaqa) { await destroyTeacherSession(); return null; }
@@ -436,7 +473,8 @@ export async function renewTeacherSession(s: TeacherSession): Promise<TeacherSes
   await createTeacherSession(fresh);
   return {
     sub: t.id, name: t.fullName, username: t.username, halaqaId: t.halaqa.id,
-    issuedAt: nowSec(), preview: null,
+    issuedAt: nowSec(), preview: null, acting: false,
+    exp: nowSec() + TEACHER_SESSION_DAYS * 24 * 60 * 60,
   };
 }
 
