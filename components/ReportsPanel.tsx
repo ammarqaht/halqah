@@ -51,7 +51,7 @@ export const REPORTS: {
      (client, 18 Sep 2026). It is the رتل file's own arithmetic and belongs
      where a period is chosen deliberately, not on the screen that answers
      «what is happening this afternoon». */
-  { id: 'progress',    label: 'تقدّم الحلقات — للفترة',   icon: TrendingUp },
+  { id: 'progress',    label: 'تقدّم الحلقات — للفترة',   icon: TrendingUp, needs: 'period' },
   { id: 'pick-list',   label: 'قائمة تسليم الهدايا',     icon: PackageCheck },
   { id: 'bookings',    label: 'اختبارات اليوم',          icon: ClipboardList },
 ];

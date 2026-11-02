@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { releaseQuietly } from '@/lib/examRelease';
 import { db } from '@/lib/db';
 import { planOf, pointerOf } from '@/lib/level';
 import { scope } from '../_scope';
@@ -35,6 +36,7 @@ import type { CurriculumDay, ExamDayMap, StudentPlan, Track } from '@/lib/types'
 export async function GET() {
   const g = await scope();
   if (!g.ok) return g.res;
+  await releaseQuietly([g.s.sub]);
 
   const student = await db.student.findUnique({
     where: { id: g.s.sub }, include: { progress: true, plans: true } });

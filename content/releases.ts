@@ -20,7 +20,7 @@
    ───────────────────────────────────────────────────────────────────────── */
 import type { LucideIcon } from 'lucide-react';
 import {
-  BookOpenCheck, Calculator, KeyRound, LogIn, UserCheck, CalendarDays, ClipboardList, Crown, Eye, FileSpreadsheet, GraduationCap,
+  ArrowLeftCircle, BookOpenCheck, Calculator, KeyRound, LogIn, TrendingUp, UserCheck, CalendarDays, ClipboardList, Crown, Eye, FileSpreadsheet, GraduationCap,
   Layers3, ListChecks, MessageSquareText, Printer, ShieldCheck, Store, Users,
 } from 'lucide-react';
 
@@ -52,6 +52,22 @@ export type Release = {
 };
 
 export const RELEASES: Release[] = [
+  {
+    id: '2026-11-02-badge-advance-progress',
+    date: '2026-11-02',
+    audience: ['admin'],
+    title: 'اجتاز وسامه؟ ينتقل وحده',
+    summary:
+      'إذا اجتاز الطالب اختبار الوسام الذي وقف عنده، انتقل تلقائيًا إلى المقرّر الذي بعده — من ١٢ إلى ١٣ مثلًا — دون أن تنقله بيدك. وتقرير «تقدّم الحلقات» صار يُحسب من تسجيل المعلمين للفترة التي تختارها.',
+    points: [
+      { icon: ArrowLeftCircle, title: 'من ١٢ إلى ١٣ وحده',
+        body: 'يكفي أن تسجّل نتيجة الوسام «اجتاز». ونهاية المستوى (الماسي على آخر مقرّر) يبقى لك: تنقله إلى المستوى التالي بنفسك.' },
+      { icon: TrendingUp, title: 'تقدّم الحلقات للفترة',
+        body: 'أوجه الحفظ والمراجعة وأيام الحضور لكل حلقة، مما سمّعه الطلاب فعلًا بين التاريخين — لا من آخر ملف مرفوع.' },
+      { icon: Crown, title: 'فارس الأسبوع ويوم الاختبار',
+        body: 'يوم اجتاز فيه الطالب اختبارًا يُحسب يومًا مكتملًا في «فرسان الأسبوع» وإن لم يسمّع فيه.' },
+    ],
+  },
   {
     id: '2026-10-26-acting-supervisor',
     date: '2026-10-26',

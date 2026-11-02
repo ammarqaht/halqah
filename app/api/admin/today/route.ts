@@ -33,8 +33,25 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const day = (url.searchParams.get('day') || isoDate(new Date())).slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) {
+  /* «تقدّم الحلقات — للفترة» asks the same question over a period: the same
+     sums, from the same lines, between two dates (client, 2 Nov 2026 — the
+     report had been reading the last uploaded file, so it never changed). */
+  const from = url.searchParams.get('from')?.slice(0, 10) || null;
+  const to = url.searchParams.get('to')?.slice(0, 10) || null;
+  const ok = (v: string | null) => v == null || /^\d{4}-\d{2}-\d{2}$/.test(v);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !ok(from) || !ok(to)) {
     return NextResponse.json({ error: 'تاريخ غير صحيح.' }, { status: 400 });
+  }
+  const period = !!(from || to);
+  /* A period has both ends, in order, and no more than a little over a year —
+     every afternoon in it is read with its lines. */
+  if (period) {
+    if (!from || !to || from > to) {
+      return NextResponse.json({ error: 'اختر بداية الفترة ونهايتها.' }, { status: 400 });
+    }
+    if ((Date.parse(to) - Date.parse(from)) / 86_400_000 > 400) {
+      return NextResponse.json({ error: 'الفترة أطول من سنة — اختر فترة أقصر.' }, { status: 400 });
+    }
   }
 
   /* حسبة الأوجه من قاعدة البيانات، لا من الشيفرة. */
@@ -51,7 +68,9 @@ export async function GET(req: Request) {
       select: { id: true, halaqaId: true, track: true, currentLevel: true },
     }),
     db.dayEntry.findMany({
-      where: { day },
+      where: period
+        ? { day: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } }
+        : { day },
       /* `level` comes off the ENTRY: it is the level he was on when the day
          was saved, and the big review is measured from where he stands. */
       include: { lines: { select: { kind: true, recited: true } } },
@@ -142,6 +161,9 @@ export async function GET(req: Request) {
 
   return NextResponse.json({
     day,
+    from, to,
+    /** The afternoons in the window that anyone recorded at all. */
+    days: new Set(entries.map((e) => e.day)).size,
     halaqat: list,
     totals: {
       students: sum((r) => r.students),

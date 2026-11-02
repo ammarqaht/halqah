@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { releaseQuietly } from '@/lib/examRelease';
 import { db } from '@/lib/db';
 import { readSession } from '@/lib/auth';
 import { dayCountFor, DEFAULT_EXAM_DAYS } from '@/lib/curriculum';
@@ -26,6 +27,7 @@ export async function GET(req: Request) {
   if (!s) return NextResponse.json({ error: 'غير مصرّح' }, { status: 401 });
 
   const halaqaId = new URL(req.url).searchParams.get('halaqa');
+  await releaseQuietly();
 
   const [students, halaqat] = await Promise.all([
     db.student.findMany({

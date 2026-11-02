@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { releaseQuietly } from '@/lib/examRelease';
 import { db } from '@/lib/db';
 import { bumpRev, lockRev, readRev } from '@/lib/rev';
 import { issueMissingAccounts, type IssuedAccount } from '@/lib/credentials';
@@ -475,6 +476,10 @@ export async function PUT(req: Request) {
       { error: 'تعذّر الحفظ على الخادم.', detail: e instanceof Error ? e.message : '' },
       { status: 500 });
   }
+
+  /* A badge exam he passed in this save lets his مقرّر move on (lib/examRelease).
+     After the commit, so a failure here can never cost the save itself. */
+  await releaseQuietly();
 
   /* Named, not swallowed. A save that quietly kept two thirds of what it was
      given is the failure this whole endpoint exists to avoid. */

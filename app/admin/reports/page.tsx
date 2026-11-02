@@ -32,7 +32,10 @@ function baseHref(id: ReportId, halaqa: string, student: string,
       const q = [from && `from=${from}`, to && `to=${to}`].filter(Boolean).join('&');
       return `/print/period${q ? `?${q}` : ''}`;
     }
-    case 'progress':    return '/print/progress';
+    case 'progress': {
+      const q = [from && `from=${from}`, to && `to=${to}`].filter(Boolean).join('&');
+      return `/print/progress${q ? `?${q}` : ''}`;
+    }
     case 'pick-list':   return '/print/pick-list';
     case 'bookings':    return '/print/bookings';
     default:            return null;

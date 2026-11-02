@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { releaseQuietly } from '@/lib/examRelease';
 import { db } from '@/lib/db';
 import { assertMine, fail, scope, teacherSettings } from '../_scope';
 import { cardsFor } from '@/lib/day';
@@ -22,6 +23,9 @@ const MAX_DAYS = 120;
 export async function GET(req: Request) {
   const g = await scope(req);
   if (!g.ok) return g.res;
+  /* A boy who passed the badge he was stopped at moves on before his card is
+     built — lib/examRelease (client, 2 Nov 2026). Once per request. */
+  await releaseQuietly();
   /* الغياب التلقائي — the days that have passed are settled before they are read. */
   await applyAutoAbsence();
   const { who } = g;

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { releaseQuietly } from '@/lib/examRelease';
 import { talqeenLines } from '@/lib/talqeenLines';
 import { db } from '@/lib/db';
 import { readSession } from '@/lib/auth';
@@ -38,6 +39,7 @@ export async function GET(req: Request) {
   if (!s) return NextResponse.json({ error: 'غير مصرّح' }, { status: 401 });
   /* الغياب التلقائي — the days that have passed are settled before they are read. */
   await applyAutoAbsence();
+  await releaseQuietly();
 
   const q = new URL(req.url).searchParams;
   const today = isoDate(new Date());
