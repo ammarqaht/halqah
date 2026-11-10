@@ -212,7 +212,7 @@ export function Modal({ open, onClose, title, children, footer, wide }:
         style={{ ['--sheet-y' as string]: `${y}px` }}
         onAnimationEnd={() => { if (phase === 'in') setPhase('rest'); }}
         onTransitionEnd={() => { if (phase === 'settle') setPhase('rest'); }}
-        className={cx('relative m-0 flex max-h-[90vh] w-full flex-col overflow-hidden rounded-t-2xl bg-paper shadow-pop sm:m-6 sm:rounded-2xl',
+        className={cx('relative m-0 flex max-h-[90svh] w-full flex-col overflow-hidden rounded-t-2xl bg-paper shadow-pop sm:m-6 sm:rounded-2xl',
           PHASE[phase], wide ? 'sm:max-w-2xl' : 'sm:max-w-md')}>
         <header onPointerDown={grab} onPointerMove={move}
           onPointerUp={release} onPointerCancel={release}

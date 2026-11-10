@@ -104,15 +104,18 @@ export function AlertStory({ items, ready, onSeen }: {
 
   return createPortal(
     <div role="dialog" aria-modal="true" aria-label="تنبيه جديد"
-      className={cx('fixed inset-0 z-[80] grid place-items-center p-5 transition-opacity duration-300',
+      className={cx('fixed inset-0 z-[80] grid place-items-center p-4 transition-opacity duration-300 sm:p-5',
         leaving ? 'opacity-0' : 'fade')}>
       <div className="absolute inset-0 bg-brand-900/55 backdrop-blur-[6px]" />
 
-      <div className={cx('relative w-full max-w-[25rem] overflow-hidden rounded-[22px] bg-paper',
+      {/* The card never grows past the screen: a long announcement scrolls
+          inside it, and the crown and the buttons stay where the thumb is —
+          «بالجوال ما يقدر يسوي التالي أو تخطّي لأن الإعلان طويل». */}
+      <div className={cx('relative flex max-h-[calc(100svh-2rem)] w-full max-w-[25rem] flex-col overflow-hidden rounded-[22px] bg-paper',
         'shadow-[0_30px_80px_-20px_rgba(10,64,60,.55),0_0_0_1px_rgba(255,255,255,.06)]')}>
 
         {/* ── the crown: green, the lattice, the progress, the medallion ── */}
-        <div className="relative overflow-hidden bg-gradient-to-b from-brand-900 to-brand-800 px-5 pb-12 pt-4 text-white">
+        <div className="relative shrink-0 overflow-hidden bg-gradient-to-b from-brand-900 to-brand-800 px-5 pb-12 pt-4 text-white">
           <Lattice className="pointer-events-none absolute inset-0 h-full w-full text-white" opacity={0.08} />
           <div aria-hidden className="pointer-events-none absolute -top-24 left-1/2 h-48 w-72 -translate-x-1/2 rounded-full bg-brand-600/25 blur-3xl" />
 
@@ -141,7 +144,7 @@ export function AlertStory({ items, ready, onSeen }: {
         </div>
 
         {/* The medallion sits on the seam between the crown and the page. */}
-        <div className="relative -mt-9 flex justify-center">
+        <div className="relative z-[1] -mt-9 flex shrink-0 justify-center">
           <span key={`m${i}`} className="mark-in grid h-[72px] w-[72px] place-items-center rounded-full bg-paper p-[5px] shadow-[0_10px_30px_-10px_rgba(10,64,60,.5)]">
             <span className="grid h-full w-full place-items-center rounded-full bg-gradient-to-br from-brand-800 to-brand-900 text-[#E7D3A5] ring-2 ring-[#D9BE83]/70">
               <I size={26} strokeWidth={1.7} />
@@ -150,7 +153,7 @@ export function AlertStory({ items, ready, onSeen }: {
         </div>
 
         {/* ── the page ── */}
-        <div key={i} className="mark-in px-6 pb-2 pt-3 text-center">
+        <div key={i} className="mark-in thin-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-2 pt-3 text-center">
           <p className="text-micro font-medium tracking-[.14em] text-warn-700">{a.label}</p>
           {a.title && (
             <h2 className="mt-1.5 font-display text-t1 text-ink-900">{a.title}</h2>
@@ -160,8 +163,8 @@ export function AlertStory({ items, ready, onSeen }: {
             {a.body}
           </p>
           {a.lists?.length ? (
-            /* A long list scrolls inside the card; the buttons stay in reach. */
-            <div className="-mx-1 max-h-[min(42vh,calc(100svh-26rem))] overflow-y-auto px-1">
+            /* The page itself scrolls now; the list just sits in it. */
+            <div className="-mx-1 px-1">
               {a.lists.map((l, n) => <NamesGrid key={n} title={l.title} names={l.names} />)}
             </div>
           ) : null}
@@ -172,7 +175,7 @@ export function AlertStory({ items, ready, onSeen }: {
           )}
         </div>
 
-        <div className="flex flex-col gap-2 px-6 pb-5 pt-4">
+        <div className="flex shrink-0 flex-col gap-2 border-t border-ink-150/70 px-6 pb-5 pt-4">
           <button type="button" onClick={next} autoFocus
             className="press flex h-12 items-center justify-center gap-2 rounded-xl bg-brand-900 text-base2 font-medium text-white shadow-[0_8px_20px_-10px_rgba(10,64,60,.8)] transition-colors hover:bg-brand-800">
             {last ? 'تمّ' : <>التالي <ChevronLeft size={18} strokeWidth={2} /></>}

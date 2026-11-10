@@ -20,7 +20,7 @@
    ───────────────────────────────────────────────────────────────────────── */
 import type { LucideIcon } from 'lucide-react';
 import {
-  ArrowLeftCircle, BookOpenCheck, Calculator, KeyRound, LogIn, TrendingUp, UserCheck, CalendarDays, ClipboardList, Crown, Eye, FileSpreadsheet, GraduationCap,
+  ArrowLeftCircle, BookOpenCheck, Pencil, Coins, Smartphone, Calculator, KeyRound, LogIn, TrendingUp, UserCheck, CalendarDays, ClipboardList, Crown, Eye, FileSpreadsheet, GraduationCap,
   Layers3, ListChecks, MessageSquareText, Printer, ShieldCheck, Store, Users,
 } from 'lucide-react';
 
@@ -52,6 +52,41 @@ export type Release = {
 };
 
 export const RELEASES: Release[] = [
+  {
+    id: '2026-11-10-edit-exam',
+    date: '2026-11-10',
+    audience: ['admin'],
+    title: 'عدّل الاختبار بدل أن تحذفه',
+    summary:
+      'بجانب أيقونة الحذف في سجلّ الاختبارات صار فيه قلم: يفتح الاختبار نفسه بكل بياناته، فتصحّح الدرجة أو الأسئلة أو أي شيء فيه وتحفظ.',
+    points: [
+      { icon: Pencil, title: 'كل حقل قابل للتعديل',
+        body: 'الطالب والتاريخ والمستوى والأسئلة والدرجة والنتيجة والملاحظة — دون أن تُعيد إدخاله من الصفر.' },
+      { icon: Coins, title: 'النقاط تُصحَّح بالفرق',
+        body: 'إن تغيّرت نقاط الاجتياز أُضيف الفرق أو خُصم من رصيد الطالب، ولا تُصرف مرّتين.' },
+      { icon: Smartphone, title: 'التنبيهات الطويلة على الجوال',
+        body: 'الإعلان الطويل يُمرَّر داخل بطاقته، وزرّا «التالي» و«تخطَّ الكل» ظاهران دائمًا.' },
+    ],
+    tour: {
+      href: '/admin/exams',
+      steps: [
+        { target: 'exam-edit', title: 'قلم التعديل',
+          body: 'في آخر كل سطر من سجلّ الاختبارات. اضغطه ليفتح الاختبار بكل ما فيه، عدّل ثم اضغط «حفظ التعديل».' },
+      ],
+    },
+  },
+  {
+    id: '2026-11-10-long-alerts-mobile',
+    date: '2026-11-10',
+    audience: ['teacher', 'student'],
+    title: 'التنبيه الطويل صار يُقرأ كاملًا',
+    summary:
+      'على الجوال، الإعلان الطويل من الإدارة يُمرَّر داخل بطاقته، وزرّ «التالي» وزرّ «تخطَّ الكل» يبقيان ظاهرين أسفلها.',
+    points: [
+      { icon: Smartphone, title: 'مرّر النص بإصبعك',
+        body: 'النص وحده يتحرّك، وأعلى البطاقة وأزرارها ثابتة في مكانها.' },
+    ],
+  },
   {
     id: '2026-11-02-badge-advance-progress',
     date: '2026-11-02',

@@ -221,6 +221,110 @@ describe('deleting an exam takes back its points without erasing the ledger', ()
   });
 });
 
+describe('editing a recorded exam', () => {
+  it('keeps one record and pays only the difference', () => {
+    store.reset();
+    store.upsertStudent(student({ id: 'se1', track: 'GOLDEN' }));
+    const e = exam({ id: 'ee1', studentId: 'se1', pointsAwarded: 200, pointsPaid: true });
+    store.saveExam(e);
+    store.saveExam({ ...e, score: 90, pointsAwarded: 150 });
+    expect(store.get().exams.filter((x) => x.id === 'ee1')).toHaveLength(1);
+    expect(store.get().exams[0].score).toBe(90);
+    expect(balance('se1')).toBe(150);
+  });
+
+  it('moving it to another student takes the points back from the first', () => {
+    store.reset();
+    store.upsertStudent(student({ id: 'sa', track: 'GOLDEN' }));
+    store.upsertStudent(student({ id: 'sb', track: 'GOLDEN' }));
+    const e = exam({ id: 'ee2', studentId: 'sa', pointsAwarded: 200, pointsPaid: true });
+    store.saveExam(e);
+    store.saveExam({ ...e, studentId: 'sb' });
+    expect(balance('sa')).toBe(0);
+    expect(balance('sb')).toBe(200);
+  });
+
+  it('should take the points back when «صُرفت» is un-ticked on edit', () => {
+    store.reset();
+    store.upsertStudent(student({ id: 'su', track: 'GOLDEN' }));
+    const e = exam({ id: 'eu', studentId: 'su', pointsAwarded: 200, pointsPaid: true });
+    store.saveExam(e);
+    store.saveExam({ ...e, pointsPaid: false });
+    expect(balance('su')).toBe(0);
+    const rows = ledgerFor('eu');
+    expect(rows).toHaveLength(2);
+    expect(rows[1]).toMatchObject({ studentId: 'su', delta: -200, kind: 'CORRECTION' });
+    /* Re-ticking pays again, once. */
+    store.saveExam({ ...e, pointsPaid: true });
+    expect(balance('su')).toBe(200);
+  });
+
+  it('should reverse the full old amount from the source and pay the new amount to the target', () => {
+    store.reset();
+    store.upsertStudent(student({ id: 'ma', track: 'GOLDEN' }));
+    store.upsertStudent(student({ id: 'mb', track: 'GOLDEN' }));
+    const e = exam({ id: 'em', studentId: 'ma', pointsAwarded: 200, pointsPaid: true });
+    store.saveExam(e);
+    store.saveExam({ ...e, studentId: 'mb', pointsAwarded: 150 });
+    expect(balance('ma')).toBe(0);
+    expect(balance('mb')).toBe(150);
+    /* Saving the same edit again is a no-op on the ledger. */
+    const n = ledgerFor('em').length;
+    store.saveExam({ ...e, studentId: 'mb', pointsAwarded: 150 });
+    expect(ledgerFor('em')).toHaveLength(n);
+    expect(balance('ma')).toBe(0);
+    expect(balance('mb')).toBe(150);
+  });
+
+  it('should give a TALQEEN target 0 while still reversing the source', () => {
+    store.reset();
+    store.upsertStudent(student({ id: 'ta', track: 'GOLDEN' }));
+    store.upsertStudent(student({ id: 'tt', track: 'TALQEEN' }));
+    const e = exam({ id: 'et', studentId: 'ta', pointsAwarded: 200, pointsPaid: true });
+    store.saveExam(e);
+    store.saveExam({ ...e, studentId: 'tt' });
+    expect(balance('ta')).toBe(0);
+    expect(balance('tt')).toBe(0);
+    expect(ledgerFor('et').filter((t) => t.studentId === 'tt')).toHaveLength(0);
+  });
+
+  it('should reverse the source when moved and un-ticked in the same edit', () => {
+    store.reset();
+    store.upsertStudent(student({ id: 'xa', track: 'GOLDEN' }));
+    store.upsertStudent(student({ id: 'xb', track: 'GOLDEN' }));
+    const e = exam({ id: 'ex', studentId: 'xa', pointsAwarded: 200, pointsPaid: true });
+    store.saveExam(e);
+    store.saveExam({ ...e, studentId: 'xb', pointsPaid: false });
+    expect(balance('xa')).toBe(0);
+    expect(balance('xb')).toBe(0);
+  });
+
+  it('should settle correctly when moved A to B and back to A', () => {
+    store.reset();
+    store.upsertStudent(student({ id: 'ra', track: 'GOLDEN' }));
+    store.upsertStudent(student({ id: 'rb', track: 'GOLDEN' }));
+    const e = exam({ id: 'er', studentId: 'ra', pointsAwarded: 200, pointsPaid: true });
+    store.saveExam(e);
+    store.saveExam({ ...e, studentId: 'rb' });
+    store.saveExam({ ...e, studentId: 'ra', pointsAwarded: 100 });
+    expect(balance('ra')).toBe(100);
+    expect(balance('rb')).toBe(0);
+    expect(store.get().exams.filter((x) => x.id === 'er')).toHaveLength(1);
+  });
+
+  it('should leave the balance alone when deleting an exam that was moved', () => {
+    store.reset();
+    store.upsertStudent(student({ id: 'da', track: 'GOLDEN' }));
+    store.upsertStudent(student({ id: 'db', track: 'GOLDEN' }));
+    const e = exam({ id: 'ed', studentId: 'da', pointsAwarded: 200, pointsPaid: true });
+    store.saveExam(e);
+    store.saveExam({ ...e, studentId: 'db' });
+    store.removeExam('ed');
+    expect(balance('da')).toBe(0);
+    expect(balance('db')).toBe(0);
+  });
+});
+
 describe('adopting the server\'s student ids', () => {
   it('carries every record that names him across, so nothing is orphaned', () => {
     store.reset();

@@ -921,9 +921,15 @@ export const store = {
 
     /* What the ledger has already paid out for THIS exam, from the ledger
        itself rather than from a flag — the ledger is the truth. */
-    const paidSoFar = cur.txns
-      .filter((t) => t.refType === 'exam' && t.refId === exam.id)
-      .reduce((sum, t) => sum + t.delta, 0);
+    /* Counted per student: an edit may move the sitting to another boy, and
+       what the first one was paid is taken back from HIM, not netted against
+       the new one's award. */
+    const paidBy = new Map<string, number>();
+    for (const t of cur.txns) {
+      if (t.refType !== 'exam' || t.refId !== exam.id) continue;
+      paidBy.set(t.studentId, (paidBy.get(t.studentId) ?? 0) + t.delta);
+    }
+    const paidSoFar = paidBy.get(exam.studentId) ?? 0;
 
     const student = cur.students.find((s) => s.id === exam.studentId);
     const shouldHave = exam.pointsPaid && student && earnsPoints(student)
@@ -931,6 +937,20 @@ export const store = {
     const delta = shouldHave - paidSoFar;
 
     const txns = [...cur.txns];
+    for (const [sid, paid] of paidBy) {
+      if (sid === exam.studentId || paid === 0) continue;
+      txns.push({
+        id: uid(),
+        studentId: sid,
+        delta: -paid,
+        kind: 'CORRECTION',
+        reason: `نُقل اختبار إلى طالب آخر — ${EXAM_LABEL(exam.type)}`,
+        refType: 'exam',
+        refId: exam.id,
+        createdBy: actor,
+        createdAt: new Date().toISOString(),
+      });
+    }
     if (delta !== 0) {
       txns.push({
         id: uid(),

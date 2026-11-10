@@ -13,7 +13,7 @@ import { Fragment, Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import {
-  ClipboardCheck, Plus, Search, Coins, AlertTriangle, Inbox, ChevronLeft, StickyNote, Trash2,
+  ClipboardCheck, Plus, Search, Coins, AlertTriangle, Inbox, ChevronLeft, StickyNote, Trash2, Pencil,
 } from 'lucide-react';
 import { TopBar } from '@/components/TopBar';
 import { Sheet } from '@/components/Sheet';
@@ -578,13 +578,23 @@ function ExamCells({ e, halaqaOf, dim = false, onDelete }: {
             </Tooltip>
           : <span className="text-ink-300">—</span>}
       </td>
-      <td className="w-9 px-2 py-3">
+      <td className="w-24 px-2 py-3">
         {onDelete && (
+          <div className="flex items-center justify-end gap-0.5">
+          {/* «المشرف يبي يعدل على الاختبار تم اجراءه بدون ما يحذفه» (client,
+              10 Nov 2026) — the recording form, opened on this record. */}
+          <Link href={`/admin/exams/new?edit=${e.id}`} onClick={(ev) => ev.stopPropagation()}
+            data-tour="exam-edit"
+            title="تعديل هذا الاختبار" aria-label="تعديل هذا الاختبار"
+            className="rounded p-2.5 text-ink-600 transition-colors hover:bg-brand-100 hover:text-brand-800">
+            <Pencil size={14} />
+          </Link>
           <button onClick={(ev) => { ev.stopPropagation(); onDelete(e); }}
             title="حذف هذا الاختبار" aria-label="حذف هذا الاختبار"
-            className="rounded p-1.5 text-ink-300 transition-colors hover:bg-risk-100 hover:text-risk-700">
+            className="rounded p-2.5 text-ink-500 transition-colors hover:bg-risk-100 hover:text-risk-700">
             <Trash2 size={14} />
           </button>
+          </div>
         )}
       </td>
     </>

@@ -17,7 +17,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ClipboardCheck, AlertTriangle, ArrowRight, Check, Coins, FileText, Minus, Plus,
-  Trash2, X, CalendarCheck,
+  Trash2, X, CalendarCheck, Pencil,
 } from 'lucide-react';
 import { TopBar } from '@/components/TopBar';
 import { Sheet, SheetHead } from '@/components/Sheet';
@@ -37,7 +37,7 @@ import {
 import { type Exam, type Track } from '@/lib/types';
 import { SURAHS } from '@/lib/surahs';
 import { shortName } from '@/lib/normalise';
-import { isoDate } from '@/lib/dates';
+import { formatDate, isoDate } from '@/lib/dates';
 import { cx } from '@/lib/cx';
 
 const TYPES: ExamType[] = ['BADGE_GOLDEN', 'BADGE_DIAMOND', 'ASSOCIATION', 'MOCK', 'TAJWEED'];
@@ -159,6 +159,48 @@ function RecordExam() {
     if (booking.level !== null) setLevel(String(booking.level));
   }, [booking, appliedBooking]);
 
+  /* ── editing a sitting already recorded ───────────────────────────────────
+     «المشرف يبي يعدل على الاختبار تم اجراءه بدون ما يحذفه» (client, 10 Nov
+     2026). The same form, opened on the record: every field filled from it,
+     and saving writes the SAME exam back — same id, so `store.saveExam`
+     reconciles its points against what the ledger already paid instead of
+     paying twice. Deleting and re-entering lost the questions and the date
+     it was first written. */
+  const editId = sp.get('edit');
+  const editing = editId ? db.exams.find((e) => e.id === editId) ?? null : null;
+  const [appliedEdit, setAppliedEdit] = useState<string | null>(null);
+  useEffect(() => {
+    if (!editing || appliedEdit === editing.id) return;
+    setAppliedEdit(editing.id);
+    setStudentId(editing.studentId);
+    setType(editing.type as ExamType);
+    setTakenOn(editing.takenOn);
+    setLevel(editing.level !== null ? String(editing.level) : '');
+    setAjza(editing.ajza !== null ? String(editing.ajza) : '');
+    const rows = db.examQuestions
+      .filter((q) => q.examId === editing.id)
+      .sort((a, b) => a.seq - b.seq)
+      .map((q): QRow => ({
+        id: q.id, surah: q.surah, ayahFrom: q.ayahFrom,
+        errors: q.errors ? String(q.errors) : '', warnings: q.warnings ? String(q.warnings) : '',
+        tajweed: q.tajweedErrors ? String(q.tajweedErrors) : '', note: q.note,
+      }));
+    setQuestions(rows.length ? rows : freshRows());
+    setErrorsOverride(editing.errors !== null ? String(editing.errors) : null);
+    setWarningsOverride(editing.warnings !== null ? String(editing.warnings) : null);
+    setTajweedOverride(editing.tajweedErrors !== null ? String(editing.tajweedErrors) : null);
+    setScoreOverride(editing.score !== null ? String(editing.score) : null);
+    setPassOverride(editing.passed);
+    setPointsOverride(String(editing.pointsAwarded));
+    setPointsPaid(editing.pointsPaid);
+    setTopics(editing.tajweedTopics);
+    setNote(editing.note);
+    setExaminer(editing.examiner);
+  }, [editing, appliedEdit, db.examQuestions]);
+  /* While the form still shows the record as it was loaded, the suggestion
+     chain below must not overwrite it with today's figures. */
+  const asLoaded = !!editing && appliedEdit === editing.id;
+
   const student = db.students.find((s) => s.id === studentId) ?? null;
   const halaqa = student?.halaqaId ? db.halaqat.find((h) => h.id === student.halaqaId) ?? null : null;
   /* A talqeen student can be EXAMINED — the client records his association
@@ -173,11 +215,13 @@ function RecordExam() {
   // level ← the student's current level
   useEffect(() => {
     if (!student) return;
+    if (asLoaded && editing && student.id === editing.studentId) return;
     /* …unless a booking already said which level this sitting is on. It was
        fixed when the appointment was made, and the roster may have moved since;
        the appointment is what the boy came to sit. */
     if (booking && booking.studentId === student.id && booking.level !== null) return;
     setLevel(student.currentLevel !== null ? String(student.currentLevel) : '');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [student, booking]);
 
   const levelNum = level === '' ? null : Number(level);
@@ -188,7 +232,10 @@ function RecordExam() {
 
   // ajza ← the level, via §4.2
   useEffect(() => {
+    if (asLoaded && editing && studentId === editing.studentId
+      && level === (editing.level !== null ? String(editing.level) : '')) return;
     setAjza(suggestedAjza !== null ? String(suggestedAjza) : '');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [suggestedAjza]);
 
   /* ── the questions, and the totals they add up to ─────────────────────────
@@ -258,7 +305,9 @@ function RecordExam() {
 
   // a type change invalidates every override downstream of it
   useEffect(() => {
+    if (asLoaded && editing && type === editing.type) return;
     setScoreOverride(null); setPassOverride(null); setPointsOverride(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [type]);
 
   /* Talqeen students are not offered at all. They have no level and no
@@ -335,6 +384,9 @@ function RecordExam() {
     : null;
 
   const reset = () => {
+    /* «سجّل اختبارًا آخر» after an edit is a NEW exam: leave the edit link,
+       or the next save would write over the one just corrected. */
+    if (editId) router.replace('/admin/exams/new');
     setStudentId(''); setType('BADGE_GOLDEN'); setTakenOn(isoDate(new Date()));
     setLevel(''); setAjza(''); setQuestions(freshRows());
     setErrorsOverride(null); setWarningsOverride(null); setTajweedOverride(null);
@@ -344,11 +396,15 @@ function RecordExam() {
 
   const save = () => {
     if (!valid || !student) return;
+    /* An edit keeps the record's identity: its id (the ledger points at it),
+       when it was first written, where it came from, and — for the same
+       student — the halaqa he sat it in, which a later move must not rewrite. */
+    const same = editing && editing.studentId === student.id ? editing : null;
     const exam: Exam = {
-      id: uid(),
+      id: editing?.id ?? uid(),
       studentId: student.id,
-      halaqaId: student.halaqaId,
-      track: student.track,
+      halaqaId: same ? same.halaqaId : student.halaqaId,
+      track: same?.track ?? student.track,
       type,
       takenOn,
       level: levelled ? levelNum : null,
@@ -363,8 +419,8 @@ function RecordExam() {
       note: note.trim(),
       examiner: examiner.trim(),
       tajweedTopics: type === 'TAJWEED' ? topics : [],
-      source: 'MANUAL',
-      createdAt: new Date().toISOString(),
+      source: editing?.source ?? 'MANUAL',
+      createdAt: editing?.createdAt ?? new Date().toISOString(),
     };
     store.saveExam(exam);
     /* The questions belong to the exam, so they are written with it and under
@@ -381,7 +437,7 @@ function RecordExam() {
     /* Settle the appointment in the same action. Without this the sitting is in
        the log and the booking is still «محجوز», so the overview goes on calling
        for a boy who has already been heard. */
-    if (booking) store.closeBooking(booking.id, exam.id);
+    if (booking && !editing) store.closeBooking(booking.id, exam.id);
     const after = suggestionAfter(exam, exam.level);
     setSaved({ exam, studentName: student.fullName, nextLevel: after?.printLevel ?? null });
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -417,7 +473,7 @@ function RecordExam() {
               </span>
               <div className="min-w-0 flex-1">
                 <h2 className="font-display text-t1 text-ink-900">
-                  سُجِّل {EXAM_TYPE_AR[saved.exam.type as ExamType]} للطالب {saved.studentName}
+                  {editing ? 'عُدِّل' : 'سُجِّل'} {EXAM_TYPE_AR[saved.exam.type as ExamType]} للطالب {saved.studentName}
                 </h2>
                 <p className="mt-1.5 text-base2 text-ink-700">
                   الدرجة <Num className="font-medium">{saved.exam.score}</Num> من{' '}
@@ -481,7 +537,7 @@ function RecordExam() {
 
   return (
     <>
-      <TopBar title="تسجيل اختبار" crumbs={['الاختبارات']}
+      <TopBar title={editing ? 'تعديل اختبار' : 'تسجيل اختبار'} crumbs={['الاختبارات']}
         panelOpen={panelOpen} onOpenPanel={() => setPanelOpen(true)}
         action={<Link href="/admin/exams"><Btn>سجلّ الاختبارات</Btn></Link>} />
 
@@ -489,7 +545,16 @@ function RecordExam() {
         {/* Where this form came from, when it came from an appointment — so the
             prefilled fields are explained rather than merely surprising, and so
             he knows the booking will close itself when he saves. */}
-        {booking && (
+        {editing && (
+          <div className="rise mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-warn-200 bg-warn-100/50 px-4 py-3">
+            <Pencil size={17} className="shrink-0 text-warn-700" />
+            <p className="min-w-0 flex-1 text-base2 text-ink-800">
+              تعديل اختبار مسجَّل في <Num>{formatDate(editing.takenOn)}</Num> — غيّر ما تريد ثم احفظ.
+              إن تغيّرت النقاط صُحِّح رصيد الطالب بالفرق وحده.
+            </p>
+          </div>
+        )}
+        {booking && !editing && (
           <div className="rise mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3">
             <CalendarCheck size={17} className="shrink-0 text-brand-800" />
             <p className="min-w-0 flex-1 text-base2 text-ink-800">
@@ -828,7 +893,7 @@ function RecordExam() {
                   : missing}
               </p>
               <Btn variant="primary" size="lg" icon={Check} onClick={save} disabled={!valid}>
-                حفظ الاختبار
+                {editing ? 'حفظ التعديل' : 'حفظ الاختبار'}
               </Btn>
             </div>
           </>
