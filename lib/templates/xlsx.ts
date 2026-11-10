@@ -370,7 +370,7 @@ function progressSheet(wb: Workbook, tracks: { name: string; levels: number[]; l
       row.getCell(2).value = level;
       const rng = (c: string) => `'${t.name}'!$${c}$5:$${c}$${t.last}`;
       row.getCell(3).value = {
-        formula: `COUNTIFS(${rng('A')},B${r},${rng('D')},"?*",${rng('D')},"<>الوسام*")`,
+        formula: `COUNTIFS(${rng('A')},B${r},${rng('D')},"?*",${rng('D')},"<>الوسام*",${rng('D')},"<>-")`,
       } as ExcelJSNS.CellFormulaValue;
       row.getCell(4).value = { formula: `IF(C${r}=0,"فارغ — يبقى كما هو في النظام","يُرفع ويستبدل هذا المستوى")` } as ExcelJSNS.CellFormulaValue;
       for (let c = 1; c <= 4; c++) {

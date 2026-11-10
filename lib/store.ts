@@ -1029,13 +1029,14 @@ export const store = {
 
 
   /* ── Curriculum & plans — SPEC.md §3.2/§3.3, approved PDF §9 (إد-٥-أ) ───────
-     The curriculum is reference data: it is REPLACED per track on import, not
-     merged, because a re-upload of «منهج الحفظ» is a corrected file rather than
-     an addition. Student plans and their overrides survive it untouched — a
+     The curriculum is reference data: each level a file carries is REPLACED
+     whole on import, not merged, because a re-upload of «منهج الحفظ» is a
+     corrected file rather than an addition. Levels the file does not carry —
+     or leaves blank, as the upload template does — are left alone. Student plans and their overrides survive it untouched — a
      supervisor fixing a typo in the curriculum must not lose the sheets he has
      already issued. */
 
-  /** Replace one track's curriculum. The other track, and every plan, stand. */
+  /** Replace the levels these days carry. Every other level, and every plan, stand.*/
   /** One upload, every kind of row it carried. The screens do not each get
       their own uploader: a file that holds students and exams and plan dates
       should fill all three in one commit, or the halves fall out of step. */
@@ -1073,6 +1074,10 @@ export const store = {
     const plans = (payload.plans ?? []).map((p) => ({ ...p, studentId: resolve(p.studentId)! }));
 
     if (payload.curriculum?.length) {
+      /* Without this the state save leaves the curriculum out (see the
+         `curriculumDirty` spread in the save), and an upload through «رفع
+         الملفات» stays in this browser only. */
+      curriculumDirty = true;
       let curriculum = next.curriculum;
       for (const c of payload.curriculum) {
         const levels = new Set(c.days.map((d) => d.level));

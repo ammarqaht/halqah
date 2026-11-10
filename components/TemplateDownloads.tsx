@@ -32,7 +32,7 @@ export function TemplateButton({ k, label, icon: Ico = Download, variant = 'quie
   const [failed, setFailed] = useState(false);
   const go = async () => {
     setBusy(true); setFailed(false);
-    try { await build(k); } catch { setFailed(true); }
+    try { await build(k); } catch (e) { console.error('template build failed', e); setFailed(true); }
     setBusy(false);
   };
   return (
