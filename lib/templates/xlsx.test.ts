@@ -63,10 +63,9 @@ describe('table templates', () => {
     const out = readWorkbook(read(await wb.xlsx.writeBuffer() as ArrayBuffer), 't.xlsx', [student]);
     expect(out.payload.exams).toHaveLength(1);
     expect(out.payload.exams[0]).toMatchObject({ studentId: 's1', type: 'BADGE_GOLDEN', level: 45, score: 95, passed: true });
-    /* The day itself is not asserted: SheetJS reads a date cell as 23:59:08 the
-       evening before in UTC+3, and toIsoDate takes that evening — a known
-       one-day shift that predates the templates (reported, not fixed here). */
-    expect(out.payload.exams[0].takenOn).toMatch(/^2026-11-(09|10)$/);
+    /* SheetJS reads this cell as 23:59:08 on the 9th in UTC+3; the day must
+       still come out as the 10th. */
+    expect(out.payload.exams[0].takenOn).toBe('2026-11-10');
   });
 });
 

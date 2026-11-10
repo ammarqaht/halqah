@@ -30,7 +30,15 @@ export function examTypeFrom(text: unknown, fallback: ExamType = 'ASSOCIATION'):
 /** Excel gives a Date for date cells and a string when the column was text. */
 export function toIsoDate(v: unknown): string | null {
   if (v instanceof Date && !isNaN(v.getTime())) {
-    return `${v.getFullYear()}-${String(v.getMonth() + 1).padStart(2, '0')}-${String(v.getDate()).padStart(2, '0')}`;
+    /* SheetJS turns a date cell into LOCAL midnight measured against the 1899
+       epoch, and in Riyadh that epoch carries the old +3:06:52 offset — so
+       10/11 arrives as 23:59:08 on the 9th, and every imported exam and plan
+       landed a day early. A date cell has no time of day; anything within two
+       minutes of midnight is that midnight. (Migration 20261110120000 moved
+       the rows the shift had already written.) */
+    const near = new Date(v.getTime() + 120_000);
+    const d = near.getHours() === 0 && near.getMinutes() < 3 ? near : v;
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
   const s = collapse(v);
   if (!s) return null;
