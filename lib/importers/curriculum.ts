@@ -49,6 +49,10 @@ export type CurriculumParse = {
   levels: number[];
   rowCount: number;
   issues: CurriculumIssue[];
+  /** Levels laid out in the file with nothing written in them — the upload
+      template carries every level, and the supervisor may fill only one.
+      Dropped, so they never replace what the system already holds. */
+  emptyLevels: number[];
 };
 
 const HEADERS: Record<string, string> = {
@@ -133,6 +137,22 @@ export function parseCurriculumSheet(rows: unknown[][], sheet: string, track: Tr
     });
   }
 
+  /* A level with not one range written is a blank in the template, not a
+     level with an empty curriculum. Drop it whole — its exam markers too —
+     so that uploading a template with one level filled touches that level
+     only. «-» is how the file writes «nothing here» and counts as empty. */
+  const written = (v: string) => Boolean(v) && v !== '-';
+  const hasContent = new Set(days
+    .filter((d) => written(d.fromSurah) || written(d.toSurah))
+    .map((d) => d.level));
+  const allLevels = new Set([...days.map((d) => d.level), ...examDays.map((e) => e.level)]);
+  const emptyLevels = [...allLevels].filter((l) => !hasContent.has(l)).sort((a, b) => b - a);
+  if (emptyLevels.length) {
+    const keep = (l: number) => hasContent.has(l);
+    days.splice(0, days.length, ...days.filter((d) => keep(d.level)));
+    examDays.splice(0, examDays.length, ...examDays.filter((e) => keep(e.level)));
+  }
+
   /* §5.4: «assert 24 days × 3 kinds for every level, or fail loudly». The
      exam days occupy two of the twenty-four and carry no rows, so a complete
      level has 22 recitation days × 3 kinds = 66 rows. Report, never repair. */
@@ -142,8 +162,11 @@ export function parseCurriculumSheet(rows: unknown[][], sheet: string, track: Tr
     byLevel.get(d.level)!.add(d.dayNo);
   }
   for (const [level, dayset] of byLevel) {
-    const examCount = examDays.filter((e) => e.level === level).length;
-    const total = dayset.size + examCount;
+    /* The exam day's own م.ص and درس lines are kind rows too, so the day is
+       already in `dayset`: a union, not a sum — the sum read every complete
+       level as «26 يومًا بدل ٢٤». */
+    const total = new Set([...dayset,
+      ...examDays.filter((e) => e.level === level).map((e) => e.dayNo)]).size;
     if (total !== 24) {
       issues.push({
         level,
@@ -169,6 +192,7 @@ export function parseCurriculumSheet(rows: unknown[][], sheet: string, track: Tr
     levels: [...byLevel.keys()].sort((a, b) => b - a),
     rowCount,
     issues,
+    emptyLevels,
   };
 }
 

@@ -112,7 +112,8 @@ export function readWorkbook(
           { header: 1, blankrows: false, defval: null });
         const c = parseCurriculumSheet(grid, scan.sheet, track);
         out.push({ kind: 'CURRICULUM', scan, curriculum: c, track });
-        curriculum.push({ track, days: c.days });
+        /* A blank template sheet: nothing to replace, so nothing to commit. */
+        if (c.days.length) curriculum.push({ track, days: c.days });
         break;
       }
       default:

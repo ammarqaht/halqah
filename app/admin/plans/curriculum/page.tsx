@@ -2,16 +2,17 @@
 /* رفع منهج الحفظ — SPEC.md §5.4, the reference data every plan is built from.
 
    Follows the importer contract in §5: parse is pure, **a preview is always
-   shown before anything is written**, and the commit replaces one track at a
-   time. Re-uploading is the normal case — a corrected file, not an addition —
-   so a track's curriculum is REPLACED rather than merged. Student plans and
-   their overrides survive untouched.
+   shown before anything is written**, and the commit replaces the LEVELS the
+   file carries — every one of them whole, the rest untouched. Re-uploading a
+   corrected file is the normal case; so is the upload template with one level
+   filled, whose blank levels the parser drops. Student plans and their
+   overrides survive untouched.
 
    The parser is loud on purpose (§5.4: «assert 24 days for every level, or fail
    loudly»). This file becomes the content of every sheet a child is handed. */
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { UploadCloud, FileSpreadsheet, AlertTriangle, Check, BookOpen } from 'lucide-react';
+import { UploadCloud, FileSpreadsheet, AlertTriangle, Check, BookOpen, Download, FileDown } from 'lucide-react';
 import { TopBar } from '@/components/TopBar';
 import { Sheet, SheetHead } from '@/components/Sheet';
 import { Btn, Empty, Chip } from '@/components/ui';
@@ -22,6 +23,7 @@ import { coverage } from '@/lib/curriculum';
 import { parseCurriculumWorkbook, type CurriculumParse } from '@/lib/importers/curriculum';
 import { TRACK_AR } from '@/lib/types';
 import { cx } from '@/lib/cx';
+import { TemplateButton } from '@/components/TemplateDownloads';
 
 export default function CurriculumImport() {
   const { panelOpen, setPanelOpen } = usePanel();
@@ -55,7 +57,7 @@ export default function CurriculumImport() {
 
   const commit = () => {
     if (!parsed) return;
-    for (const p of parsed) store.replaceCurriculum(p.track, p.days, fileName);
+    for (const p of parsed) if (p.levels.length) store.replaceCurriculum(p.track, p.days, fileName);
     setDone(`اعتُمد المنهج من «${fileName}».`);
     setParsed(null);
   };
@@ -97,6 +99,23 @@ export default function CurriculumImport() {
         <Sheet className="rise mb-4">
           <SheetHead title="رفع الملف"
             meta="ثمانية أعمدة: المستوى · اليوم · المقرر · من سورة · آية · الى سورة · آية · ملاحظة" />
+
+          {/* the template: every level laid out, exam days marked, surahs in a list */}
+          <div data-tour="curriculum-template"
+            className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3.5">
+            <div className="min-w-0 flex-1">
+              <p className="text-body font-medium text-brand-900">قالب جاهز للتعبئة</p>
+              <p className="mt-0.5 text-panel text-ink-600">
+                المستويات كلها، ٢٤ يومًا لكل مستوى، واليومان ١٢ و٢٤ للاختبارات. عبّئ ما تريد وارفعه.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <TemplateButton k="CURRICULUM" label="قالب فارغ" icon={Download} tour="curriculum-template-blank" />
+              {loaded.length > 0 && (
+                <TemplateButton k="CURRICULUM_CURRENT" label="المنهج الحالي للتعديل" icon={FileDown} variant="default" />
+              )}
+            </div>
+          </div>
           <label className={cx('flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed px-6 py-10 text-center transition-colors',
             busy ? 'border-ink-200 bg-page' : 'border-ink-300 hover:border-brand-400 hover:bg-brand-50')}>
             <UploadCloud size={26} strokeWidth={1.7} className="text-ink-400" />
@@ -130,7 +149,9 @@ export default function CurriculumImport() {
                     <h3 className="text-lg2 font-bold text-ink-900">ورقة «{p.sheet}»</h3>
                     <Chip tone="brand">{TRACK_AR[p.track]}</Chip>
                   </div>
-                  {p.issues.length === 0
+                  {p.levels.length === 0
+                    ? <Chip tone="ink">فارغة — لا شيء يُرفع منها</Chip>
+                    : p.issues.length === 0
                     ? <Chip tone="ok"><Check size={10} />كل المستويات ٢٤ يومًا</Chip>
                     : <Chip tone="warn"><AlertTriangle size={10} />
                         <Num>{p.issues.length}</Num> مستوى يحتاج مراجعة</Chip>}
@@ -149,6 +170,13 @@ export default function CurriculumImport() {
                     </div>
                   ))}
                 </div>
+
+                {p.emptyLevels.length > 0 && (
+                  <p className="mt-4 rounded-lg bg-page px-3.5 py-2.5 text-panel text-ink-600">
+                    <Num>{p.emptyLevels.length}</Num> {p.emptyLevels.length === 1 ? 'مستوى فارغ' : 'مستويات فارغة'} في الملف
+                    {' '}— لن {p.emptyLevels.length === 1 ? 'يُرفع، ويبقى' : 'تُرفع، وتبقى'} كما هي في النظام.
+                  </p>
+                )}
 
                 {p.levels.length > 0 && (
                   <p className="mt-4 text-panel text-ink-600">
@@ -211,13 +239,14 @@ export default function CurriculumImport() {
 
             <div className="rise sticky bottom-0 -mx-6 flex flex-wrap items-center justify-between gap-4 border-t border-ink-150 bg-page/90 px-6 py-3.5 backdrop-blur-md">
               <p className="text-panel text-ink-600">
-                الاعتماد يستبدل منهج{' '}
-                {parsed.map((p) => `المسار ${TRACK_AR[p.track]}`).join(' و')} بالكامل.
-                الخطط المُصدَرة للطلاب وتعديلاتها لا تُمَسّ.
+                الاعتماد يستبدل المستويات الموجودة في الملف فقط
+                {' '}({parsed.filter((p) => p.levels.length).map((p) => `${TRACK_AR[p.track]}: ${p.levels.length}`).join('، ')}).
+                باقي المستويات والخطط المُصدَرة للطلاب وتعديلاتها لا تُمَسّ.
               </p>
               <div className="flex items-center gap-2">
                 <Btn onClick={() => setParsed(null)}>إلغاء</Btn>
-                <Btn variant="primary" icon={BookOpen} onClick={commit}>اعتماد المنهج</Btn>
+                <Btn variant="primary" icon={BookOpen} onClick={commit}
+                  disabled={!parsed.some((p) => p.levels.length)}>اعتماد المنهج</Btn>
               </div>
             </div>
           </>

@@ -1075,7 +1075,8 @@ export const store = {
     if (payload.curriculum?.length) {
       let curriculum = next.curriculum;
       for (const c of payload.curriculum) {
-        curriculum = [...curriculum.filter((d) => d.track !== c.track), ...c.days];
+        const levels = new Set(c.days.map((d) => d.level));
+        curriculum = [...curriculum.filter((d) => !(d.track === c.track && levels.has(d.level))), ...c.days];
       }
       next = { ...next, curriculum };
     }
@@ -1141,10 +1142,17 @@ export const store = {
 
   replaceCurriculum(track: Student['track'], days: CurriculumDay[], sourceFile: string) {
     curriculumDirty = true;
+    const levels = new Set(days.map((d) => d.level));
     const cur = load();
     commit({
       ...cur,
-      curriculum: [...cur.curriculum.filter((d) => d.track !== track), ...days],
+      /* Per level, not per track: a file replaces the levels it carries and
+         leaves the rest alone. The parser has already dropped levels the file
+         left blank, so a template with one level filled changes one level. */
+      curriculum: [
+        ...cur.curriculum.filter((d) => !(d.track === track && levels.has(d.level))),
+        ...days,
+      ],
       importedAt: new Date().toISOString(),
       sourceFile,
     });

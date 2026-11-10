@@ -41,7 +41,11 @@ const SIGNATURES: { kind: FileKind; need: string[]; exclude?: string[]; weight?:
   { kind: 'PLAN_LOG',   need: ['اسم الطالب', 'المسار', 'المستوى', 'معلم الحلقة'],
                         exclude: ['نوع الاختبار', 'الدرجة النهائية', 'عدد الاخطاء'], weight: 2 },
   { kind: 'CURRICULUM', need: ['المستوى', 'اليوم', 'المقرر', 'من سورة'], weight: 4 },
-  { kind: 'ROSTER',     need: ['اسم الطالب', 'الحلقة', 'رقم الهوية', 'المسار'], weight: 3 },
+  /* An exam log that also carries «رقم الهوية» (the upload template does)
+     holds every roster header too — «معلم الحلقة» contains «الحلقة» — and
+     outscores EXAMS. A score column is what a roster never has. */
+  { kind: 'ROSTER',     need: ['اسم الطالب', 'الحلقة', 'رقم الهوية', 'المسار'],
+                        exclude: ['نوع الاختبار', 'الدرجة النهائية', 'درجة الاختبار'], weight: 3 },
 ];
 
 export type SheetScan = {

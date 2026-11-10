@@ -25,6 +25,7 @@ import { useDB, store, flushToServer, ensureCurriculum } from '@/lib/store';
 import { shortName } from '@/lib/normalise';
 import { TRACK_AR } from '@/lib/types';
 import { cx } from '@/lib/cx';
+import { TemplateGallery } from '@/components/TemplateDownloads';
 
 type Job = { id: string; name: string; read: WorkbookRead | null; error?: string };
 const uid = () => Math.random().toString(36).slice(2, 9);
@@ -237,6 +238,8 @@ export default function ImportPage() {
             ولن يُحفظ شيء قبل أن تراجع المعاينة وتضغط «اعتماد».
           </p>
         </header>
+
+        {jobs.length === 0 && <TemplateGallery />}
 
         {/* ── drop zone ──────────────────────────────────────────────────── */}
         <div onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
