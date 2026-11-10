@@ -20,7 +20,7 @@
    ───────────────────────────────────────────────────────────────────────── */
 import type { LucideIcon } from 'lucide-react';
 import {
-  ArrowLeftCircle, BookOpenCheck, Pencil, Coins, Smartphone, Calculator, KeyRound, LogIn, TrendingUp, UserCheck, CalendarDays, ClipboardList, Crown, Eye, FileSpreadsheet, GraduationCap,
+  ArrowLeftCircle, BookOpenCheck, EyeOff, Pencil, Coins, Smartphone, Calculator, KeyRound, LogIn, TrendingUp, UserCheck, CalendarDays, ClipboardList, Crown, Eye, FileSpreadsheet, GraduationCap,
   Layers3, ListChecks, MessageSquareText, Printer, ShieldCheck, Store, Users,
 } from 'lucide-react';
 
@@ -52,6 +52,31 @@ export type Release = {
 };
 
 export const RELEASES: Release[] = [
+  {
+    id: '2026-11-10-alerts-go-hide',
+    date: '2026-11-10',
+    audience: ['admin'],
+    title: 'التنبيهات: اضغط لتذهب، وأخفِ ما رأيته',
+    summary:
+      'في «ما يحتاج تدخّلك» بالصفحة الرئيسية، كل تنبيه يأخذك إلى قائمته بضغطة، وبجانبه عين تخفيه إن كنت اطّلعت عليه.',
+    points: [
+      { icon: ArrowLeftCircle, title: 'اضغط التنبيه',
+        body: 'يفتح لك الطلاب أو الحجوزات أو المتجر الذي يتكلّم عنه التنبيه مباشرة.' },
+      { icon: EyeOff, title: 'العين تخفيه',
+        body: 'ويرجع وحده إذا زاد العدد، أي إذا جدّ شيء جديد يستحق نظرك.' },
+      { icon: Eye, title: 'إظهار المخفية',
+        body: 'زرّ أسفل التنبيهات يُعيد كل ما أخفيته.' },
+    ],
+    tour: {
+      href: '/admin',
+      steps: [
+        { target: 'alert-row', title: 'اضغط التنبيه',
+          body: 'يأخذك إلى القائمة التي يتكلّم عنها — مثلًا من «تأخّر في مستواه» إلى أسماء الطلاب المتأخرين.' },
+        { target: 'alert-row-hide', title: 'عين الإخفاء',
+          body: 'إذا اطّلعت على التنبيه ولا تريده أمامك اضغط العين. يرجع وحده متى زاد عدده.' },
+      ],
+    },
+  },
   {
     id: '2026-11-10-edit-exam',
     date: '2026-11-10',

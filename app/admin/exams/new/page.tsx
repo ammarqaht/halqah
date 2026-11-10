@@ -200,6 +200,14 @@ function RecordExam() {
   /* While the form still shows the record as it was loaded, the suggestion
      chain below must not overwrite it with today's figures. */
   const asLoaded = !!editing && appliedEdit === editing.id;
+  /* The render that FIRST sees the record (a client-side arrival from the
+     pencil, where the store is already in memory) is also the mount, and every
+     effect runs on mount in declaration order — so the suggestion effects
+     below would fire after the load above in the same pass and their setState
+     would win: ajza back to '', score/pass/points overrides back to null. That
+     left the button disabled («عدد الأجزاء مطلوب» / «الدرجة مطلوبة»). Until
+     the record has been applied, none of them may touch the form. */
+  const pendingEdit = !!editing && appliedEdit !== editing.id;
 
   const student = db.students.find((s) => s.id === studentId) ?? null;
   const halaqa = student?.halaqaId ? db.halaqat.find((h) => h.id === student.halaqaId) ?? null : null;
@@ -214,7 +222,7 @@ function RecordExam() {
 
   // level ← the student's current level
   useEffect(() => {
-    if (!student) return;
+    if (!student || pendingEdit) return;
     if (asLoaded && editing && student.id === editing.studentId) return;
     /* …unless a booking already said which level this sitting is on. It was
        fixed when the appointment was made, and the roster may have moved since;
@@ -232,6 +240,7 @@ function RecordExam() {
 
   // ajza ← the level, via §4.2
   useEffect(() => {
+    if (pendingEdit) return;
     if (asLoaded && editing && studentId === editing.studentId
       && level === (editing.level !== null ? String(editing.level) : '')) return;
     setAjza(suggestedAjza !== null ? String(suggestedAjza) : '');
@@ -305,6 +314,7 @@ function RecordExam() {
 
   // a type change invalidates every override downstream of it
   useEffect(() => {
+    if (pendingEdit) return;
     if (asLoaded && editing && type === editing.type) return;
     setScoreOverride(null); setPassOverride(null); setPointsOverride(null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -366,10 +376,15 @@ function RecordExam() {
   /* Talqeen has no level and no curriculum (§13.1), so neither field can be
      demanded of him — the same reasoning that exempts a tajweed sitting. */
   const levelled = type !== 'TAJWEED' && student?.track !== 'TALQEEN';
-  const levelValid = !levelled
+  /* An edit does not demand what the record never had: an imported sitting
+     with a blank level, or «لم يحضر» with no score, is saved as it stands —
+     the supervisor came to correct one thing, not to invent the rest. */
+  const keepBlank = (f: 'level' | 'ajza' | 'score') => !!editing && editing[f] === null;
+  const levelValid = !levelled || (level === '' && keepBlank('level'))
     || (levelNum !== null && levelNum >= LEVEL_MIN && levelNum <= LEVEL_MAX);
-  const ajzaValid = !levelled || (ajza !== '' && Number(ajza) > 0);
-  const scoreValid = score !== null && score >= 0 && score <= scoreMax(type);
+  const ajzaValid = !levelled || (ajza === '' && keepBlank('ajza')) || (ajza !== '' && Number(ajza) > 0);
+  const scoreValid = (score === null && keepBlank('score'))
+    || (score !== null && score >= 0 && score <= scoreMax(type));
 
   const valid = !!student && !blocked && takenOn !== ''
     && (type !== 'TAJWEED' || topics.length > 0)

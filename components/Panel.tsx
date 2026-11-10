@@ -1,7 +1,7 @@
 'use client';
 /* Tier 2 — the contextual panel. Not a submenu: it re-tools itself per section
    so the supervisor filters without leaving the results (DESIGN.md §4). */
-import { PanelRightClose } from 'lucide-react';
+import { ChevronLeft, EyeOff, PanelRightClose } from 'lucide-react';
 import { Num } from '@/components/Num';
 import { cx } from '@/lib/cx';
 
@@ -60,5 +60,34 @@ export function PanelItem({ children, sub, count, tone, active, onClick, tour }:
         </span>
       )}
     </button>
+  );
+}
+
+/* One line of «تنبيهات»: the line itself goes where the alert is about, and
+   the eye beside it puts it away. «في التنبيهات… يضغط علامة العين عشان يختفي»
+   (client, 10 Nov 2026). Two buttons side by side, never one inside the
+   other — a button nested in a button is invalid and swallows the click. */
+export function AlertItem({ children, count, tone, onGo, onHide, tour }:
+  { children: React.ReactNode; count: number; tone: 'risk' | 'warn' | 'info' | 'ok';
+    onGo: () => void; onHide: () => void; tour?: string }) {
+  const dot = { risk: 'bg-risk-500', warn: 'bg-warn-500', info: 'bg-info-500', ok: 'bg-ok-500' }[tone];
+  const label = typeof children === 'string' ? children : 'التنبيه';
+  return (
+    <div className="group mb-0.5 flex items-center rounded-md transition-colors duration-150 hover:bg-ink-100">
+      <button onClick={onGo} data-tour={tour} title={`افتح: ${label}`}
+        className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md py-2 ps-2 text-start text-ink-700">
+        <span className={cx('h-1.5 w-1.5 shrink-0 rounded-full', dot)} />
+        <span className="min-w-0 flex-1 truncate text-panel">{children}</span>
+        <span className="shrink-0 rounded bg-ink-100 px-1.5 py-0.5 text-2xs font-medium text-ink-600 group-hover:bg-paper">
+          <Num>{count}</Num>
+        </span>
+        <ChevronLeft size={14} strokeWidth={2} aria-hidden className="shrink-0 text-ink-500 group-hover:text-brand-800" />
+      </button>
+      <button onClick={onHide} data-tour={tour ? `${tour}-hide` : undefined}
+        title="إخفاء هذا التنبيه" aria-label={`إخفاء: ${label}`}
+        className="me-0.5 grid h-9 w-9 shrink-0 place-items-center rounded text-ink-500 transition-colors hover:bg-paper hover:text-ink-800">
+        <EyeOff size={14} strokeWidth={1.9} aria-hidden />
+      </button>
+    </div>
   );
 }

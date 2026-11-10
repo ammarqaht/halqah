@@ -1,9 +1,11 @@
 'use client';
 /* The panel's content is chosen by section. Each section gets a surface built
    for its own work — a jump list here, a live filter surface there. DESIGN.md §4. */
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Eye } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
-import { PanelShell, PanelGroup, PanelItem } from '@/components/Panel';
+import { PanelShell, PanelGroup, PanelItem, AlertItem } from '@/components/Panel';
+import { Num } from '@/components/Num';
 import { StudentsPanel } from '@/components/StudentsPanel';
 import { PointsPanel } from '@/components/PointsPanel';
 import { ExamsPanel } from '@/components/ExamsPanel';
@@ -15,6 +17,11 @@ import { useDB } from '@/lib/store';
 import { derive } from '@/lib/derive';
 import { followUpRows, followedRows, listCounts, dueForExamCount } from '@/lib/followup';
 import { isLowStock } from '@/lib/points';
+
+type Alert = {
+  id: string; tone: 'risk' | 'warn' | 'ok'; count: number; label: string; href: string;
+};
+const HIDDEN_KEY = 'halqah.admin.hiddenAlerts.v1';
 
 export function PanelContext({ onClose }: { onClose: () => void }) {
   const path = usePathname();
@@ -46,6 +53,49 @@ export function PanelContext({ onClose }: { onClose: () => void }) {
     };
   }, [db, isOverview]);
 
+  /* Every alert the overview can raise, in the order they are shown. A booked
+     sitting whose day has come is the one alert the supervisor made himself,
+     so it sits above the inferred ones. An alert at zero is absent, never a 0. */
+  const live = useMemo<Alert[]>(() => {
+    if (!overview || overview.d.isEmpty) return [];
+    const o = overview;
+    const all: Alert[] = [
+      { id: 'orphans', tone: 'risk', count: o.d.orphans, label: 'طالب بلا حلقة', href: '/admin/students?halaqa=none' },
+      { id: 'flagged', tone: 'warn', count: o.d.flagged, label: 'رقم هوية يحتاج مراجعة', href: '/admin/students' },
+      { id: 'due', tone: 'risk', count: o.dueExams, label: 'حان موعد اختباره', href: '/admin/exams/onsite' },
+      { id: 'ready', tone: 'ok', count: o.readyCount, label: 'جاهز لاختبار الجمعية', href: '/admin/follow-up?list=ready' },
+      { id: 'late', tone: 'warn', count: o.lateCount, label: 'تأخّر في مستواه', href: '/admin/follow-up?list=late' },
+      { id: 'overdue', tone: 'risk', count: o.overdueCount, label: 'لم يُختبر مؤخرًا', href: '/admin/follow-up?list=unexamined' },
+      { id: 'orders', tone: 'warn', count: o.pendingOrders, label: 'طلبات بانتظار التسليم', href: '/admin/store?status=PENDING' },
+      { id: 'stock', tone: 'warn', count: o.lowStockGifts, label: 'هدية قاربت على النفاد', href: '/admin/store' },
+    ];
+    return all.filter((a) => a.count > 0);
+  }, [overview]);
+
+  /* Hiding is «I have seen this», not «never tell me again»: the eye stores
+     the count it was hidden at, and the alert returns by itself when that
+     count grows — a new boy late on his level is news again. Per device, in
+     this browser; it is a view preference, not a record. */
+  const [hidden, setHidden] = useState<Record<string, number>>({});
+  useEffect(() => {
+    try { setHidden(JSON.parse(localStorage.getItem(HIDDEN_KEY) || '{}') ?? {}); } catch { /* private mode */ }
+  }, []);
+  const saveHidden = (h: Record<string, number>) => {
+    setHidden(h);
+    try { localStorage.setItem(HIDDEN_KEY, JSON.stringify(h)); } catch { /* private mode */ }
+  };
+  const hide = (id: string, count: number) => saveHidden({ ...hidden, [id]: count });
+  const showAll = () => saveHidden({});
+  /* A count that FALLS lowers the mark, so «returns when it grows» means
+     grows from where it is now: hidden at 5, down to 2, up to 4 is news. */
+  useEffect(() => {
+    const lower = live.filter((a) => a.id in hidden && a.count < hidden[a.id]);
+    if (lower.length) saveHidden({ ...hidden, ...Object.fromEntries(lower.map((a) => [a.id, a.count])) });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [live]);
+  const visible = live.filter((a) => !(a.id in hidden) || a.count > hidden[a.id]);
+  const hiddenCount = live.length - visible.length;
+
   if (path.startsWith('/admin/students')) return <StudentsPanel onClose={onClose} />;
   if (path.startsWith('/admin/exams')) return <ExamsPanel onClose={onClose} />;
   if (path.startsWith('/admin/plans')) return <PlansPanel onClose={onClose} />;
@@ -61,7 +111,7 @@ export function PanelContext({ onClose }: { onClose: () => void }) {
   }
 
   if (overview) {
-    const { d, pendingOrders, lowStockGifts, dueExams, readyCount, lateCount, overdueCount } = overview;
+    const { d } = overview;
     return (
       <PanelShell title="ما يحتاج تدخّلك"
         meta={d.sourceFile ? `آخر ملف: ${d.sourceFile}` : 'لم يُرفع ملف بعد'} onClose={onClose}>
@@ -71,48 +121,25 @@ export function PanelContext({ onClose }: { onClose: () => void }) {
           </p>
         ) : (
           <PanelGroup label="تنبيهات">
-            {d.orphans > 0 && (
-              <PanelItem tone="risk" count={d.orphans}
-                onClick={() => router.push('/admin/students?halaqa=none')}>طالب بلا حلقة</PanelItem>
-            )}
-            {d.flagged > 0 && (
-              <PanelItem tone="warn" count={d.flagged}
-                onClick={() => router.push('/admin/students')}>رقم هوية يحتاج مراجعة</PanelItem>
-            )}
-            {/* A booked sitting whose day has come is the only alert here the
-                supervisor made himself, so it outranks the inferred ones: he is
-                not being told something about a boy, he is being reminded of an
-                appointment he set. */}
-            {dueExams > 0 && (
-              <PanelItem tone="risk" count={dueExams}
-                onClick={() => router.push('/admin/exams/onsite')}>حان موعد اختباره</PanelItem>
-            )}
-            {/* SPEC.md §6.1 lists both of these against phase 6, and phase 6 is
-                now built, so they can finally be computed rather than promised.
-                An alert that cannot be computed stays absent; it is never a zero. */}
-            {readyCount > 0 && (
-              <PanelItem tone="ok" count={readyCount}
-                onClick={() => router.push('/admin/follow-up?list=ready')}>جاهز لاختبار الجمعية</PanelItem>
-            )}
-            {lateCount > 0 && (
-              <PanelItem tone="warn" count={lateCount}
-                onClick={() => router.push('/admin/follow-up?list=late')}>تأخّر في مستواه</PanelItem>
-            )}
-            {overdueCount > 0 && (
-              <PanelItem tone="risk" count={overdueCount}
-                onClick={() => router.push('/admin/follow-up?list=unexamined')}>لم يُختبر مؤخرًا</PanelItem>
-            )}
-            {pendingOrders > 0 && (
-              <PanelItem tone="warn" count={pendingOrders}
-                onClick={() => router.push('/admin/store?status=PENDING')}>طلبات بانتظار التسليم</PanelItem>
-            )}
-            {lowStockGifts > 0 && (
-              <PanelItem tone="warn" count={lowStockGifts}
-                onClick={() => router.push('/admin/store')}>هدية قاربت على النفاد</PanelItem>
-            )}
-            {d.orphans === 0 && d.flagged === 0 && pendingOrders === 0 && lowStockGifts === 0
-              && dueExams === 0 && readyCount === 0 && lateCount === 0 && overdueCount === 0 && (
+            {visible.map((a, n) => (
+              <AlertItem key={a.id} tone={a.tone} count={a.count}
+                tour={n === 0 ? 'alert-row' : undefined}
+                onGo={() => router.push(a.href)} onHide={() => hide(a.id, a.count)}>
+                {a.label}
+              </AlertItem>
+            ))}
+            {live.length === 0 && (
               <p className="px-1.5 py-2 text-panel text-ink-500">لا شيء يحتاج تدخّلك الآن.</p>
+            )}
+            {live.length > 0 && visible.length === 0 && (
+              <p className="px-1.5 py-2 text-panel text-ink-500">أخفيت كل التنبيهات.</p>
+            )}
+            {hiddenCount > 0 && (
+              <button onClick={showAll}
+                className="mt-1 flex items-center gap-1.5 rounded px-1.5 py-1 text-micro text-ink-500 transition-colors hover:bg-ink-100 hover:text-ink-800">
+                <Eye size={13} strokeWidth={1.9} aria-hidden />
+                إظهار المخفية (<Num>{hiddenCount}</Num>)
+              </button>
             )}
           </PanelGroup>
         )}
